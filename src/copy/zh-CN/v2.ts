@@ -254,7 +254,7 @@ export const v2Copy = {
     example: '查看示例',
     pricing: '价格',
     configuration: '示例配置',
-    operatorCount: (count: number) => `示例 ${count}`,
+    operatorSample: '示例',
     sampleOwned: (count: number) => `示例中拥有 ${count} 位干员`,
   },
   overview: '排班总览',

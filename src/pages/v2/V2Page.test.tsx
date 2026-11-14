@@ -533,7 +533,7 @@ describe('V2 results-first workspace', () => {
       copy.v2.guestNavigation.example, copy.v2.generateMine, copy.v2.tools, copy.v2.guestNavigation.pricing,
     ])
     const count = SAMPLE_OPERATORS.filter((operator) => operator.own).length
-    expect(navigation.getByRole('button', { name: copy.v2.sidebar.editOperators })).toHaveTextContent(copy.v2.guestNavigation.operatorCount(count))
+    expect(navigation.getByRole('button', { name: copy.v2.sidebar.editOperators }).querySelector('small')).toHaveTextContent(copy.v2.guestNavigation.operatorSample)
     expect(screen.getByText(copy.v2.contextDetails, { selector: 'summary > span' }).closest('details')).not.toHaveAttribute('open')
     await userEvent.click(screen.getByText(copy.v2.contextDetails, { selector: 'summary > span' }))
     expect(screen.getByText(copy.v2.guestNavigation.sampleOwned(count))).toBeVisible()

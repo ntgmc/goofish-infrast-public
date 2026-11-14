@@ -243,6 +243,9 @@
   font-size: var(--text-sm);
 }
 
+.v2-config-shortcut { flex-wrap: wrap; }
+.v2-config-shortcut > span { flex: none; }
+
 .v2-config-shortcut small {
   font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
