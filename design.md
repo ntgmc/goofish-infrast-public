@@ -257,6 +257,21 @@ it deliberately when changing the shared design.
   below the selected row and collapse methods by default. Retain the V2
   palette, fonts, responsive controls and reduced-motion behavior. Frozen data,
   publication fields and verification: [site comparison](docs/site-benchmark.md).
+- Service status uses a bounded reading area, a quiet tinted current-status banner,
+  a single component list and the seven-day hourly history. The palette in
+  `src/pages/v2/pages/service-status.css` consistently maps normal to emerald,
+  expanding capacity to blue, slower processing to ochre, congestion to orange,
+  excessive queuing to vermilion and unavailable to crimson; unknown periods are
+  neutral and hatched. Excessive queuing has diagonal stripes and unavailable
+  periods use crosshatching. Keep text and distinct badge icons alongside color.
+  History cells share the legend palette,
+  scroll locally on narrow screens and expose details on click or keyboard focus.
+  Use one Tab stop in the grid, arrow keys between hours/days and Home/End within
+  the day (Ctrl for the full week). Preserve real samples, missing-data states,
+  refresh recovery and incident updates. OpenAI's [status page](https://status.openai.com/)
+  and DeepSeek's [status page](https://status.deepseek.com/) informed the restrained
+  surfaces, status hierarchy and continuous history marks; retain the V2 shell,
+  typography and real seven-day data contract.
 - Page coverage and verification: [V2 workspace redesign](docs/v2-workspace-redesign.md).
 
 ### Management console (`/admin`)
