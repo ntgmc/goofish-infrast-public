@@ -1089,8 +1089,10 @@ describe('V2 results-first workspace', () => {
     expect(originalRoom.querySelector('.v2-operator')).toBe(originalSlot)
     await user.click(screen.getByRole('button', { name: /贸易站.*巫恋/ }))
     expect(await screen.findByRole('dialog')).toHaveTextContent(copy.v2.roomDetails)
+    expect(originalRoom).toHaveAttribute('data-shared-card-open')
     await dismissDrawer(user)
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(originalRoom).not.toHaveAttribute('data-shared-card-open')
     expect(originalRoom).toHaveFocus()
   })
 

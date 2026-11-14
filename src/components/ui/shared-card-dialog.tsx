@@ -7,8 +7,9 @@ import { motionTokens } from '../MotionPrimitives'
 import { useAppReducedMotion } from '../../lib/motion-preference'
 import './shared-card-dialog.css'
 
-export default function SharedCardDialog({ layoutId, onClose, closeLabel, children, className = '', stationaryContent = false }: {
+export default function SharedCardDialog({ layoutId, source, onClose, closeLabel, children, className = '', stationaryContent = false }: {
   layoutId: string
+  source: HTMLElement | null
   onClose: (surface: HTMLDivElement | null) => void
   closeLabel: string
   children: ReactNode
@@ -18,6 +19,10 @@ export default function SharedCardDialog({ layoutId, onClose, closeLabel, childr
   const reduced = useAppReducedMotion()
   const opener = useRef<HTMLElement | null>(null)
   const surface = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    source?.setAttribute('data-shared-card-open', '')
+    return () => source?.removeAttribute('data-shared-card-open')
+  }, [source])
   useLayoutEffect(() => {
     const guard = (event: WheelEvent) => {
       if (event.ctrlKey) return

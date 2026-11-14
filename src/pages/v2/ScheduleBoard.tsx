@@ -54,6 +54,7 @@ export default memo(function ScheduleBoard({ result, prepared, expanded, onExpan
   showProduction: boolean
 }) {
   const id = useId()
+  const source = useRef<HTMLButtonElement | null>(null)
   const reduced = useAppReducedMotion()
   const [roomKey, setRoomKey] = useState<string | null>(null)
   const [frontRoomKey, setFrontRoomKey] = useState<string | null>(null)
@@ -134,7 +135,7 @@ export default memo(function ScheduleBoard({ result, prepared, expanded, onExpan
           <section key={group.label} className="v2-room-group" aria-label={group.label}>
             <h3 className="v2-room-group-title">{group.label}</h3>
             <div className={`v2-room-grid ${view === 'list' ? 'v2-room-list' : ''}`}>
-              {group.rooms.map((room) => <RoomCard key={room.key} room={room} layoutKey={layoutKey} compact={group.compact} direction={transition.direction} selectedKey={roomKey} front={frontRoomKey === room.key} onClick={() => { setFrontRoomKey(room.key); setRoomKey(room.key) }}
+              {group.rooms.map((room) => <RoomCard key={room.key} room={room} layoutKey={layoutKey} compact={group.compact} direction={transition.direction} selectedKey={roomKey} front={frontRoomKey === room.key} onClick={(button) => { source.current = button; setFrontRoomKey(room.key); setRoomKey(room.key) }}
                 autofill={room.roomType === 'dormitory' && Boolean(plan?.rooms.dormitory?.[room.roomIndex]?.autofill)}
                 drone={isDroneTarget(plan?.drones, room.roomType, room.roomIndex)} />)}
             </div>
@@ -143,7 +144,7 @@ export default memo(function ScheduleBoard({ result, prepared, expanded, onExpan
         </div>
       </div>
     </section>
-    {openedRoom && <SharedCardDialog key={openedRoom.key} layoutId={`room-${openedRoom.key}`} onClose={() => setRoomKey(null)} closeLabel={text.close} className={`v2-room-detail v2-room-${openedRoom.roomType}`}>
+    {openedRoom && <SharedCardDialog key={openedRoom.key} layoutId={`room-${openedRoom.key}`} source={source.current} onClose={() => setRoomKey(null)} closeLabel={text.close} className={`v2-room-detail v2-room-${openedRoom.roomType}`}>
       <header className="v2-room-detail-heading">
         <motion.span className="v2-room-icon" layoutId={reduced ? undefined : `room-icon-${openedRoom.key}`} transition={motionTokens.morph}><FacilityIcon room={openedRoom} /></motion.span>
         <div><DialogTitle asChild><motion.h2 layoutId={reduced ? undefined : `room-title-${openedRoom.key}`} transition={motionTokens.morph}>{openedRoom.label}<small>{openedRoom.indexLabel}</small></motion.h2></DialogTitle>
@@ -162,7 +163,7 @@ function FacilityIcon({ room }: { room: BoardRoom }) {
   return <Icon size={16} />
 }
 
-function RoomCard({ room, layoutKey, direction, selectedKey, front, drone = false, compact = false, autofill = false, onClick }: { room: BoardRoom; layoutKey: string; direction: number; selectedKey: string | null; front: boolean; drone?: boolean; compact?: boolean; autofill?: boolean; onClick: () => void }) {
+function RoomCard({ room, layoutKey, direction, selectedKey, front, drone = false, compact = false, autofill = false, onClick }: { room: BoardRoom; layoutKey: string; direction: number; selectedKey: string | null; front: boolean; drone?: boolean; compact?: boolean; autofill?: boolean; onClick: (source: HTMLButtonElement) => void }) {
   const reduceMotion = useAppReducedMotion()
   const layout = reduceMotion ? false : 'position'
   const geometryTransition = { duration: 0.28, ease: motionTokens.ease.enter }
@@ -170,7 +171,7 @@ function RoomCard({ room, layoutKey, direction, selectedKey, front, drone = fals
   const efficiency = room.row && room.row.efficiency !== '-' && ['trading', 'manufacture', 'power'].includes(room.roomType) ? room.row.efficiency : null
   const showBottom = !compact || room.product !== '-' || Boolean(efficiency)
   return (
-    <motion.button type="button" className={`v2-room-card v2-room-${room.roomType} ${compact ? 'v2-room-card-compact' : ''}`} onClick={onClick} data-shared-card-front={front || undefined}
+    <motion.button type="button" className={`v2-room-card v2-room-${room.roomType} ${compact ? 'v2-room-card-compact' : ''}`} onClick={(event) => onClick(event.currentTarget)} data-shared-card-front={front || undefined}
       aria-haspopup="dialog" layout={!reduceMotion} layoutId={reduceMotion ? undefined : `room-${room.key}`} style={{ borderRadius: 6 }} layoutDependency={`${layoutKey}-${selectedKey}`} transition={motionTokens.morph}>
       <motion.div layout={layout} layoutDependency={layoutKey} transition={geometryTransition} className="v2-room-header">
         <motion.span className="v2-room-icon" layoutId={reduceMotion ? undefined : `room-icon-${room.key}`} transition={motionTokens.morph}><FacilityIcon room={room} /></motion.span>

@@ -46,17 +46,19 @@ function MaterialFeeNotes({ items, data }: { items: Record<string, number>; data
 
 export function MaterialBrowser({ data, children }: { data: CultivationData; children: (select: SelectMaterial) => ReactNode }) {
   const group = useId()
+  const source = useRef<HTMLButtonElement | null>(null)
   const [selected, setSelected] = useState<Selection | null>(null)
   const select: SelectMaterial = (id, count, button) => {
     if (selected) setSelected({ ...selected, id, count })
     else {
+      source.current = button
       button.focus({ preventScroll: true })
       setSelected({ id, count, source: button.dataset.materialKey! })
     }
   }
   return <LayoutGroup id={group}>
     <div className="v2-project-material-browser">{children(select)}</div>
-    {selected && <SharedCardDialog stationaryContent layoutId={`material-${selected.source}`} onClose={() => setSelected(null)} closeLabel={copy.v2.close} className="v2-project-material-dialog">
+    {selected && <SharedCardDialog stationaryContent layoutId={`material-${selected.source}`} source={source.current} onClose={() => setSelected(null)} closeLabel={copy.v2.close} className="v2-project-material-dialog">
       <MaterialRoute selection={selected} data={data} onSelect={select} />
     </SharedCardDialog>}
   </LayoutGroup>
