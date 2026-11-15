@@ -170,7 +170,7 @@ function sendResponse(request: FastifyRequest, reply: FastifyReply, response: Re
     reply.raw.end()
     return reply
   }
-  return reply.send(response.body ? Readable.fromWeb(response.body as Parameters<typeof Readable.fromWeb>[0]) : null)
+  return reply.send(response.body ? Readable.fromWeb(response.body as Parameters<typeof Readable.fromWeb>[0]) : undefined)
 }
 
 function errorResponse(
