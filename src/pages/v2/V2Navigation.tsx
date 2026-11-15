@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { AnnouncementIcon, CollapsedIcon, ComparisonIcon, EditIcon, FacilitiesIcon, GenerateIcon, HelpIcon, MoreIcon, OperatorsIcon, OverviewIcon, PreferencesIcon, PricingIcon, ProjectsIcon, ReleasesIcon, ResultHistoryIcon, ServiceStatusIcon, SiteBenchmarkIcon, SupportIcon, ToolsIcon, UploadIcon } from '../../components/icons'
 import Link from '../../components/InternalLink'
+import { useLocation } from 'react-router'
 import FeedbackButton from '../../components/FeedbackDialog'
 import { copy } from '../../copy'
 import { useSiteFeatures } from '../../lib/site-feature-context'
@@ -28,6 +29,7 @@ export default function V2Navigation({ section, session, operatorCount, sampleOp
   onClose: () => void
 }) {
   const { features } = useSiteFeatures()
+  const location = useLocation()
   const more = useRef<HTMLDetailsElement>(null)
   useEffect(() => {
     function closeOutside(event: PointerEvent) {
@@ -52,6 +54,7 @@ export default function V2Navigation({ section, session, operatorCount, sampleOp
     const contents = <><Icon size={19} aria-hidden="true" /><span>{label}</span>
       {entry === 'announcements' && session.announcementUnreadCount > 0 && <small>{session.announcementUnreadCount}</small>}</>
     return <Link key={entry} className={`v2-nav-item ${active ? 'v2-nav-active' : ''}`} to={v2Path(entry, session.activeProfile?.id)}
+      state={{ authBackTo: `${location.pathname}${location.search}${location.hash}` }}
       aria-current={current ? 'page' : active ? 'location' : undefined} onClick={closeNavigation}>{contents}</Link>
   }
   return <nav aria-label={text.navigation}>

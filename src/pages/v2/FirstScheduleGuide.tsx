@@ -6,6 +6,7 @@ const text = copy.v2.firstSchedule
 export default function FirstScheduleGuide({ step }: { step: number }) {
   const steps = [text.login, text.import, text.config, text.generate]
   return <aside className="v2-first-schedule-guide" aria-label={text.title}>
+    <progress className="v2-first-schedule-bar" aria-label={text.title} value={step} max={steps.length} />
     <details open={!window.matchMedia?.('(max-width: 40rem)').matches}>
     <summary><span className="v2-first-schedule-progress" role="status">{text.progress(step + 1)}</span><strong>{steps[step]}</strong><ExpandIcon size={16} aria-hidden="true" /></summary>
     <ol>{steps.map((label, index) => <li key={label} aria-current={step === index ? 'step' : undefined} data-complete={index < step}>

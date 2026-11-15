@@ -1,4 +1,5 @@
 import { isAppRoutePath } from './app-routes'
+import { V2_GUEST_SECTIONS, v2Section } from '../pages/v2/navigation'
 
 export type AuthMode = 'login' | 'register' | 'forgot'
 export const USER_SESSION_EXPIRED_EVENT = 'maatool:user-session-expired'
@@ -17,10 +18,21 @@ export function safeAuthReturn(value: string | null | undefined): string {
   return `${url.pathname}${url.search}${url.hash}`
 }
 
-export function authPath(mode: AuthMode = 'login', returnTo?: string, invite?: string): string {
+export function safeAuthBack(value: string | null | undefined): string {
+  const url = new URL(safeAuthReturn(value), 'https://auth.internal')
+  if (url.pathname === '/account-safety') return '/v2'
+  if (url.pathname === '/v2' || url.pathname.startsWith('/v2/')) {
+    if (!V2_GUEST_SECTIONS.includes(v2Section(url.searchParams, url.hash, url.pathname))) return '/v2'
+    url.searchParams.delete('feedback')
+  }
+  return `${url.pathname}${url.search}${url.hash}`
+}
+
+export function authPath(mode: AuthMode = 'login', returnTo?: string, invite?: string, backTo?: string): string {
   const params = new URLSearchParams()
   if (returnTo) params.set('return_to', safeAuthReturn(returnTo))
   if (invite) params.set('invite', invite)
+  if (backTo) params.set('back_to', safeAuthBack(backTo))
   return `${paths[mode]}${params.size ? `?${params}` : ''}`
 }
 

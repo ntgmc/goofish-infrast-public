@@ -219,6 +219,8 @@ export const v2Copy = {
     config: '确认基建配置',
     generate: '生成排班',
     loginHelp: '网站账号用于保存你的游戏账号、配置和排班。',
+    loginContinue: '登录或注册后回到这里，继续绑定游戏账号并导入干员。',
+    backToExample: '返回示例排班',
     importHelp: '绑定森空岛，选择游戏角色，一次完成账号添加和干员导入。',
     configHelp: '确认布局、产物和换班方式与你的游戏内基建一致。',
     generateHelp: '数据与配置已准备好，点击生成排班，计算完成后即可查看结果。',

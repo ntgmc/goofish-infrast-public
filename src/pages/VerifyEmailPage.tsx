@@ -64,7 +64,7 @@ export default function VerifyEmailPage() {
   }, [token, verify])
 
   return (
-    <AuthLayout title={copy.auth.pages_VerifyEmailPage_005} description={copy.auth.pages_VerifyEmailPage_006} returnTo={returnPath}>
+    <AuthLayout title={copy.auth.pages_VerifyEmailPage_005} description={copy.auth.pages_VerifyEmailPage_006} backTo={returnPath}>
 
         {state === 'loading' && <div className="tool-alert mt-6" role="status" aria-live="polite">{copy.auth.pages_VerifyEmailPage_002}</div>}
         {state === 'success' && <div className="tool-alert tool-alert--success mt-6" role="status" aria-live="polite">{copy.auth.pages_VerifyEmailPage_003}</div>}

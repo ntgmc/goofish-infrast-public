@@ -56,7 +56,7 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <AuthLayout title={copy.auth.pages_ResetPasswordPage_007} description={copy.auth.pages_ResetPasswordPage_008} returnTo={returnTo}>
+    <AuthLayout title={copy.auth.pages_ResetPasswordPage_007} description={copy.auth.pages_ResetPasswordPage_008} backTo={returnTo}>
       <form onSubmit={handleSubmit} noValidate>
 
         {error && <div className="tool-alert tool-alert--error mt-5" role="alert">{error}</div>}

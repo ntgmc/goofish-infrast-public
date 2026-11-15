@@ -76,6 +76,30 @@ it('keeps the destination and email when switching registration to login', async
   expect(new URLSearchParams(router.state.location.search).get('return_to')).toBe('/v2?section=add-account&mode=cdk')
 })
 
+it('keeps cancellation separate from task completion when switching through registration and password recovery', async () => {
+  const router = mount(authPath('login', '/v2?section=generation', undefined, '/v2?section=tools'))
+  await screen.findByLabelText(copy.auth.components_AuthForm_011)
+  fireEvent.click(within(screen.getByRole('group', { name: copy.auth.components_AuthForm_007 })).getByRole('button', { name: copy.auth.components_AuthForm_009 }))
+  await waitFor(() => expect(router.state.location.pathname).toBe('/register'))
+  fireEvent.click(within(screen.getByRole('group', { name: copy.auth.components_AuthForm_007 })).getByRole('button', { name: copy.auth.components_AuthForm_008 }))
+  await waitFor(() => expect(router.state.location.pathname).toBe('/login'))
+  fireEvent.click(screen.getByRole('button', { name: copy.auth.components_AuthForm_017 }))
+  expect(await screen.findByRole('heading', { name: copy.auth.forgotTitle })).toBeVisible()
+  expect(new URLSearchParams(router.state.location.search).get('return_to')).toBe('/v2?section=generation')
+  expect(screen.getByRole('link', { name: copy.auth.backToTask })).toHaveAttribute('href', '/v2?section=tools')
+  fireEvent.click(screen.getByRole('link', { name: copy.auth.backToTask }))
+  expect(await screen.findByRole('heading', { name: '原任务' })).toBeVisible()
+  expect(router.state.location.pathname + router.state.location.search).toBe('/v2?section=tools')
+  expect(fetchMock.mock.calls.some(([path]) => path === '/api/auth/login')).toBe(false)
+})
+
+it('uses the completion destination after login even when cancellation would return elsewhere', async () => {
+  const router = mount(authPath('login', '/v2?section=generation', undefined, '/v2?section=tools'))
+  await fillLogin()
+  expect(await screen.findByRole('heading', { name: '原任务' })).toBeVisible()
+  expect(router.state.location.pathname + router.state.location.search).toBe('/v2?section=generation')
+})
+
 it('collapses an optional invite and still accepts a manually entered code', async () => {
   mount('/register')
   expect(await screen.findByRole('button', { name: copy.auth.optionalInvitation })).toBeVisible()

@@ -103,10 +103,14 @@ textarea.v2-input { resize: vertical; }
 .v2-first-schedule-layout > .v2-section-heading { grid-column: 1 / -1; margin-bottom: 0; }
 .v2-first-schedule-layout > .v2-section-body { min-width: 0; }
 .v2-first-schedule-guide { position: sticky; top: var(--space-lg); padding: var(--space-md); background: var(--v2-paper); color: var(--v2-ink); border: 1px solid var(--v2-line); border-radius: var(--radius-v2-panel); }
-.v2-first-schedule-guide summary { display: flex; min-height: 44px; align-items: center; flex-wrap: wrap; gap: var(--space-xs); cursor: pointer; list-style: none; }
+.v2-first-schedule-bar { display: block; width: 100%; height: 4px; margin-bottom: var(--space-xs); appearance: none; border: 0; border-radius: var(--radius-pill); overflow: hidden; background: var(--v2-line); color: var(--v2-accent); }
+.v2-first-schedule-bar::-webkit-progress-bar { background: var(--v2-line); }
+.v2-first-schedule-bar::-webkit-progress-value { background: var(--v2-accent); }
+.v2-first-schedule-bar::-moz-progress-bar { background: var(--v2-accent); }
+.v2-first-schedule-guide summary { display: grid; grid-template-columns: minmax(0, 1fr) auto; min-height: 44px; align-items: center; gap: var(--space-2xs) var(--space-xs); cursor: pointer; list-style: none; }
 .v2-first-schedule-guide summary::-webkit-details-marker { display: none; }
-.v2-first-schedule-guide summary > strong { flex: 1; padding: 0; }
-.v2-first-schedule-guide summary > svg { flex: none; transition: transform var(--dur-fast) ease-out; }
+.v2-first-schedule-guide summary > strong { grid-column: 1; min-width: 0; padding: 0; }
+.v2-first-schedule-guide summary > svg { grid-column: 2; grid-row: 1 / 3; transition: transform var(--dur-fast) ease-out; }
 .v2-first-schedule-guide details[open] summary > svg { transform: rotate(180deg); }
 .v2-first-schedule-progress { font-size: var(--text-xs); }
 .v2-first-schedule-guide details[open] ol { margin-top: var(--space-sm); }

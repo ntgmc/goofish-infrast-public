@@ -194,8 +194,14 @@ it deliberately when changing the shared design.
   row spacing and no enclosing panel or step numbers. Use at least 14px for action
   guidance, operator names and inventory hints; reserve 12px for auxiliary metadata
   such as times and facility levels. Separate room groups with larger gaps than the
-  spacing within a group. Below 40rem, the first-use checklist collapses to the
-  current step, and preparation rows open the existing editors across the whole row.
+  spacing within a group. “生成我的排班” opens a public four-step tutorial before
+  authentication: sign in or register, bind and import operators, confirm the base
+  configuration, then generate. Keep its progress bar and current step visible;
+  below 40rem only the detailed checklist collapses. The first step links to the
+  independent authentication pages and returns here after completion or cancellation.
+  Keep a visible route back to the example schedule. Infer progress from the
+  current account, imported operators and saved configuration; generation remains
+  an explicit action. Preparation rows open the existing editors across the whole row.
   Coupon options expand on demand on mobile; when no coupons are available, show
   “暂无可用券” and keep the rules collapsed at every width. Keep the generation action
   and any charge summary at the bottom, reserve its measured height in the page,

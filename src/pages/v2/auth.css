@@ -22,5 +22,5 @@
 @media (max-width: 30rem) {
   .v2-auth-header .v2-brand small { display: none; }
   .v2-auth-panel { padding: min(1.25rem, 5vw); }
-  .v2-auth-actions .v2-button { padding-inline: .625rem; }
+  .v2-auth-actions .v2-button { min-width: 44px; padding-inline: 8px; }
 }

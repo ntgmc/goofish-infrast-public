@@ -21,7 +21,7 @@ import AnnouncementBanner from '../../components/AnnouncementBanner'
 import AnnouncementPopup from '../../components/AnnouncementPopup'
 import { LockedCapabilityPreview, UpgradeSuggestionStatusNotice } from '../tool/optimize/ResultSection'
 import WorkspaceSections, { type V2Workflow } from './WorkspaceSections'
-import { sectionLabels, v2Path, v2Section, v2SectionAvailable, type V2Section } from './navigation'
+import { sectionLabels, V2_GUEST_SECTIONS, v2Path, v2Section, v2SectionAvailable, type V2Section } from './navigation'
 import V2Navigation from './V2Navigation'
 import V2TopbarTools from './V2TopbarTools'
 import { normalizeScheduleMode, SCHEDULE_MODE_LABELS, validateScheduleConfig } from '../../lib/config'
@@ -191,7 +191,12 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
   function navigateSection(next: V2Section) {
     setMobileNavigation(false)
     setPanel(null)
-    void navigate(v2Path(next, session.activeProfile?.id))
+    const target = v2Path(next, session.activeProfile?.id)
+    if (!session.user && !V2_GUEST_SECTIONS.includes(next) && v2SectionAvailable(next, features)) {
+      void navigate(authPath('login', target, undefined, returnTo))
+      return
+    }
+    void navigate(target)
   }
   async function openProfile(profile: V2Session['profiles'][number], next: V2Section = 'overview') {
     if (busy || session.openingProfileId || ((manualDirty || toolDirty) && !window.confirm(text.discardManual))) return
