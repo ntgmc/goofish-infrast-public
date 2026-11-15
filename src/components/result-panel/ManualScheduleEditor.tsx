@@ -14,6 +14,7 @@ import ManualMoodSummary from './ManualMoodSummary'
 import ManualScheduleSettings from './ManualScheduleSettings'
 import { manualScheduleSourceSchema, resolveManualScheduleConfig } from '../../lib/manual-schedule-tool'
 import { getOptimizePollRetryDelayMs } from '../../lib/optimize-poll'
+import { useTaskDraft } from '../../lib/task-drafts'
 import { submitOptimizationJob } from '../../pages/tool/optimize/optimization-api'
 import { fetchOptimizeJobSnapshotStatus, isOptimizeJobPollCancelled, isRetryableOptimizePollError, waitForOptimizePoll } from '../../pages/tool/optimize/job-progress'
 import {
@@ -33,13 +34,14 @@ export default function ManualScheduleEditor({ source: initialSource, profileId,
 }) {
   const label = copy.domain.manual_schedule
   const standalone = Boolean(simulationBaseline && !simulationBaseline.id)
-  const [source, setSource] = useState(initialSource)
+  const taskKey = `manual-editor:${draftStorageKey}:${manualSourceKey(initialSource)}`
+  const [source, setSource] = useTaskDraft(`${taskKey}:source`, initialSource)
   const validationSource = useMemo(() => standalone ? {
     ...source, plans: source.plans.map((plan) => ({ ...plan, Fiammetta: undefined })),
   } : source, [source, standalone])
-  const [plans, setPlans] = useState<ManualPlan[]>(() => createManualPlans(source))
+  const [plans, setPlans] = useTaskDraft<ManualPlan[]>(`${taskKey}:plans`, () => createManualPlans(source))
   const scheduleKey = (source: OptimizeResult, plans: ManualPlan[]) => canonicalJson(standalone ? { source, plans } : plans)
-  const [baseline, setBaseline] = useState(() => scheduleKey(source, createManualPlans(source)))
+  const [baseline, setBaseline] = useTaskDraft(`${taskKey}:baseline`, () => scheduleKey(initialSource, createManualPlans(initialSource)))
   const [stored, setStored] = useState<ManualDraft | null>(null)
   const [activePlan, setActivePlan] = useState(0)
   const [room, setRoom] = useState<BoardRoom | null>(null)

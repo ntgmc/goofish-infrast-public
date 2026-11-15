@@ -1,4 +1,6 @@
 import { useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useLocation } from 'react-router'
+import { authPath } from '../../../lib/auth-navigation'
 import { NextIcon as ArrowRight, AddIcon as Plus, RefreshIcon, SaveIcon, CultivationIcon, ResourceCalendarIcon, DailyOutputIcon } from '../../../components/icons'
 import { copy } from '../../../copy'
 import OperatorPicker from '../../../components/OperatorPicker'
@@ -27,10 +29,11 @@ const number = (amount: number) => amount.toLocaleString('zh-CN', { maximumFract
 const profession = (operator: ProjectOperator) => copy.tools.cultivation.professions[operator.profession as keyof typeof copy.tools.cultivation.professions] ?? ''
 
 export default function CultivationProjects({ session, onConfig }: { session: V2Session; onConfig: () => void }) {
+  const location = useLocation()
   const profile = session.activeProfile
   if (session.authLoading) return <Loading label={copy.v2.loading} />
   if (session.authStatus === 'error') return <Notice error>{session.authError?.message ?? text.authFailed}<button className="v2-text-button" onClick={session.retryAuth}>{text.retry}</button></Notice>
-  if (!session.user || !profile?.skland_binding || profile.status !== 'active' || profile.archived_at) return <EmptyState title={session.user ? text.noBinding : text.login} action={<Link className="v2-button v2-button-primary" to={v2Path('profiles', profile?.id)}>{text.profiles}</Link>} />
+  if (!session.user || !profile?.skland_binding || profile.status !== 'active' || profile.archived_at) return <EmptyState title={session.user ? text.noBinding : text.login} action={<Link className="v2-button v2-button-primary" to={!session.user ? authPath('login', `${location.pathname}${location.search}${location.hash}`) : v2Path('profiles', profile?.id)}>{text.profiles}</Link>} />
   return <ProjectWorkspace key={`${session.user.id}:${profile.id}`} session={session} profile={profile} onConfig={onConfig} />
 }
 

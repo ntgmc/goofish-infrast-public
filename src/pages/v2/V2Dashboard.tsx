@@ -1,7 +1,9 @@
 import { lazy, Suspense, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AnimatePresence, LayoutGroup, motion, useIsPresent } from 'motion/react'
 import { useAppReducedMotion } from '../../lib/motion-preference'
-import { NextIcon as ArrowRight, ExpandIcon as ChevronDown, BreadcrumbIcon, ExportIcon as Download, LoginIcon as LogIn, MenuIcon as Menu, GenerateIcon, LoadingIcon, ConfigIcon as Settings2, DataSourceIcon as ShieldCheck, InfoIcon as Sparkles, CloseIcon as X, PreviewIcon, SampleIcon } from '../../components/icons'
+import { authPath } from '../../lib/auth-navigation'
+import './auth.css'
+import { NextIcon as ArrowRight, ExpandIcon as ChevronDown, BreadcrumbIcon, ExportIcon as Download, MenuIcon as Menu, GenerateIcon, LoadingIcon, ConfigIcon as Settings2, DataSourceIcon as ShieldCheck, InfoIcon as Sparkles, CloseIcon as X, PreviewIcon, SampleIcon } from '../../components/icons'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import Link from '../../components/InternalLink'
 import { copy } from '../../copy'
@@ -110,7 +112,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
       if (!sample) window.localStorage.removeItem(FIRST_SCHEDULE_INTENT_KEY)
     } catch { /* Storage may be disabled. */ }
   }, [firstSchedule, section, session.user, sample])
-  const [panel, setPanel] = useState<OptionPanel | null>(() => params.get('feedback') === 'new' && !session.user ? 'account' : null)
+  const [panel, setPanel] = useState<OptionPanel | null>(null)
   const [view, setView] = useState<View>('schedule')
   const [expanded, setExpanded] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
@@ -143,7 +145,15 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
   const profileName = session.activeProfile?.display_name
   const signedIn = Boolean(session.user)
   const profileLabel = profileName ?? (signedIn ? text.account : text.login)
-  const openPanel = useCallback((next: OptionPanel) => { setPanel(next); setMobileNavigation(false) }, [])
+  const returnTo = `${pathname}${params.size ? `?${params}` : ''}${hash}`
+  const openPanel = useCallback((next: OptionPanel) => {
+    setMobileNavigation(false)
+    if (next === 'account' && !session.user) { void navigate(authPath('login', returnTo)); return }
+    setPanel(next)
+  }, [navigate, returnTo, session.user])
+  useEffect(() => {
+    if (params.get('feedback') === 'new' && !session.user) void navigate(authPath('login', returnTo), { replace: true })
+  }, [params, session.user, navigate, returnTo])
   const restrictedPreview = Boolean(session.activeProfile && isFreePreviewProfile(session.activeProfile) && !isFreePreviewTrialActive(session.activeProfile))
   const canManual = Boolean(features.manual_schedule && !sample && session.activeProfile && session.activeProfile.kind !== 'free_preview' && !result.preview_limit
     && hasCapability({ kind: session.activeProfile.kind, permission }, 'edit_full_config') && result.plans.length)
@@ -289,12 +299,11 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
               </V2TopbarTools>
               <div title={copy.notifications.title}><NotificationBell iconOnly onInventory={() => navigateSection('inventory')} /></div>
             </div>
-            <button className="v2-profile-button" type="button" aria-label={profileLabel} title={profileLabel} aria-haspopup="dialog" aria-expanded={panel === 'account'} onClick={() => openPanel('account')}>
+            {!signedIn ? <div className="v2-auth-actions"><Link to={authPath('login', returnTo)} className="v2-button v2-button-secondary">{copy.auth.components_AuthForm_008}</Link><Link to={authPath('register', returnTo)} className="v2-button v2-button-primary">{copy.auth.components_AuthForm_009}</Link></div> : <button className="v2-profile-button" type="button" aria-label={profileLabel} title={profileLabel} aria-haspopup="dialog" aria-expanded={panel === 'account'} onClick={() => openPanel('account')}>
               {profileName && <span className="v2-profile-avatar" aria-hidden="true">{Array.from(profileName)[0]}</span>}
-              {!signedIn && <LogIn size={18} aria-hidden="true" />}
               <span className="v2-profile-label">{profileName && <small>{text.topbar.profile}</small>}<span>{profileLabel}</span></span>
               <ChevronDown className="v2-profile-chevron" size={14} aria-hidden="true" />
-            </button>
+            </button>}
           </div>
         </header>
         <main className="v2-main" tabIndex={-1} data-route-focus>
@@ -340,7 +349,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
           {view !== 'manual' && <ResultActions plans={result.plans} shift={shift} showShift={view === 'schedule'} onShiftChange={setShift} onExport={() => setExportOpen(true)} sample={sample} busy={busy} loadingResult={loadingResult} />}
           <div className="v2-feature-content v2-manual-workspace" hidden={view !== 'manual'}>
             {canManual && manualOpened && session.activeProfile && <Suspense fallback={<Loading label={text.loading} />}><ManualScheduleEditor revealCandidates key={manualKey} source={result} profileId={session.activeProfile.id} operators={operators} simulationBaseline={simulationBaseline} onDirtyChange={setManualDirty} renderExport={(props) => workflow && <ManualResultExport key={props.resultId} {...props} workflow={workflow}
-              onRecover={(action) => { navigateSection(action === 'login' ? 'generation' : action); if (action === 'login') session.retryAuth() }} />} /></Suspense>}
+              onRecover={(action) => { if (action === 'login') void navigate(authPath('login', returnTo)); else navigateSection(action) }} />} /></Suspense>}
             {!canManual && restrictedPreview && view === 'manual' && <LockedCapabilityPreview title={copy.optimize.paid_preview.manual_title} description={copy.optimize.paid_preview.manual_description} />}
           </div>
           <div className="v2-result-view" hidden={view === 'manual'}>
@@ -367,7 +376,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
         </main>
       </div>
       <ResultExportDrawer key={`${session.activeProfile?.id ?? 'sample'}:${exportResultId ?? manualKey}`} open={exportOpen} onOpenChange={setExportOpen} result={result} prepared={prepared} shift={shift} busy={busy} failure={exportFailure} exportNotice={exportNotice}
-        onRecover={(action) => { setExportOpen(false); navigateSection(action === 'login' ? 'generation' : action); if (action === 'login') session.retryAuth() }}
+        onRecover={(action) => { setExportOpen(false); if (action === 'login') void navigate(authPath('login', returnTo)); else navigateSection(action) }}
         onDownloadMaa={!sample && features.maa_export ? onExport : undefined} onDownloadSample={sample ? downloadSample : undefined}
         onDownloadFullResult={!sample && canViewAnalysis && !result.preview_limit && features.full_result_export && workflow?.userCanDownloadFullResult ? workflow.handleDownloadFullResult : undefined} />
       <OptionsDrawer panel={panel} onClose={closePanel} onOpenProfile={openProfile} onNavigate={navigateSection} session={guardedSession} config={config} operators={sortedOperators}

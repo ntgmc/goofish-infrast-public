@@ -2,7 +2,9 @@
 import { StrictMode } from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '../../test/query-render'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router'
+import { MemoryRouter, Route, Routes } from 'react-router'
+import AuthPage from './AuthPage'
+import { TaskDraftProvider } from '../../lib/task-drafts'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { apiJson, apiJsonOrNull } from '../../lib/api-client'
 import { copy } from '../../copy'
@@ -81,6 +83,7 @@ afterEach(() => {
   window.sessionStorage.clear()
   window.localStorage.removeItem('maatool-reduce-motion')
   window.localStorage.removeItem(FIRST_SCHEDULE_INTENT_KEY)
+  window.localStorage.removeItem('maatool:v2:last-profile:user-1')
   vi.resetAllMocks()
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
@@ -112,16 +115,18 @@ it.each([false, true])('continues from login and Skland import through saved con
     if (url === '/api/user/inventory') return { stacks: [], capacities: [], recent_events: [] }
     throw new Error(`Unexpected API request: ${url}`)
   })
-  render(<MemoryRouter initialEntries={['/']}><MotionPreferenceProvider><V2Page /></MotionPreferenceProvider></MemoryRouter>)
+  render(<MemoryRouter initialEntries={['/']}><TaskDraftProvider><MotionPreferenceProvider><Routes><Route path="/login" element={<AuthPage />} /><Route path="*" element={<V2Page />} /></Routes></MotionPreferenceProvider></TaskDraftProvider></MemoryRouter>)
   await user.click(await screen.findByRole('button', { name: copy.v2.generateMine }))
-  const guide = screen.getByRole('complementary', { name: copy.v2.firstSchedule.title }).querySelector('details')!
-  expect(guide.open).toBe(!mobile)
-  expect(guide.querySelector('summary')).toHaveTextContent(copy.v2.firstSchedule.progress(1))
+  expect(await screen.findByRole('heading', { name: copy.auth.pageTitle })).toBeVisible()
   fireEvent.change(screen.getByLabelText(copy.auth.components_AuthForm_011), { target: { value: 'doctor@example.test' } })
   fireEvent.change(screen.getByLabelText(copy.auth.components_AuthForm_012), { target: { value: 'password123' } })
-  await user.click(document.querySelector('.v2-login-panel button[type="submit"]')!)
+  await user.click(document.querySelector('button[type="submit"]')!)
   // Cold imports of the lazy account and generation pages can exceed the default 1s wait in CI.
-  await user.click(await screen.findByRole('button', { name: copy.v2.firstSchedule.importAction }, { timeout: 5_000 }))
+  const importAction = await screen.findByRole('button', { name: copy.v2.firstSchedule.importAction }, { timeout: 5_000 })
+  const guide = screen.getByRole('complementary', { name: copy.v2.firstSchedule.title }).querySelector('details')!
+  expect(guide.open).toBe(!mobile)
+  expect(guide.querySelector('summary')).toHaveTextContent(copy.v2.firstSchedule.progress(2))
+  await user.click(importAction)
   await user.click(await screen.findByRole('button', { name: copy.workspace.components_SklandBindingDialog_004 }))
   fireEvent.change(screen.getByPlaceholderText(copy.workspace.components_SklandBindingDialog_037), { target: { value: 'test-credential' } })
   await user.click(screen.getByRole('button', { name: copy.workspace.components_SklandBindingDialog_038 }))

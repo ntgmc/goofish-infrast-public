@@ -17,6 +17,8 @@ import { createAccountLicense, isSchedulableProfile } from './tool-utils'
 import { usePublicAnnouncementsQuery } from '../../lib/announcement-query'
 import { copy } from '../../copy/index'
 import { syncSklandSnapshotSession } from '../../lib/skland-snapshot-client'
+import { useTaskDraft } from '../../lib/task-drafts'
+import { canonicalJson } from '../../lib/crypto'
 
 
 export type WorkspacePatch = {
@@ -41,7 +43,7 @@ export function useToolSession(requestedProfileId?: string | null, rememberLastP
   const [workspace, setWorkspace] = useState<UserWorkspace | null>(null)
   const [license, setLicense] = useState<LicenseFile | null>(null)
   const [eliteOverrides, setEliteOverridesState] = useState<Record<string, number>>({})
-  const [configOverride, setConfigOverrideState] = useState<LicenseConfig | null>(null)
+  const [configOverride, setConfigOverrideState] = useTaskDraft<LicenseConfig | null>(`workspace:${user?.id ?? 'guest'}:${activeProfile?.id ?? 'none'}:config`, null)
   const announcements = usePublicAnnouncementsQuery(loadAnnouncementPopups)
   const banner: Announcement | null = loadAnnouncementPopups ? announcements.data?.banner ?? null : null
   const popups: Announcement[] = loadAnnouncementPopups ? announcements.data?.popups ?? [] : []
@@ -302,6 +304,16 @@ export function useToolSession(requestedProfileId?: string | null, rememberLastP
     await runPendingConfigSave()
     return !pendingConfigRef.current
   }, [runPendingConfigSave])
+
+  useEffect(() => {
+    if (authStatus !== 'authenticated' || !activeProfile || !configOverride || pendingConfigRef.current) return
+    if (canonicalJson(configOverride) === canonicalJson(workspace?.config)) {
+      setConfigOverrideState(null)
+      return
+    }
+    pendingConfigRef.current = { profileId: activeProfile.id, generation: ++configGenerationRef.current, config: configOverride }
+    setConfigSyncStatus('failed')
+  }, [authStatus, activeProfile, configOverride, workspace?.config, setConfigOverrideState])
 
   const retryConfigSave = useCallback(() => {
     if (!pendingConfigRef.current) return

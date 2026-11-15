@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useTaskDraft } from '../../../lib/task-drafts'
 import type { AuthSuccessResponse } from '../../../lib/types'
 import { apiJson } from '../../../lib/api-client'
 import { markInventoryStale } from '../../../lib/inventory-refresh'
@@ -16,18 +17,18 @@ type CdkRedeemResponse =
   | { redemption_type: 'profile'; auth: AuthSuccessResponse }
   | { redemption_type: 'inventory'; item: { code: string; name: string; quantity: 1; expires_at: string | null } }
 
-type RedeemProps = { onRedeemed: (payload: AuthSuccessResponse) => void; onInventoryRedeemed?: (itemName: string) => void; tourReplayToken?: number; autoStartTour?: boolean; preferPreview?: boolean }
+type RedeemProps = { onRedeemed: (payload: AuthSuccessResponse) => void; onInventoryRedeemed?: (itemName: string) => void; tourReplayToken?: number; autoStartTour?: boolean; preferPreview?: boolean; draftScope?: string }
 
-export function useAccountRedemption({ onRedeemed, onInventoryRedeemed, tourReplayToken = 0, autoStartTour = true, preferPreview = false }: RedeemProps) {
+export function useAccountRedemption({ onRedeemed, onInventoryRedeemed, tourReplayToken = 0, autoStartTour = true, preferPreview = false, draftScope }: RedeemProps) {
   const { features } = useSiteFeatures()
-  const [mode, setMode] = useState<AddAccountMode>(() => preferPreview && features.free_preview ? 'preview' : features.cdk_redemption ? 'cdk' : 'preview')
-  const [cdk, setCdk] = useState('')
-  const [displayName, setDisplayName] = useState('')
-  const [note, setNote] = useState('')
+  const [mode, setMode] = useTaskDraft<AddAccountMode>(draftScope ? `${draftScope}:mode` : null, () => preferPreview && features.free_preview ? 'preview' : features.cdk_redemption ? 'cdk' : 'preview')
+  const [cdk, setCdk] = useTaskDraft(draftScope ? `${draftScope}:cdk` : null, '')
+  const [displayName, setDisplayName] = useTaskDraft(draftScope ? `${draftScope}:name` : null, '')
+  const [note, setNote] = useTaskDraft(draftScope ? `${draftScope}:note` : null, '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [claimDialogOpen, setClaimDialogOpen] = useState(false)
-  const idempotencyKeyRef = useRef(crypto.randomUUID())
+  const [idempotencyKey, setIdempotencyKey] = useTaskDraft(draftScope ? `${draftScope}:request` : null, () => crypto.randomUUID())
   const { guard: guardPersonalUseDeclaration, declarationDialog } = usePersonalUseDeclaration({
     enabled: true,
     onError: setError,
@@ -67,13 +68,13 @@ export function useAccountRedemption({ onRedeemed, onInventoryRedeemed, tourRepl
     try {
       const data = await apiJson<CdkRedeemResponse>('/api/user/cdk/redeem', {
         method: 'POST',
-        json: { cdk, display_name: displayName, note, idempotency_key: idempotencyKeyRef.current },
+        json: { cdk, display_name: displayName, note, idempotency_key: idempotencyKey },
         fallbackMessage: copy.dashboard.pages_tool_dashboard_RedeemSection_001,
       })
       setCdk('')
       setDisplayName('')
       setNote('')
-      idempotencyKeyRef.current = crypto.randomUUID()
+      setIdempotencyKey(crypto.randomUUID())
       markInventoryStale()
       if (data.redemption_type === 'profile') onRedeemed(data.auth)
       else onInventoryRedeemed?.(data.item.name)

@@ -1,4 +1,5 @@
-import { useRef, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
+import { useTaskDraft } from '../../lib/task-drafts'
 import { Link, useSearchParams } from 'react-router'
 import { RedemptionIcon, NextIcon } from '../../components/icons'
 import { copy } from '../../copy'
@@ -37,10 +38,11 @@ export default function ProfileUpgrade({ session, onUpgraded }: {
   onUpgraded: (payload: AuthSuccessResponse) => Promise<void>
 }) {
   const { features } = useSiteFeatures()
-  const [cdk, setCdk] = useState('')
+  const draftKey = `profile-upgrade:${session.user!.id}:${session.activeProfile!.id}`
+  const [cdk, setCdk] = useTaskDraft(`${draftKey}:cdk`, '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const request = useRef<{ cdk: string; idempotencyKey: string } | null>(null)
+  const [request, setRequest] = useTaskDraft<{ cdk: string; idempotencyKey: string } | null>(`${draftKey}:request`, null)
   const profile = session.activeProfile!
 
   async function submit(event: FormEvent) {
@@ -51,10 +53,10 @@ export default function ProfileUpgrade({ session, onUpgraded }: {
     try {
       if (!await session.flushConfigSave()) throw new Error(copy.v2.saveFailed)
       const normalizedCdk = cdk.trim()
-      const pending = request.current?.cdk === normalizedCdk ? request.current : { cdk: normalizedCdk, idempotencyKey: crypto.randomUUID() }
-      request.current = pending
+      const pending = request?.cdk === normalizedCdk ? request : { cdk: normalizedCdk, idempotencyKey: crypto.randomUUID() }
+      setRequest(pending)
       const payload = await upgradeProfileWithCdk({ profileId: profile.id, cdk: normalizedCdk, idempotencyKey: pending.idempotencyKey, fallbackMessage: copy.optimize.pages_tool_optimize_useOptimizeWorkflow_023 })
-      request.current = null
+      setRequest(null)
       setCdk('')
       await onUpgraded(payload)
     } catch (caught) {
@@ -66,7 +68,7 @@ export default function ProfileUpgrade({ session, onUpgraded }: {
 
   return <form className="v2-account-registration v2-profile-upgrade-form" aria-label={text.title} onSubmit={submit}>
     <SectionTitle title={profile.display_name || copy.v2.account} description={text.description} />
-    <Field label={copy.workspace.pages_tool_WorkspaceSetupPage_054} value={cdk} maxLength={256} required autoComplete="off" disabled={loading} onChange={(event) => { request.current = null; setCdk(event.target.value) }} placeholder="MAA-XXXX-XXXX-XXXX" />
+    <Field label={copy.workspace.pages_tool_WorkspaceSetupPage_054} value={cdk} maxLength={256} required autoComplete="off" disabled={loading} onChange={(event) => { setRequest(null); setCdk(event.target.value) }} placeholder="MAA-XXXX-XXXX-XXXX" />
     <Notice error>{error}</Notice>
     <div className="v2-actions"><button type="submit" className="v2-button v2-button-primary" disabled={loading} aria-busy={loading}>{loading ? copy.workspace.pages_tool_WorkspaceSetupPage_055 : copy.workspace.pages_tool_WorkspaceSetupPage_056}</button>
       {features.pricing && <Link className="v2-button v2-button-secondary" to={v2Path('pricing', profile.id)}>{text.pricing}</Link>}

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useTaskDraft } from '../../../lib/task-drafts'
 import { materialDemandCopy as text } from '../../../copy/zh-CN/material-demand'
 import snapshot from '../../../data/material-demand.json'
 import { materialDemandCsv, materialDemandMonths, materialDemandSeries, type MaterialDemandMetric } from '../../../lib/material-demand'
@@ -12,13 +13,13 @@ const analyses = materialDemandAnalysis(snapshot, months)
 const format = (value: number) => new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 1 }).format(value)
 
 export default function MaterialDemand() {
-  const [materialId, setMaterialId] = useState(snapshot.materials[0].id)
-  const [metric, setMetric] = useState<MaterialDemandMetric>('amount')
-  const [window, setWindow] = useState(6)
-  const [selected, setSelected] = useState(Math.max(0, months.length - (months[months.length - 1]?.partial ? 2 : 1)))
-  const [sources, setSources] = useState(true)
-  const [rawPoints, setRawPoints] = useState(false)
-  const [fullScale, setFullScale] = useState(false)
+  const [materialId, setMaterialId] = useTaskDraft('material-demand:material', snapshot.materials[0].id)
+  const [metric, setMetric] = useTaskDraft<MaterialDemandMetric>('material-demand:metric', 'amount')
+  const [window, setWindow] = useTaskDraft('material-demand:window', 6)
+  const [selected, setSelected] = useTaskDraft('material-demand:selected', Math.max(0, months.length - (months[months.length - 1]?.partial ? 2 : 1)))
+  const [sources, setSources] = useTaskDraft('material-demand:sources', true)
+  const [rawPoints, setRawPoints] = useTaskDraft('material-demand:raw-points', false)
+  const [fullScale, setFullScale] = useTaskDraft('material-demand:full-scale', false)
   const [narrow, setNarrow] = useState(() => Boolean(globalThis.matchMedia?.('(max-width: 639px)').matches))
   useEffect(() => {
     const query = globalThis.matchMedia?.('(max-width: 639px)')

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation } from 'react-router'
+import { authPath } from '../../../lib/auth-navigation'
 import { ScheduleComparisonIcon, UploadIcon } from '../../../components/icons'
 import FacilityLayoutEditor from '../../../components/FacilityLayoutEditor'
 import { OperatorAvatarTile } from '../../../components/result-panel/OperatorAvatarStrip'
@@ -12,6 +14,7 @@ import { createManualPlans } from '../../../lib/manual-schedule'
 import { compareScheduleOperators, scheduleProductionMetrics, type ScheduleAssignment } from '../../../lib/schedule-comparison'
 import { getOptimizePollRetryDelayMs } from '../../../lib/optimize-poll'
 import { useSiteFeatures } from '../../../lib/site-feature-context'
+import { useTaskDraft } from '../../../lib/task-drafts'
 import type { LicenseConfig, LicenseOperator, OptimizeResult, UserWorkspace } from '../../../lib/types'
 import { useQueryClient } from '@tanstack/react-query'
 import { fetchCachedResultHistoryDetail } from '../../tool/optimize/result-history-query'
@@ -34,6 +37,7 @@ export default function ScheduleComparison({ session, onOpenProfile }: {
   session: V2Session
   onOpenProfile: (profile: V2Session['profiles'][number]) => Promise<void>
 }) {
+  const location = useLocation()
   const { features } = useSiteFeatures()
   const available = session.profiles.filter((profile) => isManualScheduleProfileAvailable(profile) &&
     (features.metered_billing || !profile.kind.startsWith('metered_')))
@@ -44,7 +48,7 @@ export default function ScheduleComparison({ session, onOpenProfile }: {
   return <div className="v2-schedule-comparison">
     <p className="v2-lead">{text.description}</p>
     {session.authLoading ? <Notice>{manual.loading}</Notice> : session.authStatus === 'error' ? <Notice error>{session.authError?.message}<button className="v2-text-button" onClick={session.retryAuth}>{copy.v2.retry}</button></Notice>
-      : !profile ? <Notice>{text.unavailable}</Notice> : <>
+      : !profile ? <Notice>{text.unavailable}{!session.user && <Link className="v2-button v2-button-primary" to={authPath('login', `${location.pathname}${location.search}${location.hash}`)}>{copy.v2.login}</Link>}</Notice> : <>
         <label className="v2-field v2-schedule-comparison-profile"><span>{manual.profile}</span>
           <select className="v2-input" value={ready ? profile.id : ''} disabled={Boolean(session.openingProfileId)} onChange={(event) => {
             const next = available.find((entry) => entry.id === event.target.value)
@@ -63,18 +67,19 @@ function ComparisonWorkspace({ userId, profileId, operators, config, workspace }
 }) {
   const client = useQueryClient()
   const history = useResultHistoryPagination(profileId, workspace, userId)
-  const [slots, setSlots] = useState<Slot[]>([{ selection: '' }, { selection: '' }])
+  const inputsKey = canonicalJson({ config, operators })
+  const draftKey = `schedule-comparison:${userId}:${profileId}:${inputsKey}`
+  const [slots, setSlots] = useTaskDraft<Slot[]>(`${draftKey}:slots`, [{ selection: '' }, { selection: '' }])
   const [outputs, setOutputs] = useState<(OptimizeResult | null)[]>([null, null])
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [preset, setPreset] = useState('')
-  const [shiftHours, setShiftHours] = useState<string | null>(null)
-  const [configDraft, setConfigDraft] = useState<LicenseConfig | null>(null)
+  const [preset, setPreset] = useTaskDraft(`${draftKey}:preset`, '')
+  const [shiftHours, setShiftHours] = useTaskDraft<string | null>(`${draftKey}:hours`, null)
+  const [configDraft, setConfigDraft] = useTaskDraft<LicenseConfig | null>(`${draftKey}:config`, null)
   const requests = useRef<(AbortController | null)[]>([null, null])
   const simulationRun = useRef(0)
   const simulationLock = useRef(false)
-  const inputsKey = canonicalJson({ config, operators })
   const currentInputs = useRef(inputsKey)
   currentInputs.current = inputsKey
   const baseConfig = configDraft ?? (preset ? normalizeConfig(CONFIG_PRESETS[preset]) : config)
@@ -85,7 +90,7 @@ function ComparisonWorkspace({ userId, profileId, operators, config, workspace }
   const differences = useMemo(() => left && right ? compareScheduleOperators(left.source, right.source) : null, [left, right])
 
   useEffect(() => {
-    setSlots([{ selection: '' }, { selection: '' }])
+    setSlots((current) => current.map((slot) => ({ ...slot, loading: false })))
     setOutputs([null, null])
     setBusy(false)
     setProgress(null)

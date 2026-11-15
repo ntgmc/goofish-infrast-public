@@ -210,7 +210,6 @@ export const v2Copy = {
   },
   announcements: '查看公告',
   signInRequired: '登录后即可使用此功能。',
-  generationSignIn: '先用邮箱登录或注册 MaaTool，登录后继续绑定游戏账号。',
   firstSchedule: {
     title: '生成第一份排班',
     description: '完成下面四步，用自己的干员生成排班。',
@@ -569,7 +568,6 @@ export const v2Copy = {
     opening: '正在切换…',
     empty: '还没有游戏账号档案。',
   },
-  loginUnavailable: '账号服务暂不可用，可继续浏览示例，稍后重试登录。',
   loginServiceUnavailable: '登录服务暂不可用，请稍后重新确认登录状态。',
   loginRetry: '重新连接账号服务',
   profiles: '我的游戏账号档案',

@@ -3,6 +3,7 @@ import { ScrollArea } from './ui/scroll-area'
 import { SuccessIcon as Check, AddImageIcon as ImagePlus, FeedbackIcon as MessageSquare, RemoveIcon as X } from './icons'
 import { useQueryClient } from '@tanstack/react-query'
 import { usePrivateQueryScope } from '../lib/private-query-scope'
+import { useTaskDraft } from '../lib/task-drafts'
 import { copy } from '../copy'
 import { apiJson, getApiErrorMessage } from '../lib/api-client'
 import { FEEDBACK_CATEGORIES, FEEDBACK_IMAGE_TYPES, FEEDBACK_MESSAGE_MAX_LENGTH, type FeedbackCategory } from '../lib/feedback-contracts'
@@ -27,12 +28,13 @@ export default function FeedbackButton({ iconOnly = false, className = 'tool-sec
   const successClose = useRef<HTMLButtonElement>(null)
   const focusAfterImage = useRef(false)
   const [open, setOpen] = useState(false)
-  const [category, setCategory] = useState<FeedbackCategory>('schedule')
-  const [message, setMessage] = useState('')
-  const [attachProfile, setAttachProfile] = useState(false)
-  const [resultId, setResultId] = useState('')
-  const [jobId, setJobId] = useState('')
-  const [attachment, setAttachment] = useState<(Awaited<ReturnType<typeof prepareFeedbackImage>> & { name: string }) | null>(null)
+  const draftKey = `feedback:${owner.identity ?? 'guest'}:${profileId ?? 'none'}`
+  const [category, setCategory] = useTaskDraft<FeedbackCategory>(`${draftKey}:category`, 'schedule')
+  const [message, setMessage] = useTaskDraft(`${draftKey}:message`, '')
+  const [attachProfile, setAttachProfile] = useTaskDraft(`${draftKey}:profile`, false)
+  const [resultId, setResultId] = useTaskDraft(`${draftKey}:result`, '')
+  const [jobId, setJobId] = useTaskDraft(`${draftKey}:job`, '')
+  const [attachment, setAttachment] = useTaskDraft<(Awaited<ReturnType<typeof prepareFeedbackImage>> & { name: string }) | null>(`${draftKey}:image`, null)
   const [processing, setProcessing] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)

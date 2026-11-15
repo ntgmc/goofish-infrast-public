@@ -16,9 +16,7 @@ import { copy } from '../copy/index'
 import { useSiteFeatures } from '../lib/site-feature-context'
 import { useAppReducedMotion } from '../lib/motion-preference'
 import AuthActionButton from './AuthActionButton'
-
-
-type AuthMode = 'login' | 'register' | 'forgot'
+import type { AuthMode } from '../lib/auth-navigation'
 type FieldErrors = Record<string, string>
 type EmailInputValidation = { message: string | null; suggestedEmail: string | null }
 type RegistrationEmailApiError = { message: string; suggestedEmail: string | null }
@@ -29,6 +27,10 @@ type AuthFormProps = {
   intro?: string
   submitClassName?: string
   animateActions?: boolean
+  mode?: AuthMode
+  onModeChange?: (mode: AuthMode) => void
+  collapseOptionalInvite?: boolean
+  invitationCode?: string
 }
 
 export default function AuthForm({
@@ -38,15 +40,22 @@ export default function AuthForm({
   intro,
   submitClassName,
   animateActions = false,
+  mode: controlledMode,
+  onModeChange,
+  collapseOptionalInvite = false,
+  invitationCode,
 }: AuthFormProps) {
   const { features } = useSiteFeatures()
   const reducedMotion = useAppReducedMotion()
-  const [initialInviteCode] = useState(readInitialInviteCode)
-  const [mode, setMode] = useState<AuthMode>(() => initialInviteCode && features.registration
+  const [initialInviteCode] = useState(() => (invitationCode ?? readInitialInviteCode()).trim().toUpperCase())
+  const [storedMode, setStoredMode] = useState<AuthMode>(() => initialInviteCode && features.registration
     ? 'register'
     : new URLSearchParams(window.location.search).get('recovery') === '1'
       ? 'forgot'
       : features.login ? 'login' : features.registration ? 'register' : 'forgot')
+  const mode = controlledMode ?? storedMode
+  const setMode = (next: AuthMode) => { setStoredMode(next); onModeChange?.(next) }
+  const [showInviteCode, setShowInviteCode] = useState(Boolean(initialInviteCode))
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [passwordVisible, setPasswordVisible] = useState(false)
@@ -79,6 +88,9 @@ export default function AuthForm({
   useEffect(() => {
     if (mode !== 'register') setEmailSuggestion(null)
     setPasswordVisible(false)
+    setFieldErrors({})
+    setError(null)
+    setNotice(null)
   }, [mode])
 
   useEffect(() => {
@@ -333,7 +345,7 @@ export default function AuthForm({
       {mode !== 'forgot' && (
         <div>
           <label htmlFor={passwordId} className="mb-2 block text-sm font-medium text-ink-secondary">{copy.auth.components_AuthForm_012}</label>
-          <div className="flex items-center gap-2">
+          <div className="auth-password-field flex items-center gap-2">
             <input
               id={passwordId}
               type={passwordVisible ? 'text' : 'password'}
@@ -366,7 +378,8 @@ export default function AuthForm({
       )}
 
       {mode === 'register' && <>
-        <label className="block">
+        {collapseOptionalInvite && !inviteCodeRequired && !showInviteCode && <button type="button" className="tool-secondary-action min-h-11 px-3 text-sm" onClick={() => setShowInviteCode(true)}>{copy.auth.optionalInvitation}</button>}
+        {(!collapseOptionalInvite || inviteCodeRequired || showInviteCode) && <label className="block">
           <span className="mb-2 block text-sm font-medium text-ink-secondary">
             {inviteCodeRequired ? copy.auth.components_AuthForm_032 : copy.auth.components_AuthForm_015}
           </span>
@@ -387,7 +400,7 @@ export default function AuthForm({
             aria-describedby={fieldErrors.inviteCode ? 'auth-invite-code-error' : undefined}
           />
           <FieldMessage id="auth-invite-code-error" message={fieldErrors.inviteCode} />
-        </label>
+        </label>}
         {registrationSettingsLoading && (
           <p className="-mt-3 text-sm text-ink-muted" role="status">{copy.auth.components_AuthForm_047}</p>
         )}

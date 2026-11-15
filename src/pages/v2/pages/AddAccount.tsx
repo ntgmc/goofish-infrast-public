@@ -10,9 +10,9 @@ import { Field, Notice, SectionTitle } from '../components/WorkspaceUI'
 const text = copy.dashboard
 const ui = copy.v2.accountCreation
 
-export default function AddAccount({ onAdded, onInventory, guided = false }: { onAdded: (payload: AuthSuccessResponse) => Promise<void>; onInventory: () => void; guided?: boolean }) {
+export default function AddAccount({ userId, onAdded, onInventory, guided = false }: { userId: string; onAdded: (payload: AuthSuccessResponse) => Promise<void>; onInventory: () => void; guided?: boolean }) {
   const [params] = useSearchParams()
-  const model = useAccountRedemption({ onRedeemed: (payload) => void onAdded(payload), onInventoryRedeemed: onInventory, preferPreview: params.get('mode') !== 'cdk', autoStartTour: false })
+  const model = useAccountRedemption({ onRedeemed: (payload) => void onAdded(payload), onInventoryRedeemed: onInventory, preferPreview: params.get('mode') !== 'cdk', autoStartTour: false, draftScope: `add-account:${userId}` })
   const choices = [
     ...(model.features.free_preview ? [{ id: 'preview' as const, label: ui.freeTitle, description: ui.freeSummary, icon: SklandIcon }] : []),
     ...(model.features.cdk_redemption ? [{ id: 'cdk' as const, label: ui.cdkTitle, description: ui.cdkSummary, icon: KeyRound }] : []),

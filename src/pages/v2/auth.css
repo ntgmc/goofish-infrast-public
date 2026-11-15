@@ -1,0 +1,26 @@
+.v2-auth-page { display: flex; flex-direction: column; }
+.v2-auth-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.25rem clamp(1rem, 4vw, 3rem); }
+.v2-auth-header .v2-brand { color: var(--v2-ink); }
+.v2-auth-header .v2-brand small { color: var(--v2-secondary); }
+.v2-auth-main { display: grid; flex: 1; place-items: center; padding: 1rem clamp(.75rem, 4vw, 1rem) 4rem; }
+.v2-auth-content { width: min(100%, 28rem); min-width: 0; }
+.v2-auth-back { display: inline-flex; align-items: center; gap: .5rem; min-height: 2.75rem; margin-bottom: .75rem; color: var(--v2-secondary); font-size: .875rem; }
+.v2-auth-panel { padding: clamp(1.25rem, 4vw, 2rem); border: 1px solid var(--v2-line); border-radius: var(--radius-xl); background: var(--v2-paper); }
+.v2-auth-panel h1 { margin: 0; font-size: 1.625rem; font-weight: 650; line-height: 1.4; }
+.v2-auth-description { margin: .625rem 0 1.5rem; color: var(--v2-secondary); font-size: .875rem; }
+.v2-auth-legal { margin: 1.25rem 0 0; color: var(--v2-secondary); font-size: .8125rem; line-height: 1.8; text-align: center; }
+.v2-auth-legal a { display: inline-block; min-height: 1.5rem; margin-left: .25rem; text-decoration: underline; text-underline-offset: .2em; }
+.v2-auth-panel .auth-feedback-content { overflow-wrap: anywhere; }
+.v2-auth-panel [role="group"] > button { padding-inline: clamp(.375rem, 2vw, 1rem); }
+.v2-auth-panel .tool-alert { white-space: normal; }
+.v2-auth-panel .v2-button { min-height: 3rem; }
+.v2-auth-panel .auth-password-field { flex-wrap: wrap; }
+.v2-auth-panel .auth-password-field input { flex-basis: 8rem; }
+.v2-auth-panel .auth-password-field button { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.v2-auth-actions { display: flex; align-items: center; gap: .5rem; }
+.v2-auth-actions .v2-button { min-width: 3.5rem; min-height: 2.75rem; padding-inline: .875rem; }
+@media (max-width: 30rem) {
+  .v2-auth-header .v2-brand small { display: none; }
+  .v2-auth-panel { padding: min(1.25rem, 5vw); }
+  .v2-auth-actions .v2-button { padding-inline: .625rem; }
+}

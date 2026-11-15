@@ -24,6 +24,8 @@ import { recordDebugNavigation } from './lib/debug-diagnostics'
 import QueryProvider from './lib/query-provider'
 import V1Route from './components/V1Route'
 import { completeDeploymentRefresh } from './lib/deployment-refresh'
+import { TaskDraftProvider } from './lib/task-drafts'
+import { authModeForPath, authPath, USER_SESSION_EXPIRED_EVENT } from './lib/auth-navigation'
 
 
 const LandingPage = lazy(() => import('./pages/LandingPage'))
@@ -46,16 +48,17 @@ const PricingPage = lazy(() => import('./pages/PricingPage'))
 const ThanksPage = lazy(() => import('./pages/ThanksPage'))
 const StatusPage = lazy(() => import('./pages/StatusPage'))
 const V2Page = lazy(() => import('./pages/v2/V2Page'))
+const AuthPage = lazy(() => import('./pages/v2/AuthPage'))
 
 export default function App() {
   return (
-    <QueryProvider><ThemeProvider>
+    <QueryProvider><TaskDraftProvider><ThemeProvider>
       <MotionPreferenceProvider>
         <SiteFeatureProvider>
           <AnimatedApp />
         </SiteFeatureProvider>
       </MotionPreferenceProvider>
-    </ThemeProvider></QueryProvider>
+    </ThemeProvider></TaskDraftProvider></QueryProvider>
   )
 }
 
@@ -71,6 +74,15 @@ function AppContent() {
   const location = useLocation()
 
   useEffect(() => { completeDeploymentRefresh() }, [])
+
+  useEffect(() => {
+    const expired = () => {
+      if (location.pathname.startsWith('/admin') || authModeForPath(location.pathname) || ['/verify-email', '/reset-password'].includes(location.pathname)) return
+      void navigate(authPath('login', `${location.pathname}${location.search}${location.hash}`), { replace: true })
+    }
+    window.addEventListener(USER_SESSION_EXPIRED_EVENT, expired)
+    return () => window.removeEventListener(USER_SESSION_EXPIRED_EVENT, expired)
+  }, [location, navigate])
 
   useEffect(() => {
     recordDebugNavigation(location.pathname)
@@ -113,8 +125,11 @@ function AppContent() {
         <Route path="/" element={v2Page} />
         <Route path="/v2" element={v2Page} />
         <Route path="/v2/benchmarks" element={v2Page} />
-        <Route path="/reset-password" element={<LazyPage fallback={copy.features.loading}><ResetPasswordPage /></LazyPage>} />
-        <Route path="/verify-email" element={<LazyPage fallback={copy.features.loading}><VerifyEmailPage /></LazyPage>} />
+        <Route path="/login" element={<Suspense fallback={<V2LoadingScreen />}><AuthPage /></Suspense>} />
+        <Route path="/register" element={<Suspense fallback={<V2LoadingScreen />}><AuthPage /></Suspense>} />
+        <Route path="/forgot-password" element={<Suspense fallback={<V2LoadingScreen />}><AuthPage /></Suspense>} />
+        <Route path="/reset-password" element={<Suspense fallback={<V2LoadingScreen />}><ResetPasswordPage /></Suspense>} />
+        <Route path="/verify-email" element={<Suspense fallback={<V2LoadingScreen />}><VerifyEmailPage /></Suspense>} />
         <Route path="/cancel-account-deletion" element={<LazyPage fallback={copy.features.loading}><CancelAccountDeletionPage /></LazyPage>} />
         <Route path="/account-safety" element={<LazyPage fallback={copy.features.loading}><AccountSafetyPage /></LazyPage>} />
         <Route path="/announcements" element={<FeatureRoute feature="announcements"><LazyPage fallback={copy.common.App_002}><AnnouncementsPage /></LazyPage></FeatureRoute>} />

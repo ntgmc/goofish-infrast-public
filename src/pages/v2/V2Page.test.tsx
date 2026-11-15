@@ -2,7 +2,8 @@
 import { useState, type ComponentProps } from 'react'
 import { act, cleanup, configure, fireEvent, render, screen, waitFor, within } from '../../test/query-render'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, useLocation } from 'react-router'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
+import AuthPage from './AuthPage'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { copy } from '../../copy'
 import { MotionPreferenceProvider } from '../../lib/motion-preference'
@@ -44,7 +45,7 @@ vi.mock('../../lib/site-feature-context', async (original) => ({
   useSiteFeatures: mocks.features,
 }))
 
-import V2Page from './V2Page'
+import V2Workspace from './V2Page'
 
 // Lazy page imports share the dual-core CI runner with another test worker.
 configure({ asyncUtilTimeout: 3_000 })
@@ -88,6 +89,9 @@ function RouteLocation() {
   return <span data-testid="route-location" data-pathname={location.pathname}>{location.search}</span>
 }
 
+function V2Page() {
+  return <Routes><Route path="/login" element={<AuthPage />} /><Route path="/register" element={<AuthPage />} /><Route path="*" element={<V2Workspace />} /></Routes>
+}
 function mount(path = '/v2') {
   window.localStorage.setItem('maatool-reduce-motion', 'true')
   return render(<MemoryRouter initialEntries={[path]}><V2Page /><RouteLocation /></MemoryRouter>, { wrapper: MotionPreferenceProvider })
@@ -382,11 +386,11 @@ describe('V2 results-first workspace', () => {
     const user = userEvent.setup()
     let page = mount('/')
     await user.click(screen.getByRole('button', { name: copy.v2.generateMine }))
-    const login = await screen.findByText(copy.v2.generationSignIn)
+    const login = await screen.findByRole('heading', { name: copy.auth.pageTitle })
     const guide = () => screen.getByRole('complementary', { name: copy.v2.firstSchedule.title })
-    expect(guide().querySelector('[aria-current="step"]')).toHaveTextContent(copy.v2.firstSchedule.login)
+    expect(screen.getByTestId('route-location')).toHaveAttribute('data-pathname', '/login')
     expect(window.localStorage.getItem(FIRST_SCHEDULE_INTENT_KEY)).toBe('true')
-    const form = within(login.parentElement!)
+    const form = within(login.closest('section')!)
     fireEvent.change(form.getByLabelText(copy.auth.components_AuthForm_011), { target: { value: 'doctor@example.test' } })
     fireEvent.change(form.getByLabelText(copy.auth.components_AuthForm_012), { target: { value: 'password123' } })
     await user.click(form.getAllByRole('button', { name: copy.auth.components_AuthForm_020 }).find((button) => button.getAttribute('type') === 'submit')!)
@@ -1335,10 +1339,14 @@ describe('V2 results-first workspace', () => {
     await user.click(screen.getByRole('button', { name: copy.v2.export }))
     const dialog = within(await screen.findByRole('dialog', { name: copy.v2.exportTitle }))
     expect(dialog.getByRole('alert')).toHaveTextContent('本次导出失败')
+    if (status === 401) session = { ...session, authStatus: 'anonymous', user: null }
     await user.click(dialog.getByRole('button', { name: label }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    await waitFor(() => expect(screen.getByTestId('route-location')).toHaveTextContent(`section=${section}`))
-    if (status === 401) expect(session.retryAuth).toHaveBeenCalledOnce()
+    if (status !== 401) await waitFor(() => expect(screen.getByTestId('route-location')).toHaveTextContent(`section=${section}`))
+    if (status === 401) {
+      expect(screen.getByTestId('route-location')).toHaveAttribute('data-pathname', '/login')
+      expect(session.retryAuth).not.toHaveBeenCalled()
+    }
     expect(workflow.handleDownloadMAA).not.toHaveBeenCalled()
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
   })
@@ -1470,8 +1478,9 @@ describe('V2 results-first workspace', () => {
     expect(screen.getByRole('tab', { name: /第1班/ })).toBeInTheDocument()
     expect(session.persistWorkspacePatch).not.toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: copy.v2.generateMine }))
-    expect(await screen.findByText(copy.v2.generationSignIn)).toBeVisible()
-    expect(screen.getByTestId('route-location')).toHaveTextContent('section=generation')
+    expect(await screen.findByRole('heading', { name: copy.auth.pageTitle })).toBeVisible()
+    expect(screen.getByTestId('route-location')).toHaveAttribute('data-pathname', '/login')
+    expect(new URLSearchParams(screen.getByTestId('route-location').textContent!).get('return_to')).toBe('/v2?section=generation')
     expect(mocks.workflow).not.toHaveBeenCalled()
   })
 
@@ -2098,7 +2107,7 @@ describe('V2 feature continuity', () => {
     expect(redemption).toHaveAttribute('href', signedIn ? '/v2?section=add-account&profile_id=profile-1&mode=cdk' : '/v2?section=add-account&mode=cdk')
     await user.click(redemption)
     if (!signedIn) {
-      const form = within((await screen.findByText(copy.v2.signInRequired)).parentElement!)
+      const form = within((await screen.findByRole('heading', { name: copy.auth.pageTitle })).closest('section')!)
       fireEvent.change(form.getByLabelText(copy.auth.components_AuthForm_011), { target: { value: 'doctor@example.test' } })
       fireEvent.change(form.getByLabelText(copy.auth.components_AuthForm_012), { target: { value: 'password123' } })
       await user.click(form.getAllByRole('button', { name: copy.auth.components_AuthForm_020 }).find((button) => button.getAttribute('type') === 'submit')!)

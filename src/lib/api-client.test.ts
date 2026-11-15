@@ -9,6 +9,7 @@ import {
   getApiRetryAfterSeconds,
 } from './api-client'
 import { enableDebugMode, getDebugDiagnosticsSnapshot } from './debug-diagnostics'
+import { USER_LOGOUT_EVENT, USER_SESSION_EXPIRED_EVENT } from './auth-navigation'
 
 const DEBUG_STORAGE_KEY = 'maa:debug-diagnostics:v1'
 
@@ -25,6 +26,31 @@ afterEach(() => {
 })
 
 describe('API client boundary', () => {
+  it.each([
+    ['/api/user/workspace', 401, true], ['/api/optimization/jobs', 401, true], ['/api/cultivation-plan', 401, true], ['/api/depot-value', 401, true],
+    ['/api/auth/login', 401, false], ['/api/admin/users', 401, false], ['/api/user/behavior-risk/engagement', 401, false], ['/api/user/workspace', 503, false],
+  ] as const)('signals expired user sessions for %s status %s: %s', async (url, status, expired) => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ error: '请求失败' }, { status })))
+    const listener = vi.fn()
+    window.addEventListener(USER_SESSION_EXPIRED_EVENT, listener)
+    try {
+      await expect(apiJson(url)).rejects.toMatchObject({ status })
+      expect(listener).toHaveBeenCalledTimes(expired ? 1 : 0)
+    } finally { window.removeEventListener(USER_SESSION_EXPIRED_EVENT, listener) }
+  })
+
+  it('clears tab drafts only after the logout request succeeds', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(Response.json({ error: '暂时失败' }, { status: 503 })).mockResolvedValueOnce(Response.json({ ok: true })))
+    const listener = vi.fn()
+    window.addEventListener(USER_LOGOUT_EVENT, listener)
+    try {
+      await expect(apiJson('/api/auth/logout', { method: 'POST' })).rejects.toMatchObject({ status: 503 })
+      expect(listener).not.toHaveBeenCalled()
+      await apiJson('/api/auth/logout', { method: 'POST' })
+      expect(listener).toHaveBeenCalledTimes(1)
+    } finally { window.removeEventListener(USER_LOGOUT_EVENT, listener) }
+  })
+
   it('parses JSON only when the success response declares JSON', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('{"ok":true}', {
       headers: { 'Content-Type': 'application/json; charset=utf-8', 'X-Request-ID': 'request-success' },

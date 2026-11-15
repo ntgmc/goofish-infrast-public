@@ -25,6 +25,7 @@ import type { V2Session } from './OptionsDrawer'
 import { SAMPLE_CONFIG, SAMPLE_OPERATORS, SAMPLE_RESULT } from './sample-result'
 import { V2_PUBLIC_SECTIONS, v2Href, v2Path, v2Section } from './navigation'
 import { METERED_BILLING_AVAILABLE } from '../../lib/site-features'
+import { useTaskDraft } from '../../lib/task-drafts'
 import './v2.css'
 import './workspace-pages.css'
 
@@ -35,9 +36,9 @@ export default function V2Page() {
   const publicPage = V2_PUBLIC_SECTIONS.includes(section)
   const session = useToolSession(params.get('profile_id'), true, section !== 'announcements')
   const features = useSiteFeatures()
-  const [config, setConfig] = useState<LicenseConfig>(() => normalizeConfig(SAMPLE_CONFIG))
-  const [operators, setOperators] = useState(SAMPLE_OPERATORS)
-  const [changed, setChanged] = useState(false)
+  const [config, setConfig] = useTaskDraft<LicenseConfig>('guest:config', () => normalizeConfig(SAMPLE_CONFIG))
+  const [operators, setOperators] = useTaskDraft('guest:operators', SAMPLE_OPERATORS)
+  const [changed, setChanged] = useTaskDraft('guest:changed', false)
   useEffect(() => {
     const root = document.documentElement
     const visibility = () => root.toggleAttribute('data-v2-hidden', document.hidden)

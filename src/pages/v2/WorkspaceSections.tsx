@@ -1,8 +1,8 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
-import { useSearchParams } from 'react-router'
+import { Navigate, useLocation, useSearchParams } from 'react-router'
 import { BackIcon as ArrowLeft, NextIcon as ArrowRight } from '../../components/icons'
 import { Link } from 'react-router'
-import AuthForm from '../../components/AuthForm'
+import { authPath } from '../../lib/auth-navigation'
 import { copy } from '../../copy'
 import { useSiteFeatures } from '../../lib/site-feature-context'
 import { usePublicContent } from '../../lib/public-content-context'
@@ -74,6 +74,7 @@ export default function WorkspaceSections({ section, session, workflow, generati
   const { features } = useSiteFeatures()
   const { content } = usePublicContent()
   const [params] = useSearchParams()
+  const location = useLocation()
   const upgrading = section === 'add-account' && params.get('mode') === 'upgrade' && Boolean(session.activeProfile && isFreePreviewProfile(session.activeProfile)) && features.cdk_redemption
   const title = upgrading ? copy.v2.profileUpgrade.title : section === 'help' ? content.faq.title : section === 'pricing' ? content.pricing.title : sectionLabels[section]
   const available = v2SectionAvailable(section, features)
@@ -96,17 +97,17 @@ export default function WorkspaceSections({ section, session, workflow, generati
     <div className="v2-section-body">
       <Suspense fallback={<V2SectionLoading label={section === 'inventory' ? copy.inventory.loading : undefined} />}>
         {section === 'overview' ? null : !available ? <p className="v2-panel v2-section-loading" role="status">{copy.v2.featureUnavailable}</p>
-          : needsLogin ? <div className="v2-panel v2-login-panel"><p>{section === 'generation' ? copy.v2.generationSignIn : copy.v2.signInRequired}</p><AuthForm compact animateActions allowCdk={false} onAuthenticated={session.applyAuthPayload} submitClassName="v2-button v2-button-primary w-full" /></div>
+          : needsLogin ? <Navigate to={authPath('login', `${location.pathname}${location.search}${location.hash}`)} replace />
             : needsWorkspace ? section === 'generation' && session.activeProfile && isSchedulableProfile(session.activeProfile)
               ? <div className="v2-panel v2-section-loading"><p>{copy.v2.generationImport}</p><button className="v2-button v2-button-primary" type="button" onClick={onOperators}>{copy.public.pages_LandingPage_001}</button></div>
               : section === 'generation' && session.cdkProfiles.length === 0 && v2SectionAvailable('add-account', features)
-                ? <>{!guided && <p className="v2-lead">{copy.v2.profileRequired}</p>}<AddAccount guided={guided} onAdded={onAccountAdded} onInventory={() => onNavigate('inventory')} /></>
+                ? <>{!guided && <p className="v2-lead">{copy.v2.profileRequired}</p>}<AddAccount userId={session.user!.id} guided={guided} onAdded={onAccountAdded} onInventory={() => onNavigate('inventory')} /></>
                 : <div className="v2-panel v2-section-loading"><p>{copy.v2.profileRequired}</p><button className="v2-button v2-button-primary" type="button" onClick={() => onNavigate('profiles')}>{copy.v2.account}</button></div>
               : <>
                 {section === 'profiles' && <Profiles session={session} onOpen={onOpenProfile} onUpgrade={onUpgradeProfile} />}
                 {section === 'add-account' && (upgrading ? <ProfileUpgrade key={session.activeProfile!.id} session={session} onUpgraded={onAccountAdded} /> : <>
                   {session.activeProfile && <ProfileUpgradeEntry profile={session.activeProfile} />}
-                  <AddAccount onAdded={onAccountAdded} onInventory={() => onNavigate('inventory')} />
+                  <AddAccount userId={session.user!.id} onAdded={onAccountAdded} onInventory={() => onNavigate('inventory')} />
                 </>)}
                 {section === 'settings' && (signedIn ? <Settings session={session} /> : <div className="v2-guest-settings"><AppearanceSettings /></div>)}
                 {section === 'announcements' && <Announcements session={session} />}
