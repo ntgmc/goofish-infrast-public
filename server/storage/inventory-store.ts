@@ -251,7 +251,7 @@ export async function listInventory(userId: string, now = new Date()): Promise<I
               sum(grants.remaining_quantity) filter (where grants.expires_at is null)::text as permanent,
               min(grants.expires_at) filter (where grants.expires_at > $2) as next_expiry_at,
               jsonb_agg(jsonb_build_object('quantity', grants.remaining_quantity, 'expires_at', grants.expires_at)
-                order by grants.expires_at asc nulls last, grants.created_at asc) as expiry_buckets,
+                order by grants.expires_at asc nulls last) as expiry_buckets,
               jsonb_build_object(
                 'code', definition.code,
                 'kind', definition.kind,
@@ -264,12 +264,17 @@ export async function listInventory(userId: string, now = new Date()): Promise<I
                 'created_at', definition.created_at,
                 'updated_at', definition.updated_at
               ) as definition_json
-         from reward_grants grants
+         from (
+           select grants.reward_type, grants.gift_pack_version_id, grants.expires_at,
+                  sum(grants.remaining_quantity) as remaining_quantity
+             from reward_grants grants
+            where grants.user_id = $1 and grants.remaining_quantity > 0
+              and grants.reward_type <> 'reorder_check_coupon'
+              and (grants.expires_at is null or grants.expires_at > $2)
+            group by grants.reward_type, grants.gift_pack_version_id, grants.expires_at
+         ) grants
          join item_definitions definition on definition.code = grants.reward_type
          left join gift_pack_versions version on version.id = grants.gift_pack_version_id
-        where grants.user_id = $1 and grants.remaining_quantity > 0
-          and grants.reward_type <> 'reorder_check_coupon'
-          and (grants.expires_at is null or grants.expires_at > $2)
         group by grants.reward_type, grants.gift_pack_version_id, definition.code, version.id`,
       [userId, nowIso],
     ),
