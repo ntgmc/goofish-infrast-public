@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { AnnouncementIcon, CollapsedIcon, ComparisonIcon, EditIcon, FacilitiesIcon, GenerateIcon, HelpIcon, MoreIcon, OperatorsIcon, OverviewIcon, PreferencesIcon, PricingIcon, ProjectsIcon, ReleasesIcon, ResultHistoryIcon, ServiceStatusIcon, SiteBenchmarkIcon, SupportIcon, ToolsIcon, UploadIcon } from '../../components/icons'
 import Link from '../../components/InternalLink'
+import { useLocation } from 'react-router'
 import FeedbackButton from '../../components/FeedbackDialog'
 import { copy } from '../../copy'
 import { useSiteFeatures } from '../../lib/site-feature-context'
@@ -28,6 +29,7 @@ export default function V2Navigation({ section, session, operatorCount, sampleOp
   onClose: () => void
 }) {
   const { features } = useSiteFeatures()
+  const location = useLocation()
   const more = useRef<HTMLDetailsElement>(null)
   useEffect(() => {
     function closeOutside(event: PointerEvent) {
@@ -52,6 +54,7 @@ export default function V2Navigation({ section, session, operatorCount, sampleOp
     const contents = <><Icon size={19} aria-hidden="true" /><span>{label}</span>
       {entry === 'announcements' && session.announcementUnreadCount > 0 && <small>{session.announcementUnreadCount}</small>}</>
     return <Link key={entry} className={`v2-nav-item ${active ? 'v2-nav-active' : ''}`} to={v2Path(entry, session.activeProfile?.id)}
+      state={{ authBackTo: `${location.pathname}${location.search}${location.hash}` }}
       aria-current={current ? 'page' : active ? 'location' : undefined} onClick={closeNavigation}>{contents}</Link>
   }
   return <nav aria-label={text.navigation}>
@@ -73,7 +76,7 @@ export default function V2Navigation({ section, session, operatorCount, sampleOp
         <p className="v2-nav-label" aria-hidden="true">{signedIn ? text.configuration : text.guestNavigation.configuration}</p>
         <div className="v2-config-shortcuts">
           <button type="button" className="v2-nav-item v2-config-shortcut" aria-label={text.sidebar.editOperators} aria-describedby="v2-nav-operator-count" aria-haspopup="dialog" onClick={() => onPanel('operators')}>
-            <OperatorsIcon size={19} aria-hidden="true" /><span>{text.sidebar.editOperators}</span><small id="v2-nav-operator-count">{sampleOperators ? text.guestNavigation.operatorCount(operatorCount) : operatorCount}</small><UploadIcon className="v2-nav-edit" size={14} aria-hidden="true" />
+            <OperatorsIcon size={19} aria-hidden="true" /><span>{text.sidebar.editOperators}</span><small id="v2-nav-operator-count">{sampleOperators ? text.guestNavigation.operatorSample : operatorCount}</small><UploadIcon className="v2-nav-edit" size={14} aria-hidden="true" />
           </button>
           <button type="button" className="v2-nav-item v2-config-shortcut" aria-haspopup="dialog" onClick={() => onPanel('config')}><FacilitiesIcon size={19} aria-hidden="true" /><span>{text.sidebar.editConfig}</span><EditIcon className="v2-nav-edit" size={14} aria-hidden="true" /></button>
         </div>

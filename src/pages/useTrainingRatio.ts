@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { apiJson } from '../lib/api-client'
+import { useTaskDraft } from '../lib/task-drafts'
 import { accountTrainingRequirements, analyzeAccountTraining, defaultTrainingSettings, estimateAccountTrainingDays, type TrainingAccountData, type TrainingSettings } from '../lib/training-ratio-account'
 import { copy } from '../copy'
 import { useSklandSnapshot } from '../hooks/useSklandSnapshot'
@@ -39,9 +40,9 @@ export function useTrainingRatio(session: ReturnType<typeof useToolSession>) {
   const { features } = useSiteFeatures()
   const canImport = Boolean(features.skland && session.user && profile?.skland_binding && profile.status === 'active' && !profile.archived_at && profile.skland_binding.credential_status !== 'invalid')
   const draftKey = `maatool:training-ratio:${session.user?.id ?? 'guest'}:${profile?.id ?? 'none'}`
-  const [draft, setDraft] = useState(() => readDraft(draftKey))
+  const [draft, setDraft] = useTaskDraft('training-ratio:manual', () => readDraft(draftKey))
   const [draftFailed, setDraftFailed] = useState(false)
-  const [settings, setSettings] = useState(() => readSettings(`${draftKey}:goals`))
+  const [settings, setSettings] = useTaskDraft(`${draftKey}:goals`, () => readSettings(`${draftKey}:goals`))
   useEffect(() => {
     try {
       sessionStorage.setItem(draftKey, JSON.stringify(draft))
@@ -49,8 +50,8 @@ export function useTrainingRatio(session: ReturnType<typeof useToolSession>) {
       setDraftFailed(false)
     } catch { setDraftFailed(true) }
   }, [draft, settings, draftKey])
-  const [source, setSource] = useState<'manual' | 'imported'>('imported')
-  const [manualInventory, setManualInventory] = useState<{ lmd: number; exp: number } | null>(null)
+  const [source, setSource] = useTaskDraft<'manual' | 'imported'>('training-ratio:source', 'imported')
+  const [manualInventory, setManualInventory] = useTaskDraft<{ lmd: number; exp: number } | null>('training-ratio:manual-inventory', null)
   const profileId = profile?.id
   const latest = session.user && profileId && session.workspace?.profile_id === profileId ? session.workspace.latest_result : null
   const resultId = latest?.source !== 'manual' ? latest?.id : undefined

@@ -87,6 +87,22 @@ describe('API HTTP request lifecycle', () => {
     expect(routeHandler).toHaveBeenCalledOnce()
   })
 
+  it.each([200, 304])('sends a bodyless %s response without serializing null', async (status) => {
+    routeHandler.mockResolvedValueOnce(new Response(null, {
+      status,
+      headers: { ETag: '"unchanged"', 'Cache-Control': 'public, max-age=60' },
+    }))
+    const response = await fetch(`http://127.0.0.1:${port}/api/health/live`, {
+      headers: { 'If-None-Match': '"unchanged"' },
+    })
+    expect(response.status).toBe(status)
+    expect(await response.text()).toBe('')
+    expect(response.headers.get('ETag')).toBe('"unchanged"')
+    expect(response.headers.get('Cache-Control')).toBe('public, max-age=60')
+    expect(response.headers.get('Content-Type')).toBeNull()
+    expect(response.headers.get('Content-Length')).toBe(status === 304 ? null : '0')
+  })
+
   it('streams binary downloads without serializing their contents', async () => {
     const content = Uint8Array.from([0, 1, 127, 128, 255])
     vi.mocked(routeHandler).mockImplementationOnce(

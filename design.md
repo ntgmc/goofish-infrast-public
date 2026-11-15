@@ -194,8 +194,14 @@ it deliberately when changing the shared design.
   row spacing and no enclosing panel or step numbers. Use at least 14px for action
   guidance, operator names and inventory hints; reserve 12px for auxiliary metadata
   such as times and facility levels. Separate room groups with larger gaps than the
-  spacing within a group. Below 40rem, the first-use checklist collapses to the
-  current step, and preparation rows open the existing editors across the whole row.
+  spacing within a group. “生成我的排班” opens a public four-step tutorial before
+  authentication: sign in or register, bind and import operators, confirm the base
+  configuration, then generate. Keep its progress bar and current step visible;
+  below 40rem only the detailed checklist collapses. The first step links to the
+  independent authentication pages and returns here after completion or cancellation.
+  Keep a visible route back to the example schedule. Infer progress from the
+  current account, imported operators and saved configuration; generation remains
+  an explicit action. Preparation rows open the existing editors across the whole row.
   Coupon options expand on demand on mobile; when no coupons are available, show
   “暂无可用券” and keep the rules collapsed at every width. Keep the generation action
   and any charge summary at the bottom, reserve its measured height in the page,
@@ -257,6 +263,21 @@ it deliberately when changing the shared design.
   below the selected row and collapse methods by default. Retain the V2
   palette, fonts, responsive controls and reduced-motion behavior. Frozen data,
   publication fields and verification: [site comparison](docs/site-benchmark.md).
+- Service status uses a bounded reading area, a quiet tinted current-status banner,
+  a single component list and the seven-day hourly history. The palette in
+  `src/pages/v2/pages/service-status.css` consistently maps normal to emerald,
+  expanding capacity to blue, slower processing to ochre, congestion to orange,
+  excessive queuing to vermilion and unavailable to crimson; unknown periods are
+  neutral and hatched. Excessive queuing has diagonal stripes and unavailable
+  periods use crosshatching. Keep text and distinct badge icons alongside color.
+  History cells share the legend palette,
+  scroll locally on narrow screens and expose details on click or keyboard focus.
+  Use one Tab stop in the grid, arrow keys between hours/days and Home/End within
+  the day (Ctrl for the full week). Preserve real samples, missing-data states,
+  refresh recovery and incident updates. OpenAI's [status page](https://status.openai.com/)
+  and DeepSeek's [status page](https://status.deepseek.com/) informed the restrained
+  surfaces, status hierarchy and continuous history marks; retain the V2 shell,
+  typography and real seven-day data contract.
 - Page coverage and verification: [V2 workspace redesign](docs/v2-workspace-redesign.md).
 
 ### Management console (`/admin`)
@@ -340,7 +361,9 @@ it deliberately when changing the shared design.
 - `SharedCardDialog` provides card-to-detail transitions with shared layout IDs and the morph
   spring (320ms, no bounce) for both opening and return. Keep the close target at 44px and the
   scrolling content at its natural size throughout the transition; track the scroll offset for
-  nested shared elements. Facility cards use it for their background, icon and title. Facility
+  nested shared elements. Keep the original card mounted and explicitly hidden throughout the modal's
+  lifetime, including changes to motion preferences, and restore it on dismissal for the return.
+  Facility cards use it for their background, icon and title. Facility
   details put product, efficiency and shift production first, then compact operator rows with
   identity beside a mood track on wide surfaces and stacked on narrow ones. Keep exact
   starting and ending mood readings beside the track; its filled level represents ending mood,

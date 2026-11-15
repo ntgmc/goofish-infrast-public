@@ -1,4 +1,19 @@
 export const authCopy = {
+  pageTitle: '登录 MaaTool',
+  registerTitle: '创建账号',
+  forgotTitle: '找回密码',
+  pageDescription: '登录后继续管理账号和排班。',
+  registerDescription: '使用邮箱创建账号，开始配置你的排班。',
+  forgotDescription: '输入注册邮箱，获取密码重置邮件。',
+  backToTask: '返回原页面',
+  enterWorkspace: '进入工作台',
+  goToLogin: '去登录',
+  optionalInvitation: '有邀请码？',
+  authTerms: '使用账号前，请阅读',
+  termsLink: '服务条款',
+  privacyLink: '隐私政策',
+  actionCompleted: '已完成',
+  actionFailed: '未完成，请重试',
   api_bot_registration_disabled: 'Bot 注册暂未开放，请联系管理员。',
   // server/handlers/auth.ts and server/handlers/user-auth.ts
   api_method_not_allowed: "当前操作不受支持，请刷新页面后重试。",
@@ -151,13 +166,13 @@ export const authCopy = {
   // src/pages/VerifyEmailPage.tsx
   pages_VerifyEmailPage_002: "正在验证邮箱…",
   // src/pages/VerifyEmailPage.tsx
-  pages_VerifyEmailPage_003: "邮箱验证成功，正在进入工作台。",
+  pages_VerifyEmailPage_003: "邮箱验证成功，账号已登录。",
   // src/pages/VerifyEmailPage.tsx
   pages_VerifyEmailPage_004: "账号安全",
   // src/pages/VerifyEmailPage.tsx
   pages_VerifyEmailPage_005: "验证邮箱",
   // src/pages/VerifyEmailPage.tsx
-  pages_VerifyEmailPage_006: "验证成功后会自动登录，并进入你的账号工作台。",
+  pages_VerifyEmailPage_006: "验证成功后会自动登录。你可以返回原页面继续操作，或进入工作台。",
   // src/pages/VerifyEmailPage.tsx
   pages_VerifyEmailPage_007: "重试验证",
   // src/pages/VerifyEmailPage.tsx
@@ -188,8 +203,6 @@ export const authCopy = {
   pages_ResetPasswordPage_004: "暂时无法重置密码，请稍后重试。",
   // src/pages/ResetPasswordPage.tsx
   pages_ResetPasswordPage_005: "密码已重置，请使用新密码登录。",
-  // src/pages/ResetPasswordPage.tsx
-  pages_ResetPasswordPage_006: "账号安全",
   // src/pages/ResetPasswordPage.tsx
   pages_ResetPasswordPage_007: "重置密码",
   // src/pages/ResetPasswordPage.tsx

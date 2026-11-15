@@ -8,6 +8,7 @@ import FeedbackButton from './FeedbackDialog'
 import { MemoryRouter } from 'react-router'
 import { FeedbackLink } from './PublicFooter'
 import { copy } from '../copy'
+import { TaskDraftProvider } from '../lib/task-drafts'
 
 const mocks = vi.hoisted(() => ({ api: vi.fn(), prepareImage: vi.fn() }))
 vi.mock('../lib/api-client', () => ({ apiJson: mocks.api, getApiErrorMessage: (error: Error) => error.message }))
@@ -40,6 +41,22 @@ it('preserves the draft after failure, submits the chosen category, and clears i
   await waitFor(() => expect(screen.getByRole('button', { name: copy.feedback.title })).toHaveFocus())
   await user.click(screen.getByRole('button', { name: copy.feedback.title }))
   expect(screen.getByLabelText(copy.feedback.message)).toHaveValue('')
+})
+
+it('restores feedback after leaving for authentication without resubmitting it', async () => {
+  mocks.api.mockRejectedValueOnce(new Error('请先登录。'))
+  const view = render(<TaskDraftProvider><FeedbackButton profileId="profile-a" /></TaskDraftProvider>)
+  await userEvent.click(screen.getByRole('button', { name: copy.feedback.title }))
+  await userEvent.selectOptions(screen.getByLabelText(copy.feedback.category), 'account')
+  fireEvent.change(screen.getByLabelText(copy.feedback.message), { target: { value: '需要保留的反馈内容' } })
+  await userEvent.click(screen.getByRole('button', { name: copy.feedback.submit }))
+  await screen.findByRole('alert')
+  view.rerender(<TaskDraftProvider><main>登录页</main></TaskDraftProvider>)
+  view.rerender(<TaskDraftProvider><FeedbackButton profileId="profile-a" /></TaskDraftProvider>)
+  await userEvent.click(screen.getByRole('button', { name: copy.feedback.title }))
+  expect(screen.getByLabelText(copy.feedback.message)).toHaveValue('需要保留的反馈内容')
+  expect(screen.getByLabelText(copy.feedback.category)).toHaveValue('account')
+  expect(mocks.api).toHaveBeenCalledTimes(1)
 })
 
 it('invalidates the current user feedback pages after creation while preserving other users', async () => {

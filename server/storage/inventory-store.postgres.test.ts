@@ -208,6 +208,34 @@ describe('PostgreSQL unified inventory', () => {
     })])
   })
 
+  it('merges available grants by exact expiry while keeping permanent stock and other items separate', async () => {
+    const { userId } = await seedUserProfile()
+    const now = new Date('2026-11-15T00:00:00.000Z')
+    const early = '2026-12-01T08:00:00.000Z'
+    const later = '2026-12-01T08:01:00.000Z'
+    const grants = [[2, null], [3, null], [4, early], [5, early], [6, later], [7, '2026-11-14T00:00:00.000Z']] as const
+    for (const [index, [quantity, expiresAt]] of grants.entries()) {
+      await grantItem({
+        userId, itemCode: 'priority_compute_coupon', quantity, expiry: { mode: 'never' }, expiresAt,
+        sourceType: 'test', sourceId: `expiry-${index}`, recipientRole: 'test', now: '2026-11-01T00:00:00.000Z',
+      })
+    }
+    await grantItem({ userId, itemCode: 'training_diagnosis_coupon', quantity: 8, expiry: { mode: 'never' }, sourceType: 'test', sourceId: 'other-item', recipientRole: 'test' })
+
+    const inventory = await listInventory(userId, now)
+    const stack = inventory.stacks.find((entry) => entry.item.code === 'priority_compute_coupon')!
+    expect(stack).toMatchObject({ quantity: 20, permanent: 5 })
+    expect(new Date(stack.next_expiry_at!).toISOString()).toBe(early)
+    expect(stack.expiry_buckets.map((bucket) => ({ ...bucket, expires_at: bucket.expires_at ? new Date(bucket.expires_at).toISOString() : null }))).toEqual([
+      { quantity: 9, expires_at: early },
+      { quantity: 6, expires_at: later },
+      { quantity: 5, expires_at: null },
+    ])
+    expect(inventory.stacks.find((entry) => entry.item.code === 'training_diagnosis_coupon')?.expiry_buckets).toEqual([{ quantity: 8, expires_at: null }])
+    expect(await getItemBalance(userId, 'priority_compute_coupon', now)).toBe(20)
+    expect((await query('select count(*)::int as count from reward_grants where user_id = $1', [userId])).rows[0].count).toBe(7)
+  })
+
   it.each(['grant', 'campaign'])('waits for reserved items before %s reversal', async (mode) => {
     const { userId, profileId } = await seedUserProfile()
     let grantId: string
@@ -368,6 +396,16 @@ describe('PostgreSQL unified inventory', () => {
       { item_code: 'training_diagnosis_coupon', quantity: 2, expiry: { mode: 'never' } },
     ]) as { version_id: string }
     await publishGiftPackVersion('root', second.version_id)
+    await grantItem({
+      userId, itemCode: first.item_code, quantity: 2, expiry: { mode: 'never' },
+      sourceType: 'test', sourceId: 'new-pack', recipientRole: 'test', giftPackVersionId: second.version_id,
+    })
+    const versions = (await listInventory(userId)).stacks.filter((entry) => entry.item.code === first.item_code)
+    expect(versions).toHaveLength(2)
+    expect(versions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ gift_pack_version_id: first.version_id, expiry_buckets: [{ quantity: 1, expires_at: null }] }),
+      expect.objectContaining({ gift_pack_version_id: second.version_id, expiry_buckets: [{ quantity: 2, expires_at: null }] }),
+    ]))
 
     const opened = await useInventoryItem(userId, {
       item_code: first.item_code,

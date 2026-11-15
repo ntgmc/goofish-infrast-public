@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, Outlet, useSearchParams } from 'react-router'
+import { Link, Navigate, Outlet, useLocation, useSearchParams } from 'react-router'
 import { copy } from '../copy'
 import { profileScopedPath } from '../lib/app-routes'
 import { useSiteFeatures } from '../lib/site-feature-context'
@@ -8,6 +8,7 @@ import FeatureUnavailablePage from './FeatureUnavailablePage'
 import SessionLoader from './SessionLoader'
 import ThemeSwitcher from './ThemeSwitcher'
 import './V1Route.css'
+import { authPath } from '../lib/auth-navigation'
 
 const text = copy.features.v1_migration
 const shutdownAt = Date.parse('2026-11-15T00:00:00+08:00')
@@ -15,6 +16,9 @@ const shutdownAt = Date.parse('2026-11-15T00:00:00+08:00')
 export default function V1Route() {
   const { status, features, retry } = useSiteFeatures()
   const [params] = useSearchParams()
+  const location = useLocation()
+  const invite = params.get('invite') ?? new URLSearchParams(location.hash.slice(1)).get('invite')
+  if (location.pathname.startsWith('/tool') && (invite || params.get('recovery') === '1')) return <Navigate to={authPath(invite ? 'register' : 'forgot', '/v2', invite ?? undefined)} replace />
   if (status === 'loading') return <SessionLoader label={copy.features.loading} />
   if (status === 'error') return <FeatureUnavailablePage loadError onRetry={retry} />
   if (!features.v1) return (

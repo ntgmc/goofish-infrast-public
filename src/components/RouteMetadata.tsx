@@ -15,6 +15,11 @@ type Metadata = {
 }
 
 const PUBLIC_METADATA: Record<string, Metadata> = {
+  '/login': { ...copy.metadata.auth.login, indexable: false },
+  '/register': { ...copy.metadata.auth.register, indexable: false },
+  '/forgot-password': { ...copy.metadata.auth.forgot, indexable: false },
+  '/verify-email': { ...copy.metadata.auth.verify, indexable: false },
+  '/reset-password': { ...copy.metadata.auth.reset, indexable: false },
   '/tools/training-ratio': {
     title: routesCopy.labels['training-ratio'],
     description: routesCopy.descriptions['training-ratio'],
@@ -117,7 +122,7 @@ export default function RouteMetadata() {
     const socialImageUrl = new URL(SOCIAL_IMAGE_PATH, canonicalUrl).href
     const icon = document.head.querySelector<HTMLLinkElement>('link[rel="icon"]') ?? document.createElement('link')
     icon.rel = 'icon'
-    const v2Icon = location.pathname === '/v2' || location.pathname === '/v2/benchmarks'
+    const v2Icon = location.pathname === '/v2' || location.pathname === '/v2/benchmarks' || ['/login', '/register', '/forgot-password', '/verify-email', '/reset-password'].includes(location.pathname)
     icon.type = v2Icon ? 'image/svg+xml' : 'image/png'
     icon.href = v2Icon ? '/assets/maatool-v2-icon.svg' : '/favicon-32.png'
     if (!icon.parentElement) document.head.append(icon)

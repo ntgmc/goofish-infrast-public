@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type RefObject } from 'react'
-import { Link } from 'react-router'
-import AuthForm from '../components/AuthForm'
+import { Link, useLocation } from 'react-router'
+import { authPath } from '../lib/auth-navigation'
+import { useTaskDraft } from '../lib/task-drafts'
 import BrandLogo from '../components/BrandLogo'
 import ThemeSwitcher from '../components/ThemeSwitcher'
 import SklandBindingDialog, { type SklandPayload } from '../components/SklandBindingDialog'
@@ -30,7 +31,7 @@ export function useDepotValue(session?: ReturnType<typeof useToolSession>) {
     })
   }, [session?.user, session?.profiles, session?.activeProfile, session?.workspace, session?.announcementUnreadCount, session?.applyAuthPayload])
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
-  const [depotText, setDepotText] = useState('')
+  const [depotText, setDepotText] = useTaskDraft('depot:upload', '')
   const [auth, setAuth] = useState<AuthMeResponse | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [authError, setAuthError] = useState<string | null>(null)
@@ -41,7 +42,7 @@ export function useDepotValue(session?: ReturnType<typeof useToolSession>) {
   const [loading, setLoading] = useState<DepotValueRequest['source'] | null>(null)
   const [profilePreparing, setProfilePreparing] = useState(false)
   const [sklandDialogOpen, setSklandDialogOpen] = useState(false)
-  const [sampleConsent, setSampleConsent] = useState(true)
+  const [sampleConsent, setSampleConsent] = useTaskDraft('depot:consent', true)
   const [error, setError] = useState<string | null>(null)
   const request = useRef<AbortController | null>(null)
   const analyzedVersion = useRef('')
@@ -226,12 +227,6 @@ export function useDepotValue(session?: ReturnType<typeof useToolSession>) {
     await openSklandBinding()
   }
 
-  const handleAuthenticated = (payload: AuthMeResponse) => {
-    applyAuthData(payload)
-    updateSession(payload)
-    void openSklandBinding()
-  }
-
   const handleSklandPayload = (payload: SklandPayload) => {
     applyAuthData(payload)
     updateSession(payload)
@@ -265,15 +260,16 @@ export function useDepotValue(session?: ReturnType<typeof useToolSession>) {
   return { canvasRef, depotText, setDepotText, auth, authLoading, authError, setAuthLoadRevision, depotProfile,
     selectedProfileId, setSelectedProfileId, result, setResult, loading: loading ?? (snapshot.busy ? 'skland' as const : null), profilePreparing, sklandDialogOpen, setSklandDialogOpen,
     sampleConsent, setSampleConsent, error: error || snapshot.error || null, setError, sklandProfiles, selectedSklandProfile, openSklandBinding,
-    readClipboard, analyzeUpload, analyzeSkland, handleAuthenticated, handleSklandPayload, handleSklandCompleted, downloadShareImage }
+    readClipboard, analyzeUpload, analyzeSkland, handleSklandPayload, handleSklandCompleted, downloadShareImage }
 }
 
 export default function DepotValuePage({ embedded = false, session }: { embedded?: boolean; session?: ReturnType<typeof useToolSession> } = {}) {
+  const location = useLocation()
   const PageRoot = embedded ? 'section' : 'main'
   const { canvasRef, depotText, setDepotText, auth, authLoading, authError, setAuthLoadRevision, depotProfile,
     selectedProfileId, setSelectedProfileId, result, setResult, loading, profilePreparing, sklandDialogOpen, setSklandDialogOpen,
     sampleConsent, setSampleConsent, error, setError, sklandProfiles, selectedSklandProfile, openSklandBinding,
-    readClipboard, analyzeUpload, analyzeSkland, handleAuthenticated, handleSklandPayload, handleSklandCompleted, downloadShareImage } = useDepotValue(session)
+    readClipboard, analyzeUpload, analyzeSkland, handleSklandPayload, handleSklandCompleted, downloadShareImage } = useDepotValue(session)
   return (
     <PageRoot className={embedded ? 'v2-embedded-tool' : 'tool-page'} tabIndex={-1} data-route-focus>
       <div className={embedded ? undefined : 'tool-page-frame max-w-6xl'}>
@@ -388,12 +384,8 @@ export default function DepotValuePage({ embedded = false, session }: { embedded
                 </div>
               ) : !auth?.user ? (
                 <div className="tool-inset mt-4 p-4">
-                  <AuthForm
-                    compact
-                    allowCdk={false}
-                    intro={copy.tools.pages_DepotValuePage_028}
-                    onAuthenticated={handleAuthenticated}
-                  />
+                  <p>{copy.tools.pages_DepotValuePage_028}</p>
+                  <Link className="tool-primary-action mt-3 inline-flex" to={authPath('login', `${location.pathname}${location.search}${location.hash}`)}>{copy.v2.login}</Link>
                 </div>
               ) : (
                 <div className="mt-4 space-y-3">

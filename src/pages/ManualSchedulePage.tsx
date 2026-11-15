@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useLocation } from 'react-router'
+import { authPath } from '../lib/auth-navigation'
 import BrandLogo from '../components/BrandLogo'
 import ThemeSwitcher from '../components/ThemeSwitcher'
 import ManualBlankScheduleSetup from '../components/ManualBlankScheduleSetup'
@@ -15,6 +16,7 @@ import { useSiteFeatures } from '../lib/site-feature-context'
 import { mergeOperators } from '../lib/license'
 import type { LicenseConfig, OptimizeResult } from '../lib/types'
 import { useToolSession } from './tool/useToolSession'
+import { useTaskDraft } from '../lib/task-drafts'
 
 type PageProps = { embedded?: boolean; session?: ReturnType<typeof useToolSession>; onDirtyChange?: (dirty: boolean) => void; onOpenProfile?: (profile: ReturnType<typeof useToolSession>['profiles'][number]) => Promise<void> }
 
@@ -37,12 +39,13 @@ export function useManualTool({ session, embedded = false, onDirtyChange }: Page
   const operators = useMemo(() => ready
     ? mergeOperators(session.workspace?.operators ?? [], session.eliteOverrides) : [],
   [ready, session.workspace?.operators, session.eliteOverrides])
-  const [preset, setPreset] = useState('')
-  const [shiftHours, setShiftHours] = useState<string | null>(null)
-  const [configDraft, setConfigDraft] = useState<LicenseConfig | null>(null)
+  const draftKey = `manual-tool:${session.user?.id ?? 'guest'}:${profile?.id ?? 'none'}`
+  const [preset, setPreset] = useTaskDraft(`${draftKey}:preset`, '')
+  const [shiftHours, setShiftHours] = useTaskDraft<string | null>(`${draftKey}:hours`, null)
+  const [configDraft, setConfigDraft] = useTaskDraft<LicenseConfig | null>(`${draftKey}:config`, null)
   const baseConfig = configDraft ?? normalizeConfig(preset ? CONFIG_PRESETS[preset] : session.workspace?.config ?? CONFIG_PRESETS['243'])
   const configuredHours = shiftHours ?? (Array.isArray(baseConfig.shift_hours) ? baseConfig.shift_hours.join('-') : baseConfig.shift_hours ?? '8-8-8')
-  const [draft, setDraft] = useState<{ source: OptimizeResult; config: LicenseConfig; profileId: string; revision: number } | null>(null)
+  const [draft, setDraft] = useTaskDraft<{ source: OptimizeResult; config: LicenseConfig; profileId: string; revision: number } | null>(`${draftKey}:schedule`, null)
   const [error, setError] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
   const upload = useRef<HTMLInputElement>(null)
@@ -60,12 +63,8 @@ export function useManualTool({ session, embedded = false, onDirtyChange }: Page
 
   useEffect(() => {
     onDirtyChange?.(false)
-    setDraft(null)
     setError(null)
-    setPreset('')
-    setConfigDraft(null)
-    setShiftHours(null)
-    revision.current += 1
+    revision.current = (draft?.revision ?? 0) + 1
   }, [profile?.id])
 
   const configuration = (): LicenseConfig => ({
@@ -118,6 +117,7 @@ export function useManualTool({ session, embedded = false, onDirtyChange }: Page
 }
 
 function ManualScheduleContent({ session, embedded = false, onDirtyChange, onOpenProfile }: PageProps & { session: ReturnType<typeof useToolSession> }) {
+  const location = useLocation()
   const label = copy.tools.manualSchedule
   const ContentRoot = embedded ? 'div' : 'main'
   const operatorsPath = (profileId: string) => embedded ? `${v2Path('overview', profileId)}&panel=operators` : profileScopedPath(workspaceSetupPath('operators'), profileId)
@@ -145,7 +145,7 @@ function ManualScheduleContent({ session, embedded = false, onDirtyChange, onOpe
               <p>{session.authError?.message}</p>
               <button type="button" className="tool-secondary-action mt-2" onClick={session.retryAuth}>{copy.tools.pages_DepotValuePage_086}</button>
             </div>
-          ) : !profile ? <p className="tool-alert tool-alert--warning p-3 text-sm" role="status">{label.unavailable}</p> : (
+          ) : !profile ? <div className="tool-alert tool-alert--warning p-3 text-sm" role="status">{label.unavailable}{!session.user && <Link className="tool-primary-action mt-3 inline-flex" to={authPath('login', `${location.pathname}${location.search}${location.hash}`)}>{copy.v2.login}</Link>}</div> : (
             <>
               <label className="block space-y-2 text-sm">
                 <span>{label.profile}</span>

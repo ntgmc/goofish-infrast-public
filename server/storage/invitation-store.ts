@@ -536,7 +536,7 @@ export async function getInvitationSummary(
       campaign_enabled: settings.enabled,
       code,
       code_status: codeRow?.status ?? null,
-      share_url: code && codeRow?.status === 'active' ? `/tool/profiles?invite=${encodeURIComponent(code)}` : null,
+      share_url: code && codeRow?.status === 'active' ? `/register?invite=${encodeURIComponent(code)}` : null,
       reward_preview: {
         inviter: previews.filter((item) => item.recipient === 'inviter').map(({ recipient: _recipient, ...item }) => item),
         invitee: previews.filter((item) => item.recipient === 'invitee').map(({ recipient: _recipient, ...item }) => item),

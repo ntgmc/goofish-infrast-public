@@ -1,4 +1,7 @@
 import { useMemo, useState } from 'react'
+import { useLocation } from 'react-router'
+import { authPath } from '../../../lib/auth-navigation'
+import { useTaskDraft } from '../../../lib/task-drafts'
 import { matchesSearch } from '../../../lib/search'
 import { RefreshIcon, UndoIcon, ExcludeIcon, NextIcon, ExternalLinkIcon } from '../../../components/icons'
 import { copy } from '../../../copy'
@@ -21,8 +24,9 @@ type Model = ReturnType<typeof useCultivation>
 const text = copy.tools.cultivation
 
 export default function Cultivation({ session }: { session: V2Session }) {
+  const location = useLocation()
   const m = useCultivation(session)
-  const [view, setView] = useState('priorities')
+  const [view, setView] = useTaskDraft('cultivation:view', 'priorities')
   const appliedQuery = m.appliedOptions.recommendation ?? defaultCultivationQuery
   const projectScope = session.user && m.profileId ? { userId: session.user.id, profileId: m.profileId } : null
   const importProjects = m.recommendations?.flatMap((candidate) => { const project = projectFromCultivationCandidate(candidate); return project ? [project] : [] }) ?? []
@@ -33,7 +37,7 @@ export default function Cultivation({ session }: { session: V2Session }) {
         {session.authStatus === 'authenticated' && m.profiles.length ? <>
           <label className="v2-field"><span>{text.profile}</span><select className="v2-input" value={m.profileId} onChange={(event) => m.setChosenProfile(event.target.value)}>{m.profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.display_name}</option>)}</select></label>
           <button type="button" className="v2-button v2-button-primary" disabled={m.busy} aria-busy={m.busy} onClick={() => void m.load()}><RefreshIcon size={16} aria-hidden="true" />{copy.skland.refresh}</button>
-        </> : session.authLoading ? <Loading label={text.loading} /> : <div className="v2-cultivation-access"><p>{session.authStatus === 'authenticated' ? text.noProfile : text.login}</p><Link className="v2-button v2-button-secondary" to={v2Path('profiles', session.activeProfile?.id)}>{text.loginAction}</Link></div>}
+        </> : session.authLoading ? <Loading label={text.loading} /> : <div className="v2-cultivation-access"><p>{session.authStatus === 'authenticated' ? text.noProfile : text.login}</p><Link className="v2-button v2-button-secondary" to={!session.user ? authPath('login', `${location.pathname}${location.search}${location.hash}`) : v2Path('profiles', session.activeProfile?.id)}>{text.loginAction}</Link></div>}
         {projectScope && <Link className="v2-text-button v2-cultivation-project-link" to={v2Path('cultivation-projects', m.profileId)}>{copy.cultivationProjects.title}<NextIcon size={14} aria-hidden="true" /></Link>}
       </div>
       <div className="v2-data-feedback"><DataRefresh key={m.profileId} pending={m.busy} revision={m.data} error={Boolean(m.error)}

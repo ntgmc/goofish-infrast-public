@@ -1,5 +1,7 @@
 import { ScheduleComparisonIcon, NextIcon as ArrowRight, TrainingRatioIcon as Calculator, ProjectsIcon, CultivationIcon, ThanksRecruitmentIcon, MaterialDemandIcon, ManualScheduleIcon as CalendarClock, DepotValueIcon as Gem } from '../../../components/icons'
 import { copy } from '../../../copy'
+import { useLocation, useNavigate } from 'react-router'
+import { authPath } from '../../../lib/auth-navigation'
 import { useSiteFeatures } from '../../../lib/site-feature-context'
 import { useListReveal } from '../../../lib/use-list-reveal'
 import type { V2Session } from '../OptionsDrawer'
@@ -48,13 +50,16 @@ export default function Tools({ profileId }: { profileId?: string }) {
 }
 
 export function ManualTool({ session, workflow, onDirtyChange, onOpenProfile, onNavigate }: { session: V2Session; workflow?: V2Workflow; onDirtyChange: (dirty: boolean) => void; onOpenProfile: (profile: V2Session['profiles'][number]) => Promise<void>; onNavigate: (section: V2Section) => void }) {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const loginPath = authPath('login', `${location.pathname}${location.search}${location.hash}`)
   const m = useManualTool({ session, embedded: true, onDirtyChange })
   const text = copy.tools.manualSchedule
   const operatorsPath = (profileId: string) => `${v2Path('overview', profileId)}&panel=operators`
   return <div className="v2-manual-workspace"><p className="v2-lead">{text.description}</p><p className="v2-muted">{text.access}</p>
     <div className="v2-manual-preparation">
       <section><span className="v2-step-number">01</span><SectionTitle title={copy.v2.setupAccount} />
-        {session.authLoading ? <Loading label={text.loading} /> : session.authStatus === 'error' ? <Notice error>{session.authError?.message}<button className="v2-text-button" onClick={session.retryAuth}>{copy.tools.pages_DepotValuePage_086}</button></Notice> : !m.profile ? <Notice>{text.unavailable}</Notice> : <>
+        {session.authLoading ? <Loading label={text.loading} /> : session.authStatus === 'error' ? <Notice error>{session.authError?.message}<button className="v2-text-button" onClick={session.retryAuth}>{copy.tools.pages_DepotValuePage_086}</button></Notice> : !m.profile ? <Notice>{text.unavailable}{!session.user && <Link className="v2-button v2-button-primary" to={loginPath}>{copy.v2.login}</Link>}</Notice> : <>
           <label className="v2-field"><span>{text.profile}</span><select className="v2-input" value={m.ready ? m.profile.id : ''} disabled={Boolean(session.openingProfileId) || m.importing} onChange={(event) => { const profile = m.available.find((item) => item.id === event.target.value); if (profile) void onOpenProfile(profile) }}>{!m.ready && <option value="" disabled>{copy.common.pages_tool_useToolSession_004}</option>}{m.available.map((profile) => <option key={profile.id} value={profile.id}>{profile.display_name}</option>)}</select></label>
           {m.ready && !m.operators.some((operator) => operator.own) && <p>{text.operatorsRequired} <Link className="v2-text-button" to={operatorsPath(m.profile.id)}>{text.setup}</Link></p>}
           {m.ready && m.operators.some((operator) => operator.own) && <details className="v2-disclosure"><summary>{text.operators} · {m.operators.filter((operator) => operator.own).length}</summary><p>{copy.v2.manualOperatorsHelp}</p><OperatorSkillPreview><div className="v2-manual-operators">{m.operators.filter((operator) => operator.own).map((operator) => <div key={operator.id}><OperatorAvatarTile operator={operator} compact showFullNames /><small>{copy.domain.building_skills.unlock(operator.elite, Number(operator.level) || 1)}</small></div>)}</div></OperatorSkillPreview><Link className="v2-text-button" to={operatorsPath(m.profile.id)}>{text.editOperators}</Link></details>}
@@ -72,6 +77,6 @@ export function ManualTool({ session, workflow, onDirtyChange, onOpenProfile, on
       onUpdate={(mutate) => { const next = structuredClone(m.baseConfig); mutate(next); m.setConfigDraft(next) }} onStart={m.start} />
     <Notice error>{m.error ?? session.workspaceLoadError}{session.workspaceLoadError && m.profile && <button className="v2-text-button" disabled={Boolean(session.openingProfileId)} onClick={() => void session.refreshProfileWorkspace(m.profile!).catch(() => undefined)}>{text.retryWorkspace}</button>}</Notice>
     {m.canUse && m.draft && m.draft.profileId === m.profile?.id && <div className="v2-manual-editor"><ManualScheduleEditor revealCandidates key={`${m.draft.profileId}:${m.draft.revision}`} source={m.draft.source} profileId={m.draft.profileId} draftStorageKey={`tool:${m.draft.profileId}`} operators={m.operators} simulationBaseline={{ config: m.draft.config }} onDirtyChange={onDirtyChange} renderExport={(props) => workflow && <ManualResultExport key={props.resultId} {...props} workflow={workflow}
-      onRecover={(action) => { onNavigate(action === 'login' ? 'generation' : action); if (action === 'login') session.retryAuth() }} />} /></div>}
+      onRecover={(action) => { if (action === 'login') void navigate(loginPath); else onNavigate(action) }} />} /></div>}
   </div>
 }

@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import type { AuthSuccessResponse } from '../lib/types'
 import { apiJson } from '../lib/api-client'
 import { copy } from '../copy/index'
-import { FIRST_SCHEDULE_INTENT_KEY } from '../lib/first-schedule'
-import { v2Path } from './v2/navigation'
+import { authPath, readAuthReturn } from '../lib/auth-navigation'
+import AuthLayout from './v2/AuthLayout'
 
 type VerificationState = 'loading' | 'success' | 'error'
 
@@ -32,15 +32,11 @@ function requestEmailVerification(token: string): Promise<AuthSuccessResponse> {
 
 export default function VerifyEmailPage() {
   const [searchParams] = useSearchParams()
-  const navigate = useNavigate()
   const token = searchParams.get('token')?.trim() ?? ''
   const [state, setState] = useState<VerificationState>(token ? 'loading' : 'error')
   const [error, setError] = useState<string | null>(token ? null : copy.auth.pages_VerifyEmailPage_001)
   const attemptRef = useRef(0)
-  const [returnPath] = useState(() => {
-    try { if (window.localStorage.getItem(FIRST_SCHEDULE_INTENT_KEY) === 'true') return v2Path('generation') } catch { /* Storage may be disabled. */ }
-    return '/tool/profiles'
-  })
+  const [returnPath] = useState(readAuthReturn)
 
   const verify = useCallback((isCancelled: () => boolean = () => false) => {
     if (!token) return
@@ -66,18 +62,9 @@ export default function VerifyEmailPage() {
     verify(() => cancelled)
     return () => { cancelled = true }
   }, [token, verify])
-  useEffect(() => {
-    if (state !== 'success') return
-    const timer = window.setTimeout(() => navigate(returnPath, { replace: true }), 500)
-    return () => window.clearTimeout(timer)
-  }, [navigate, returnPath, state])
 
   return (
-    <main className="mx-auto flex min-h-[70vh] w-full max-w-xl items-center px-5 py-12 sm:px-8" tabIndex={-1} data-route-focus>
-      <section className="tool-panel w-full p-6 sm:p-8" aria-labelledby="verify-email-title">
-        <p className="section-index">{copy.auth.pages_VerifyEmailPage_004}</p>
-        <h1 id="verify-email-title" className="display-title mt-2 text-2xl text-ink-primary">{copy.auth.pages_VerifyEmailPage_005}</h1>
-        <p className="mt-3 text-sm leading-6 text-ink-secondary">{copy.auth.pages_VerifyEmailPage_006}</p>
+    <AuthLayout title={copy.auth.pages_VerifyEmailPage_005} description={copy.auth.pages_VerifyEmailPage_006} backTo={returnPath}>
 
         {state === 'loading' && <div className="tool-alert mt-6" role="status" aria-live="polite">{copy.auth.pages_VerifyEmailPage_002}</div>}
         {state === 'success' && <div className="tool-alert tool-alert--success mt-6" role="status" aria-live="polite">{copy.auth.pages_VerifyEmailPage_003}</div>}
@@ -88,12 +75,12 @@ export default function VerifyEmailPage() {
             {copy.auth.pages_VerifyEmailPage_007}
           </button>
         )}
+        {state === 'success' && <Link to={returnPath} className="v2-button v2-button-primary mt-6 w-full">{copy.auth.enterWorkspace}</Link>}
         {state === 'error' && (
-          <Link to={returnPath} className="tool-secondary-action mt-3 flex min-h-11 w-full items-center justify-center px-4 text-sm">
+          <Link to={authPath('login', returnPath)} className="tool-secondary-action mt-3 flex min-h-11 w-full items-center justify-center px-4 text-sm">
             {copy.auth.pages_VerifyEmailPage_008}
           </Link>
         )}
-      </section>
-    </main>
+    </AuthLayout>
   )
 }

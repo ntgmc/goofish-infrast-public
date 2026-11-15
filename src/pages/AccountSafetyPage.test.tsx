@@ -60,12 +60,13 @@ describe('AccountSafetyPage lifecycle controls', () => {
     expect(router.state.location.pathname).toBe('/account-safety')
   })
 
-  it('replaces the legacy entry with settings when the service is open', async () => {
+  it('opens authentication with a settings destination when the service is open', async () => {
     vi.mocked(useSiteFeatures).mockReturnValue({
       status: 'ready', features: DEFAULT_SITE_FEATURES, updatedAt: null, retry: vi.fn(),
     })
     const router = renderPage()
-    await waitFor(() => expect(router.state.location.pathname).toBe('/tool/settings'))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/login'))
+    expect(new URLSearchParams(router.state.location.search).get('return_to')).toBe('/v2?section=settings')
     expect(router.state.historyAction).toBe('REPLACE')
     expect(screen.queryByRole('button', { name: '申请注销账号' })).not.toBeInTheDocument()
   })
@@ -90,7 +91,7 @@ describe('AccountSafetyPage lifecycle controls', () => {
 function renderPage(initialEntry = '/account-safety') {
   const router = createMemoryRouter([
     { path: '/account-safety', element: <AccountSafetyPage /> },
-    { path: '/tool/settings', element: <main>Settings destination</main> },
+    { path: '/login', element: <main>Login destination</main> },
   ], { initialEntries: [initialEntry] })
   render(<RouterProvider router={router} />)
   return router

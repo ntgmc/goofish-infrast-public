@@ -18,7 +18,7 @@ export default async function userInvitationsHandler(req: Request): Promise<Resp
         : await manageInvitationCode(auth.user.id, body.action)
       return jsonResponse({
         ...result,
-        share_url: result.status === 'active' ? `/tool/profiles?invite=${encodeURIComponent(result.code)}` : null,
+        share_url: result.status === 'active' ? `/register?invite=${encodeURIComponent(result.code)}` : null,
       })
     }
     if (req.method !== 'GET') return jsonResponse({ error: '当前请求方式不受支持，请刷新页面后重试。' }, 405)

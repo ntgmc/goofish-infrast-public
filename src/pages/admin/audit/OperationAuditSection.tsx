@@ -84,7 +84,7 @@ function AuditDialog({ selected, onSelect, onClose }: { selected: Pick<AdminAudi
 }
 
 function AuditDetail({ selected, onSelect }: { selected: Pick<AdminAuditRecord, 'source' | 'id'>; onSelect: (item: AdminAuditRecord) => void }) {
-  const params = new URLSearchParams(selected)
+  const params = new URLSearchParams({ source: selected.source, id: selected.id })
   const query = useAdminPanelQuery<{ item: AdminAuditDetail }>('operation-audit-detail', `/api/admin/operation-audit?${params}`)
   const [relatedPage, setRelatedPage] = useState(1)
   const [relatedSize, setRelatedSize] = useState(25)

@@ -41,7 +41,7 @@ export default async function adminRegistrationInvitationsHandler(req: Request):
       return jsonResponse({
         invitation: created.invitation,
         code: created.code,
-        share_url: `/tool/profiles?invite=${encodeURIComponent(created.code)}`,
+        share_url: `/register?invite=${encodeURIComponent(created.code)}`,
       }, 201)
     }
     if (req.method === 'PATCH') {

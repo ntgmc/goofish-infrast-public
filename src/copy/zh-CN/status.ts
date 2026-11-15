@@ -39,6 +39,7 @@ export const statusCopy = {
   pages_StatusPage_041: "部分历史数据暂不可用，灰色方格表示该时段没有记录。",
   pages_StatusPage_042: "状态图例",
   pages_StatusPage_043: "最近 7 天每小时状态",
+  serviceStatus_historyHint: "左右滑动查看全部时段，点击方格查看详情。",
   pages_StatusPage_044: "事件时间线",
   pages_StatusPage_045: "服务事件",
   pages_StatusPage_046: "近期没有公开事件。",

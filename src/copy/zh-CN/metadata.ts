@@ -1,4 +1,11 @@
 export const metadataCopy = {
+  auth: {
+    login: { title: '登录 | MaaTool', description: '登录后继续管理游戏账号、排班和养成计划。' },
+    register: { title: '注册 | MaaTool', description: '创建 MaaTool 账号，验证邮箱后即可登录。' },
+    forgot: { title: '找回密码 | MaaTool', description: '通过邮箱重置 MaaTool 账号密码。' },
+    verify: { title: '验证邮箱 | MaaTool', description: '验证邮箱并登录 MaaTool 账号。' },
+    reset: { title: '重置密码 | MaaTool', description: '设置新密码后，登录并继续使用工作台。' },
+  },
   // src/components/RouteMetadata.tsx
   components_RouteMetadata_001: "导入森空岛或 MAA 干员数据，生成明日方舟基建排班，查看预计日产出、等效理智、培养建议和仓库估值。",
   // src/components/RouteMetadata.tsx

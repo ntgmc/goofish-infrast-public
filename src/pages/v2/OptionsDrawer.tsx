@@ -2,7 +2,6 @@ import { useRef, useState } from 'react'
 import ConfigCapabilityPreview from '../../components/ConfigCapabilityPreview'
 import type { ConfigDiffItem } from '../../lib/workspace-history'
 import { BalanceIcon, BillingIcon, InventoryIcon, LoadingIcon, NextIcon as ArrowRight, SelectedIcon as Check, SettingsIcon, LogoutIcon as LogOut, AccountIcon as UserRound, SuccessIcon } from '../../components/icons'
-import AuthForm from '../../components/AuthForm'
 import SklandIcon from '../../components/SklandIcon'
 import AppearanceSettings from './AppearanceSettings'
 import ConfigEditor from '../../components/ConfigEditor'
@@ -69,7 +68,6 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
   const availableProfiles = session.cdkProfiles.filter((profile) => (METERED_BILLING_AVAILABLE && featureState.features.metered_billing) || !profile.kind.startsWith('metered_'))
   const validation = validateScheduleConfig(config)
   const exampleData = sample && !session.license
-  const showAuthForm = shownPanel === 'account' && !session.user && featureState.status === 'ready' && featureState.features.site && featureState.features.login
   const description = shownPanel === 'settings' ? text.appearance.description : isConfig ? exampleData ? text.demoConfigDescription : text.configDescription
     : shownPanel === 'operators' ? exampleData ? text.sampleOperatorDescription : text.operatorDescription
       : session.user ? text.accountManagementDescription : text.accountDescription
@@ -77,7 +75,6 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
   return (
     <Dialog open={panel !== null} onOpenChange={(open) => { if (!open) onClose() }}>
       <DialogContent className={`v2-drawer ${isConfig ? 'v2-drawer-wide' : shownPanel === 'operators' ? 'v2-management-drawer v2-operators-drawer' : isAccount ? 'v2-management-drawer v2-account-drawer' : ''}`} showCloseButton closeLabel={text.close}
-        preventOutsideDismiss={showAuthForm}
         onOpenAutoFocus={() => { opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null }}
         onCloseAutoFocus={(event) => { event.preventDefault(); setLastPanel(null); if (opener.current?.isConnected) opener.current.focus({ preventScroll: true }) }}>
         <div className="v2-drawer-heading">
@@ -143,11 +140,9 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
                   )}</nav>
                 </section>}
               </>
-            ) : showAuthForm ? (
-              <AuthForm compact allowCdk={false} onAuthenticated={(payload) => { session.applyAuthPayload(payload); onClose() }} submitClassName="v2-button v2-button-primary w-full" />
             ) : (
-              <div className="v2-empty-state"><UserRound size={30} /><p>{text.loginUnavailable}</p>
-                <button type="button" className="v2-button v2-button-secondary" onClick={() => { featureState.retry(); session.retryAuth() }}>{text.loginRetry}</button></div>
+              <div className="v2-empty-state"><UserRound size={30} /><p>{text.signInRequired}</p>
+                <button type="button" className="v2-button v2-button-primary" onClick={onAccount}>{text.login}</button></div>
             )}
           </div>
         )}

@@ -1,11 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { DEFAULT_SITE_FEATURE_SETTINGS } from '../../src/lib/site-features'
 
 const mocks = vi.hoisted(() => ({
   getLatestWebsiteNotificationCursor: vi.fn(),
   listWebsiteNotificationEvents: vi.fn(),
   reservePersistentRateLimit: vi.fn(),
   retain: vi.fn(),
+  getSiteFeatureSettings: vi.fn(),
+  routeHandler: vi.fn(),
 }))
+
+vi.mock('../storage/feature-settings-store', () => ({ getSiteFeatureSettings: mocks.getSiteFeatureSettings }))
+vi.mock('../routes', () => ({ API_ROUTES: [['/api/integrations/qqbot/events', mocks.routeHandler]] }))
 
 vi.mock('../storage/website-notification-event-store', async (importOriginal) => ({
   ...await importOriginal<typeof import('../storage/website-notification-event-store')>(),
@@ -18,6 +24,7 @@ vi.mock('../security/persistent-rate-limit', async (importOriginal) => ({
 }))
 
 import handler from './website-events'
+import { createApiServer } from '../http-server'
 
 const originalToken = process.env.WEBSITE_EVENTS_TOKEN
 const originalReleaseToken = process.env.WEBSITE_RELEASE_CONFIRMATION_TOKEN
@@ -26,6 +33,11 @@ const releaseToken = 'release-confirmation-token-at-least-32-bytes'
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mocks.routeHandler.mockImplementation(handler)
+  mocks.getSiteFeatureSettings.mockResolvedValue({
+    ...DEFAULT_SITE_FEATURE_SETTINGS,
+    features: { ...DEFAULT_SITE_FEATURE_SETTINGS.features, qqbot: false, login: false },
+  })
   process.env.WEBSITE_EVENTS_TOKEN = token
   process.env.WEBSITE_RELEASE_CONFIRMATION_TOKEN = releaseToken
   mocks.reservePersistentRateLimit.mockResolvedValue({
@@ -60,6 +72,38 @@ describe('website event feed handler', () => {
     expect(response.status).toBe(403)
     await expect(response.json()).resolves.toEqual({ error: 'Forbidden', code: 'forbidden' })
     expect(mocks.getLatestWebsiteNotificationCursor).not.toHaveBeenCalled()
+  })
+
+  it('serves authenticated events through HTTP with personal QQ closed and honors the independent switch', async () => {
+    const server = createApiServer()
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+    try {
+      const address = server.address()
+      if (!address || typeof address === 'string') throw new Error('Test server did not expose a TCP address')
+      const url = `http://127.0.0.1:${address.port}/api/integrations/qqbot/events?cursor=841`
+      expect((await fetch(url)).status).toBe(401)
+      expect((await fetch(url, { headers: { Authorization: `Bearer ${releaseToken}` } })).status).toBe(403)
+      expect(mocks.listWebsiteNotificationEvents).not.toHaveBeenCalled()
+
+      const headers = { Authorization: `Bearer ${token}` }
+      const response = await fetch(url, { headers })
+      expect(response.status).toBe(200)
+      expect(response.headers.get('Cache-Control')).toBe('private, no-store')
+      await expect(response.json()).resolves.toMatchObject({ next_cursor: '842' })
+      expect(mocks.listWebsiteNotificationEvents).toHaveBeenCalledWith('841', 100)
+
+      mocks.getSiteFeatureSettings.mockResolvedValue({
+        ...DEFAULT_SITE_FEATURE_SETTINGS,
+        features: { ...DEFAULT_SITE_FEATURE_SETTINGS.features, website_events: false },
+      })
+      const closed = await fetch(url, { headers })
+      expect(closed.status).toBe(503)
+      await expect(closed.json()).resolves.toMatchObject({ code: 'feature_disabled', feature: 'website_events' })
+      expect(mocks.listWebsiteNotificationEvents).toHaveBeenCalledOnce()
+    } finally {
+      server.closeAllConnections()
+      await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()))
+    }
   })
 
   it('registers a first consumer at the current high-water cursor', async () => {

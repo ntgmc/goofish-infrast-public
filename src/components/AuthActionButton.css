@@ -1,0 +1,89 @@
+.auth-action {
+  --auth-action-size: 3rem;
+  display: flex;
+  justify-content: center;
+  min-height: var(--auth-action-size);
+}
+
+.auth-action .auth-action-button {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  height: var(--auth-action-size);
+  min-height: 48px;
+  padding: 0;
+  overflow: hidden;
+  transition: width 300ms ease-in-out, border-radius 300ms ease-in-out, background-color 200ms ease-in-out, border-color 200ms ease-in-out;
+}
+
+.auth-action .auth-action-button:disabled { opacity: 1; cursor: wait; }
+.auth-action .auth-action-button:disabled[data-phase="idle"] { opacity: .55; cursor: not-allowed; }
+.auth-action .auth-action-button::after { display: none; }
+.auth-action .auth-action-button:not([data-phase="idle"]) { width: var(--auth-action-size); border-radius: 50%; }
+.auth-action .auth-action-button[data-phase="success"] { background: var(--color-positive); border-color: var(--color-positive); color: var(--color-paper); }
+.auth-action .auth-action-button[data-phase="error"] { background: var(--color-negative); border-color: var(--color-negative); color: var(--color-on-negative); }
+
+.auth-action-label {
+  display: block;
+  padding-inline: 1rem;
+  min-width: 0;
+  white-space: normal;
+  line-height: 1.4;
+  transition: opacity 100ms ease-in-out 200ms;
+}
+.auth-action-button:not([data-phase="idle"]) .auth-action-label { opacity: 0; transition-delay: 0ms; }
+
+.auth-action-spinner,
+.auth-action-check,
+.auth-action-cross {
+  position: absolute;
+  inset: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin: auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+}
+.auth-action-spinner circle { stroke-dasharray: 42 15; }
+.auth-action-button[data-phase="loading"] .auth-action-spinner {
+  opacity: 1;
+  transition: opacity 150ms ease-in-out 300ms;
+  animation: auth-action-spin 800ms linear infinite;
+}
+.auth-action-check path, .auth-action-cross path { stroke-dasharray: 1; stroke-dashoffset: 1; }
+.auth-action-button[data-phase="success"] .auth-action-check,
+.auth-action-button[data-phase="error"] .auth-action-cross { opacity: 1; }
+.auth-action-button[data-phase="success"] .auth-action-check path { animation: auth-action-draw 300ms ease-in-out forwards; }
+.auth-action-button[data-phase="error"] .auth-action-cross path { animation: auth-action-draw 180ms ease-in-out forwards; }
+.auth-action-button[data-phase="error"] .auth-action-cross path + path { animation-delay: 100ms; }
+
+.auth-form--animated .auth-feedback-slot {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 220ms ease-in-out, margin-top 220ms ease-in-out, opacity 160ms ease-in-out;
+}
+.auth-form--animated .auth-feedback-slot[data-visible="true"] { grid-template-rows: 1fr; margin-top: 1rem; opacity: 1; }
+.auth-form--animated .auth-feedback-content { min-height: 0; overflow: hidden; }
+.auth-form--animated [aria-pressed] { transition: background-color 180ms ease-in-out, color 180ms ease-in-out; }
+.auth-form--animated .tool-field { transition: border-color 180ms ease-in-out, box-shadow 180ms ease-in-out; }
+.auth-form--animated .auth-field-message { animation: auth-field-reveal 180ms ease-in-out; }
+
+@keyframes auth-action-spin { to { transform: rotate(360deg); } }
+@keyframes auth-action-draw { to { stroke-dashoffset: 0; } }
+@keyframes auth-field-reveal { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: translateY(0); } }
+
+:root[data-reduced-motion] .auth-action .auth-action-button:not([data-phase="idle"]) { width: 100%; border-radius: var(--radius-v2-control); }
+:root[data-reduced-motion] .auth-action-spinner { animation: none; }
+:root[data-reduced-motion] :is(.auth-action-check, .auth-action-cross) path { animation: none; stroke-dashoffset: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .auth-action .auth-action-button:not([data-phase="idle"]) { width: 100%; border-radius: var(--radius-v2-control); }
+  .auth-action-spinner { animation: none !important; transition: none !important; }
+  :is(.auth-action-check, .auth-action-cross) path { animation: none !important; stroke-dashoffset: 0; }
+  .auth-form--animated .auth-field-message { animation: none; }
+  .auth-action .auth-action-button, .auth-action-label, .auth-form--animated [aria-pressed], .auth-form--animated .tool-field, .auth-form--animated .auth-feedback-slot { transition: none; }
+}

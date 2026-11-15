@@ -1,6 +1,7 @@
 import { recordDebugApiEvent, type DebugApiOutcome } from './debug-diagnostics'
 import { observeToolApiRequest } from './tool-behavior-observation'
 import { copy } from '../copy/index'
+import { USER_LOGOUT_EVENT, USER_SESSION_EXPIRED_EVENT } from './auth-navigation'
 
 export class ApiError extends Error {
   readonly status: number
@@ -183,6 +184,9 @@ async function request(url: string, init: ApiRequestInit): Promise<PendingRespon
     }
 
     const data = await readResponseData(response)
+    if (response.status === 401 && (url.startsWith('/api/user/') || url.startsWith('/api/optimization/') || url === '/api/cultivation-plan' || url === '/api/depot-value') && !url.startsWith('/api/user/behavior-risk/')) {
+      window.dispatchEvent(new Event(USER_SESSION_EXPIRED_EVENT))
+    }
     throw new ApiError(
       readErrorMessage(data, fallbackMessage || `Request failed: ${response.status}`),
       response.status,
@@ -232,7 +236,10 @@ function createRequestDiagnostics(url: string, method: string | undefined, json:
   }
   return {
     setResponse: (nextResponse) => { response = nextResponse },
-    completeSuccess: () => finish(null),
+    completeSuccess: () => {
+      finish(null)
+      if (url === '/api/auth/logout') window.dispatchEvent(new Event(USER_LOGOUT_EVENT))
+    },
     completeFailure: (error) => finish(error),
   }
 }

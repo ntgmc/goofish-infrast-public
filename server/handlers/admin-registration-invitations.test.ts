@@ -64,7 +64,7 @@ describe('admin registration invitations handler', () => {
     expect(await response.json()).toEqual({
       invitation,
       code: '12AB34CD5E6F7G8H',
-      share_url: '/tool/profiles?invite=12AB34CD5E6F7G8H',
+      share_url: '/register?invite=12AB34CD5E6F7G8H',
     })
     expect(store.createAdminRegistrationInvitation).toHaveBeenCalledWith({
       adminUsername: 'operator',

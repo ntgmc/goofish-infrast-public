@@ -1,4 +1,5 @@
-import { Link } from 'react-router'
+import { Link, useLocation } from 'react-router'
+import { authPath } from '../lib/auth-navigation'
 import BrandLogo from '../components/BrandLogo'
 import ThemeSwitcher from '../components/ThemeSwitcher'
 import { copy } from '../copy'
@@ -22,6 +23,7 @@ function StandaloneThanksRecruitment() {
 }
 
 function ThanksRecruitmentContent({ embedded, session }: { embedded: boolean; session: V2Session }) {
+  const location = useLocation()
   const model = useCultivation(session)
   const queues = model.data?.thanksRecruitment?.queues ?? []
   const highestScore = Math.max(...queues.map((queue) => queue.expectedScore))
@@ -32,7 +34,7 @@ function ThanksRecruitmentContent({ embedded, session }: { embedded: boolean; se
         {!embedded && <h1 className="text-2xl font-semibold">{text.title}</h1>}
         <p className="text-sm leading-6 text-ink-secondary">{text.description}</p>
         {session.authLoading ? <p role="status">{text.loading}</p> : session.authStatus === 'error' ? <div role="alert"><p>{session.authError?.message}</p><button type="button" className="tool-secondary-action mt-3" onClick={session.retryAuth}>{copy.tools.pages_DepotValuePage_086}</button></div>
-          : session.authStatus !== 'authenticated' || !model.profiles.length ? <div className="tool-inset space-y-3 p-4"><p className="text-sm">{session.authStatus !== 'authenticated' ? text.login : text.noProfile}</p><Link to={embedded ? v2Path('profiles', session.activeProfile?.id) : '/tool/profiles'} className="tool-secondary-action inline-flex">{text.loginAction}</Link></div>
+          : session.authStatus !== 'authenticated' || !model.profiles.length ? <div className="tool-inset space-y-3 p-4"><p className="text-sm">{session.authStatus !== 'authenticated' ? text.login : text.noProfile}</p><Link to={!session.user ? authPath('login', `${location.pathname}${location.search}${location.hash}`) : v2Path('profiles', session.activeProfile?.id)} className="tool-secondary-action inline-flex">{text.loginAction}</Link></div>
             : <div className="flex flex-wrap items-end gap-4"><label className="min-w-0 flex-1 space-y-2 text-sm"><span className="block">{text.profile}</span><select className="tool-field" value={model.profileId} onChange={(event) => model.setChosenProfile(event.target.value)}><option value="" disabled>{text.profile}</option>{model.profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.display_name}</option>)}</select></label><button type="button" className="tool-primary-action inline-flex items-center gap-2 whitespace-nowrap" disabled={model.busy} onClick={() => void model.load()}><RefreshIcon size={16} aria-hidden="true" />{model.busy ? text.loadingData : text.refresh}</button></div>}
         {model.error && <p role="alert" className="tool-alert tool-alert--warning p-3 text-sm">{model.error}</p>}
       </section>

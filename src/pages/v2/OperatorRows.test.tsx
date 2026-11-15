@@ -45,10 +45,13 @@ it('releases modal interaction immediately on close so another card can open dur
   for (const index of [0, 1, 0]) {
     fireEvent.click(triggers[index])
     expect(page.getByRole('dialog')).toHaveTextContent(SAMPLE_OPERATORS[index].name)
+    expect(page.container.querySelectorAll('[data-shared-card-open]')).toHaveLength(1)
+    expect(triggers[index].parentElement).toHaveAttribute('data-shared-card-open')
     expect(document.querySelector('.v2-operator-return')).not.toBeInTheDocument()
     page.getByRole('dialog').querySelector('.shared-card-scroll')!.scrollTop = 120
     fireEvent.click(within(page.getByRole('dialog')).getByRole('button', { name: '关闭' }))
     expect(page.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(page.container.querySelector('[data-shared-card-open]')).not.toBeInTheDocument()
     expect(document.querySelector('.shared-card-overlay')).not.toBeInTheDocument()
     expect(document.body.style.pointerEvents).not.toBe('none')
     expect(document.querySelector('.v2-operator-return')).toHaveAttribute('aria-hidden', 'true')

@@ -1,8 +1,8 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
-import { useSearchParams } from 'react-router'
+import { Navigate, useLocation, useSearchParams } from 'react-router'
 import { BackIcon as ArrowLeft, NextIcon as ArrowRight } from '../../components/icons'
 import { Link } from 'react-router'
-import AuthForm from '../../components/AuthForm'
+import { authPath } from '../../lib/auth-navigation'
 import { copy } from '../../copy'
 import { useSiteFeatures } from '../../lib/site-feature-context'
 import { usePublicContent } from '../../lib/public-content-context'
@@ -11,10 +11,11 @@ import { isFreePreviewProfile, isSchedulableProfile } from '../tool/tool-utils'
 import type { OptimizationTaskCenterController } from '../tool/optimize/useOptimizationTaskCenter'
 import type { AuthSuccessResponse } from '../../lib/types'
 import type { V2Session } from './OptionsDrawer'
-import { sectionLabels, V2_PUBLIC_SECTIONS, v2Path, v2SectionAvailable, type V2Section } from './navigation'
+import { sectionLabels, V2_GUEST_SECTIONS, v2Path, v2SectionAvailable, type V2Section } from './navigation'
 import { V2SectionLoading } from './V2LoadingScreen'
 import FirstScheduleGuide from './FirstScheduleGuide'
 import ProfileUpgrade, { ProfileUpgradeEntry } from './ProfileUpgrade'
+import { SectionTitle } from './components/WorkspaceUI'
 
 const Profiles = lazy(() => import('./pages/Accounts'))
 const AddAccount = lazy(() => import('./pages/AddAccount'))
@@ -52,7 +53,6 @@ const descriptions: Partial<Record<V2Section, string>> = {
   tools: copy.v2.toolsDescription,
   'add-account': copy.v2.addAccountDescription,
 }
-const publicSections: V2Section[] = ['tools', 'depot', 'manual-tool', 'schedule-comparison', 'cultivation', 'thanks-recruitment', 'cultivation-projects', 'training-ratio', 'material-demand', 'settings', ...V2_PUBLIC_SECTIONS]
 const workflowSections: V2Section[] = ['generation', 'plans', 'lab']
 
 export default function WorkspaceSections({ section, session, workflow, generationProgress, onAccountAdded, onToolDirtyChange, onOpenProfile, onUpgradeProfile, onNavigate, onConfig, onOperators, generationDisabledReason, firstSchedule = false, configConfirmed = false }: {
@@ -74,6 +74,7 @@ export default function WorkspaceSections({ section, session, workflow, generati
   const { features } = useSiteFeatures()
   const { content } = usePublicContent()
   const [params] = useSearchParams()
+  const location = useLocation()
   const upgrading = section === 'add-account' && params.get('mode') === 'upgrade' && Boolean(session.activeProfile && isFreePreviewProfile(session.activeProfile)) && features.cdk_redemption
   const title = upgrading ? copy.v2.profileUpgrade.title : section === 'help' ? content.faq.title : section === 'pricing' ? content.pricing.title : sectionLabels[section]
   const available = v2SectionAvailable(section, features)
@@ -82,31 +83,40 @@ export default function WorkspaceSections({ section, session, workflow, generati
     if (available && ['manual-tool', 'schedule-comparison', 'cultivation', 'thanks-recruitment', 'cultivation-projects', 'training-ratio', 'material-demand', 'depot'].includes(section)) setOpenedTools((current) => current.includes(section) ? current : [...current, section])
   }, [section, available])
   const signedIn = Boolean(session.user)
-  const needsLogin = !signedIn && !publicSections.includes(section)
+  const needsLogin = !signedIn && !V2_GUEST_SECTIONS.includes(section)
   const needsWorkspace = workflowSections.includes(section) && !workflow
   const guided = firstSchedule && section === 'generation' && available
   const operatorsReady = Boolean(session.license?.operators.some((operator) => operator.own))
   const step = !signedIn ? 0 : !workflow || !operatorsReady ? 1 : !configConfirmed ? 2 : 3
-  return <section hidden={section === 'overview'} className={`v2-feature-content v2-page-section${guided ? ' v2-first-schedule-layout' : ''}`} data-v2-section={section} aria-label={title}>
+  return <section hidden={section === 'overview'} className={`v2-feature-content v2-page-section${guided ? ' v2-first-schedule-layout' : ''}`} data-v2-section={section} aria-label={guided ? copy.v2.firstSchedule.title : title}>
     <div className="v2-section-heading"><div><h1>{guided ? copy.v2.firstSchedule.title : title}</h1>{guided ? <p>{copy.v2.firstSchedule.description}</p> : !upgrading && descriptions[section] && <p>{descriptions[section]}</p>}</div>
       {['manual-tool', 'schedule-comparison', 'cultivation', 'thanks-recruitment', 'cultivation-projects', 'training-ratio', 'material-demand', 'depot'].includes(section) && <Link className="v2-button v2-button-secondary" to={v2Path('tools', session.activeProfile?.id)}><ArrowLeft size={16} />{copy.v2.backToTools}</Link>}
+      {guided && <Link className="v2-button v2-button-secondary" to={v2Path('overview', session.activeProfile?.id)}><ArrowLeft size={16} />{copy.v2.firstSchedule.backToExample}</Link>}
       {section === 'profiles' && v2SectionAvailable('add-account', features) && <button type="button" className="v2-button v2-button-primary" onClick={() => onNavigate('add-account')}>{copy.v2.addAccount}<ArrowRight size={16} /></button>}
     </div>
     {guided && <FirstScheduleGuide step={step} />}
     <div className="v2-section-body">
       <Suspense fallback={<V2SectionLoading label={section === 'inventory' ? copy.inventory.loading : undefined} />}>
         {section === 'overview' ? null : !available ? <p className="v2-panel v2-section-loading" role="status">{copy.v2.featureUnavailable}</p>
-          : needsLogin ? <div className="v2-panel v2-login-panel"><p>{section === 'generation' ? copy.v2.generationSignIn : copy.v2.signInRequired}</p><AuthForm compact allowCdk={false} onAuthenticated={session.applyAuthPayload} submitClassName="v2-button v2-button-primary w-full" /></div>
+          : section === 'generation' && !signedIn ? <section className="v2-first-schedule-task">
+            <SectionTitle title={copy.v2.firstSchedule.login} description={copy.v2.firstSchedule.loginContinue} />
+            <div className="v2-actions">
+              {features.login && <Link className="v2-button v2-button-primary" to={authPath('login', `${location.pathname}${location.search}${location.hash}`)}>{copy.auth.components_AuthForm_008}</Link>}
+              {features.registration && <Link className={`v2-button ${features.login ? 'v2-button-secondary' : 'v2-button-primary'}`} to={authPath('register', `${location.pathname}${location.search}${location.hash}`)}>{copy.auth.components_AuthForm_009}</Link>}
+              {!features.login && !features.registration && <p role="status">{copy.features.closed_body}</p>}
+            </div>
+          </section>
+          : needsLogin ? <Navigate to={authPath('login', `${location.pathname}${location.search}${location.hash}`, undefined, location.state?.authBackTo)} replace />
             : needsWorkspace ? section === 'generation' && session.activeProfile && isSchedulableProfile(session.activeProfile)
               ? <div className="v2-panel v2-section-loading"><p>{copy.v2.generationImport}</p><button className="v2-button v2-button-primary" type="button" onClick={onOperators}>{copy.public.pages_LandingPage_001}</button></div>
               : section === 'generation' && session.cdkProfiles.length === 0 && v2SectionAvailable('add-account', features)
-                ? <>{!guided && <p className="v2-lead">{copy.v2.profileRequired}</p>}<AddAccount guided={guided} onAdded={onAccountAdded} onInventory={() => onNavigate('inventory')} /></>
+                ? <>{!guided && <p className="v2-lead">{copy.v2.profileRequired}</p>}<AddAccount userId={session.user!.id} guided={guided} onAdded={onAccountAdded} onInventory={() => onNavigate('inventory')} /></>
                 : <div className="v2-panel v2-section-loading"><p>{copy.v2.profileRequired}</p><button className="v2-button v2-button-primary" type="button" onClick={() => onNavigate('profiles')}>{copy.v2.account}</button></div>
               : <>
                 {section === 'profiles' && <Profiles session={session} onOpen={onOpenProfile} onUpgrade={onUpgradeProfile} />}
                 {section === 'add-account' && (upgrading ? <ProfileUpgrade key={session.activeProfile!.id} session={session} onUpgraded={onAccountAdded} /> : <>
                   {session.activeProfile && <ProfileUpgradeEntry profile={session.activeProfile} />}
-                  <AddAccount onAdded={onAccountAdded} onInventory={() => onNavigate('inventory')} />
+                  <AddAccount userId={session.user!.id} onAdded={onAccountAdded} onInventory={() => onNavigate('inventory')} />
                 </>)}
                 {section === 'settings' && (signedIn ? <Settings session={session} /> : <div className="v2-guest-settings"><AppearanceSettings /></div>)}
                 {section === 'announcements' && <Announcements session={session} />}

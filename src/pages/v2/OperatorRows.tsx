@@ -16,6 +16,7 @@ import { Avatar } from './ScheduleBoard'
 export default memo(function OperatorRows({ operators, reveal = true }: { operators: LicenseOperator[]; reveal?: boolean }) {
   const list = useListReveal(reveal, 50)
   const group = useId()
+  const source = useRef<HTMLElement | null>(null)
   const reduced = useAppReducedMotion()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [frontId, setFrontId] = useState<string | null>(null)
@@ -107,12 +108,12 @@ export default memo(function OperatorRows({ operators, reveal = true }: { operat
           className="v2-operator-entry" data-card-returning={returning?.operator.id === operator.id || undefined} data-shared-card-front={frontId === operator.id || undefined} data-owned={operator.own !== false} data-operator-index={row.index * columns + column}
           style={{ borderRadius: 6 }} role="listitem" data-reveal-id={operator.id}
           aria-posinset={row.index * columns + column + 1} aria-setsize={operators.length}>
-          <button type="button" className="v2-operator-card-trigger" aria-label={copy.v2.operatorManagement.skills(operator.name)} aria-haspopup="dialog" onClick={() => { setReturning(null); setFrontId(operator.id); setSelectedId(operator.id) }} />
+          <button type="button" className="v2-operator-card-trigger" aria-label={copy.v2.operatorManagement.skills(operator.name)} aria-haspopup="dialog" onClick={(event) => { source.current = event.currentTarget.parentElement; setReturning(null); setFrontId(operator.id); setSelectedId(operator.id) }} />
           <div data-reveal-content><OperatorCard operator={operator} active={selectedId === operator.id} /></div>
         </motion.div>)}
       </div>)}
     </div>
-    {selected && <SharedCardDialog key={selected.id} layoutId={`card-${selected.id}`}
+    {selected && <SharedCardDialog key={selected.id} layoutId={`card-${selected.id}`} source={source.current}
       onClose={close} closeLabel={copy.v2.close} className="v2-operator-detail">
       <OperatorDetails operator={selected} />
     </SharedCardDialog>}

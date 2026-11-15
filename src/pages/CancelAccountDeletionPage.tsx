@@ -35,7 +35,7 @@ export default function CancelAccountDeletionPage() {
         <button type="button" disabled={!token || loading || Boolean(status)} onClick={() => void cancel()} className="tool-primary-action mt-5 w-full">
           {loading ? copy.auth.pages_CancelAccountDeletionPage_006 : copy.auth.pages_CancelAccountDeletionPage_007}
         </button>
-        <Link to="/tool/profiles" className="mt-5 inline-flex min-h-11 w-full items-center justify-center text-sm font-medium text-brand-300 underline-offset-4 hover:underline">
+        <Link to="/login" className="mt-5 inline-flex min-h-11 w-full items-center justify-center text-sm font-medium text-brand-300 underline-offset-4 hover:underline">
           {copy.auth.pages_CancelAccountDeletionPage_008}</Link>
       </section>
     </main>

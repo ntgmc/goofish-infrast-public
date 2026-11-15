@@ -7,7 +7,7 @@ import SessionLoader from '../components/SessionLoader'
 import SettingsSection from './tool/dashboard/SettingsSection'
 import { apiVoid } from '../lib/api-client'
 import { formatAccountDeletionDeadline } from '../lib/account-lifecycle-client'
-import { dashboardPath } from '../lib/app-routes'
+import { authPath } from '../lib/auth-navigation'
 import { useSiteFeatures } from '../lib/site-feature-context'
 import { copy } from '../copy/index'
 
@@ -53,7 +53,7 @@ export default function AccountSafetyPage() {
 
   if (featureState.status === 'loading') return <SessionLoader label={copy.features.loading} />
   if (featureState.status === 'ready' && featureState.features.site && featureState.features.login) {
-    return <Navigate to={dashboardPath('settings')} replace />
+    return <Navigate to={authPath('login', '/v2?section=settings')} replace />
   }
 
   return (
@@ -68,7 +68,7 @@ export default function AccountSafetyPage() {
           {notice && <div className="tool-alert tool-alert--success mt-5" role="status">{notice}</div>}
           <div className="mt-6 flex flex-wrap gap-3">
             <button type="button" onClick={() => void logout()} disabled={busy || deletionState !== 'idle'} className="tool-secondary-action">{copy.features.logout}</button>
-            <Link to="/tool/profiles?recovery=1" className="tool-secondary-action">{copy.features.recovery}</Link>
+            <Link to={authPath('forgot', '/v2?section=settings')} className="tool-secondary-action">{copy.features.recovery}</Link>
           </div>
         </section>
         <fieldset disabled={busy} className="min-w-0">

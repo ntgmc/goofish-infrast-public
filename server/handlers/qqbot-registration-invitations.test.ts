@@ -69,7 +69,7 @@ describe('QQ Bot registration invitation handler', () => {
       status: 'created',
       invitation_code: '12AB34CD5E6F7G8H',
       expires_at: '2026-09-02T00:00:00.000Z',
-      registration_url: 'https://example.test/tool/profiles#invite=12AB34CD5E6F7G8H',
+      registration_url: 'https://example.test/register#invite=12AB34CD5E6F7G8H',
     })
     expect(mocks.issueQqBotRegistrationInvitation).toHaveBeenCalledWith({
       qqNumber: '123456789',

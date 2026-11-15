@@ -2,13 +2,15 @@ import { useMemo, useState, type Dispatch, type FormEvent, type SetStateAction }
 import { Link } from 'react-router'
 import { apiVoid } from '../lib/api-client'
 import { copy } from '../copy/index'
-import ThemeSwitcher from '../components/ThemeSwitcher'
+import AuthLayout from './v2/AuthLayout'
+import { authPath, readAuthReturn } from '../lib/auth-navigation'
 import { AUTH_PASSWORD_MAX_LENGTH, AUTH_PASSWORD_MIN_LENGTH } from '../lib/auth-constraints'
 
 
 type FieldErrors = Record<string, string>
 
 export default function ResetPasswordPage() {
+  const [returnTo] = useState(readAuthReturn)
   const token = useMemo(() => new URLSearchParams(window.location.search).get('token') ?? '', [])
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -54,14 +56,8 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <main className="tool-shell flex min-h-dvh items-center justify-center px-4 py-6 sm:px-6 sm:py-10" tabIndex={-1} data-route-focus>
-      <form onSubmit={handleSubmit} noValidate className="tool-panel w-full max-w-md p-6 sm:p-8">
-        <div className="flex items-center justify-between gap-3">
-          <p className="section-index">{copy.auth.pages_ResetPasswordPage_006}</p>
-          <ThemeSwitcher />
-        </div>
-        <h1 className="display-title mt-2 text-2xl text-ink-primary">{copy.auth.pages_ResetPasswordPage_007}</h1>
-        <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.auth.pages_ResetPasswordPage_008}</p>
+    <AuthLayout title={copy.auth.pages_ResetPasswordPage_007} description={copy.auth.pages_ResetPasswordPage_008} backTo={returnTo}>
+      <form onSubmit={handleSubmit} noValidate>
 
         {error && <div className="tool-alert tool-alert--error mt-5" role="alert">{error}</div>}
         {notice && <div className="tool-alert tool-alert--success mt-5" role="status" aria-live="polite">{notice}</div>}
@@ -114,10 +110,11 @@ export default function ResetPasswordPage() {
           </>
         )}
 
-        <Link to="/tool/profiles" className="mt-5 inline-flex min-h-11 w-full items-center justify-center text-sm font-medium text-brand-300 underline-offset-4 hover:underline">
-          {copy.auth.pages_ResetPasswordPage_013}</Link>
+        {!notice && <Link to={authPath('forgot', returnTo)} className="mt-5 inline-flex min-h-11 w-full items-center justify-center text-sm font-medium underline">{copy.auth.components_AuthForm_022}</Link>}
+        <Link to={authPath('login', returnTo)} className="v2-text-button mt-5 min-h-11 w-full justify-center">
+          {notice ? copy.auth.goToLogin : copy.auth.pages_ResetPasswordPage_013}</Link>
       </form>
-    </main>
+    </AuthLayout>
   )
 }
 

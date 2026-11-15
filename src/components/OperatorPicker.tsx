@@ -48,7 +48,7 @@ export default function OperatorPicker<T extends { id: string; name: string }>({
       </div>
       {hint && <p className="text-xs leading-5 text-ink-muted">{hint}</p>}
     </div>
-    <div ref={grid} className="grid max-h-52 grid-cols-1 gap-2 overflow-y-auto sm:max-h-72 sm:grid-cols-2 lg:grid-cols-3" aria-label={copy.domain.manual_schedule.picker}
+    <div ref={grid} className="grid max-h-52 auto-rows-max grid-cols-1 gap-2 overflow-y-auto sm:max-h-72 sm:grid-cols-2 lg:grid-cols-3" aria-label={copy.domain.manual_schedule.picker}
       aria-busy={matches !== candidates || composing || query !== search.trim()} onScroll={(event) => {
         const element = event.currentTarget
         if (element.scrollHeight - element.scrollTop - element.clientHeight < 120) showMore()

@@ -60,7 +60,7 @@ export default async function qqBotRegistrationInvitationsHandler(req: Request):
       status: result.status,
       invitation_code: result.code,
       expires_at: result.expiresAt,
-      registration_url: resolveWebsitePublicUrl('/tool/profiles', `invite=${result.code}`),
+      registration_url: resolveWebsitePublicUrl('/register', `invite=${result.code}`),
     }, result.status === 'created' ? 201 : 200)
   } catch (error) {
     if (error instanceof RateLimitStoreError) {

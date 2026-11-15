@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useSearchParams } from 'react-router'
+import { Link, useLocation, useSearchParams } from 'react-router'
+import { authPath } from '../lib/auth-navigation'
+import { useTaskDraft } from '../lib/task-drafts'
 import BrandLogo from '../components/BrandLogo'
 import ThemeSwitcher from '../components/ThemeSwitcher'
 import { copy } from '../copy/index'
@@ -28,7 +30,7 @@ function StandaloneCultivation() {
 
 export function useCultivation(session: ReturnType<typeof useToolSession>) {
   const profiles = session.profiles.filter((row) => row.status === 'active' && !row.archived_at && row.skland_binding)
-  const [chosenProfile, setChosenProfile] = useState('')
+  const [chosenProfile, setChosenProfile] = useTaskDraft(`cultivation:${session.user?.id ?? 'guest'}:profile`, '')
   const profileId = profiles.some((row) => row.id === chosenProfile) ? chosenProfile : profiles.find((row) => row.id === session.activeProfile?.id)?.id ?? profiles[0]?.id ?? ''
   const snapshot = useSklandSnapshot(session.user?.id, profiles.find((row) => row.id === profileId))
   const calculatedVersion = useRef('')
@@ -41,9 +43,10 @@ export function useCultivation(session: ReturnType<typeof useToolSession>) {
     const value = searchParams.get(`cultivation_${key}`)
     return [key, value === null ? fallback : typeof fallback === 'boolean' ? value === 'true' : typeof fallback === 'number' ? Number(value) : value]
   })) as CultivationQuery
-  const [options, setOptions] = useState<CultivationOptions>({ recommendation: queryFromUrl(), preference: 'coverage', limit: 5, excluded: [] })
-  const [appliedOptions, setAppliedOptions] = useState(options)
-  const [limit, setLimit] = useState('5')
+  const draftKey = `cultivation:${session.user?.id ?? 'guest'}:${profileId}`
+  const [options, setOptions] = useTaskDraft<CultivationOptions>(`${draftKey}:options`, () => ({ recommendation: queryFromUrl(), preference: 'coverage', limit: 5, excluded: [] }))
+  const [appliedOptions, setAppliedOptions] = useTaskDraft(`${draftKey}:applied`, options)
+  const [limit, setLimit] = useTaskDraft(`${draftKey}:limit`, '5')
   const request = useRef<AbortController | null>(null)
   const generation = useRef(0)
   const recommendations = useMemo(() => data && !snapshot.expired ? recommendCultivationTargets(data, appliedOptions) : null, [data, appliedOptions, snapshot.expired])
@@ -55,8 +58,6 @@ export function useCultivation(session: ReturnType<typeof useToolSession>) {
     setData(null)
     setError(null)
     setPhase(null)
-    setOptions((value) => ({ ...value, excluded: [] }))
-    setAppliedOptions((value) => ({ ...value, excluded: [] }))
     return () => { generation.current++; request.current?.abort() }
   }, [profileId])
 
@@ -138,6 +139,7 @@ export function useCultivation(session: ReturnType<typeof useToolSession>) {
 }
 
 function CultivationContent({ session, embedded = false }: { session: ReturnType<typeof useToolSession>; embedded?: boolean }) {
+  const location = useLocation()
   const ContentRoot = embedded ? 'div' : 'main'
   const { profiles, profileId, setChosenProfile, data, busy, error, options, setOptions, appliedOptions,
     limit, setLimit, recommendations, load, exclude, changed, apply } = useCultivation(session)
@@ -152,7 +154,7 @@ function CultivationContent({ session, embedded = false }: { session: ReturnType
       <section className="workspace-cultivation-source tool-panel space-y-5 p-5 sm:p-6">
         <div>{!embedded && <h1 className="text-2xl font-semibold text-ink-primary">{label.title}</h1>}<p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">{label.description}</p></div>
         {session.authLoading ? <p role="status">{label.loading}</p> : session.authStatus === 'error' ? <div role="alert"><p>{session.authError?.message}</p><button className="tool-secondary-action mt-3" onClick={session.retryAuth}>{copy.tools.pages_DepotValuePage_086}</button></div>
-          : session.authStatus !== 'authenticated' || !profiles.length ? <div className="tool-inset space-y-3 p-4"><p className="text-sm">{session.authStatus !== 'authenticated' ? label.login : label.noProfile}</p><Link to={embedded ? v2Path('profiles', session.activeProfile?.id) : '/tool/profiles'} className="tool-secondary-action inline-flex">{label.loginAction}</Link></div>
+          : session.authStatus !== 'authenticated' || !profiles.length ? <div className="tool-inset space-y-3 p-4"><p className="text-sm">{session.authStatus !== 'authenticated' ? label.login : label.noProfile}</p><Link to={!session.user ? authPath('login', `${location.pathname}${location.search}${location.hash}`) : v2Path('profiles', session.activeProfile?.id)} className="tool-secondary-action inline-flex">{label.loginAction}</Link></div>
             : <div className="flex flex-wrap items-end gap-4">
               <label className="min-w-0 flex-1 space-y-2 text-sm"><span className="block">{label.profile}</span><select className="tool-field" value={profileId} onChange={(event) => setChosenProfile(event.target.value)}>{profiles.map((row) => <option key={row.id} value={row.id}>{row.display_name}</option>)}</select></label>
               <button className="tool-primary-action max-w-full whitespace-nowrap" disabled={busy} onClick={() => void load()}>{busy ? label.loadingData : copy.skland.refresh}</button>
