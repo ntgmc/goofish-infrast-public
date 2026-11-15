@@ -1,5 +1,5 @@
 export const authCopy = {
-  pageTitle: '登录 MAA 基建小工具',
+  pageTitle: '登录 MaaTool',
   registerTitle: '创建账号',
   forgotTitle: '找回密码',
   pageDescription: '登录后继续管理账号和排班。',
