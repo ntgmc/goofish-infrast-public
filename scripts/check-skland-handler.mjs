@@ -968,7 +968,6 @@ async function assertFreePreviewScanClaim() {
 
   const complete = await callSkland('/api/user/skland/free-preview/login/complete', {
     scan_id: 'scan-1',
-    display_name: '免费扫码领取',
   })
   assertNoSecretLeak(complete.body, '免费档案扫码完成响应')
   if (complete.status !== 200 || complete.body.status !== 'confirm_required' || !complete.body.confirmation_id) {
@@ -1008,6 +1007,9 @@ async function assertFreePreviewScanClaim() {
   assertNoSecretLeak(confirm.body, '免费档案扫码确认响应')
   if (confirm.status !== 200 || confirm.body.active_profile?.kind !== 'free_preview') {
     throw new Error(`免费档案扫码确认：预期 free_preview 档案，实际 ${confirm.status}`)
+  }
+  if (confirm.body.active_profile.display_name !== '个人排班' || confirm.body.active_profile.note !== '') {
+    throw new Error('免费档案扫码确认：默认名称应为个人排班，备注应留空')
   }
   if (confirm.body.active_profile?.skland_binding?.uid !== '130761348' || confirm.body.skland_import?.operator_count !== 2) {
     throw new Error('免费档案扫码确认：缺少绑定或导入摘要')
@@ -1145,6 +1147,7 @@ async function assertFreePreviewCredentialClaimAndUidUniqueness() {
       credential_text: 'manual-skland-cred',
       source: 'manual',
       display_name: '免费手动领取',
+      note: '官服主账号',
     })
     assertNoSecretLeak(preview.body, '免费档案凭据预览响应')
     if (preview.status !== 200 || preview.body.status !== 'confirm_required' || !preview.body.confirmation_id) {
@@ -1161,6 +1164,9 @@ async function assertFreePreviewCredentialClaimAndUidUniqueness() {
     assertNoSecretLeak(confirm.body, '免费档案凭据确认响应')
     if (confirm.status !== 200 || confirm.body.active_profile?.kind !== 'free_preview') {
       throw new Error(`免费档案凭据确认：预期 free_preview 档案，实际 ${confirm.status}`)
+    }
+    if (confirm.body.active_profile.display_name !== '免费手动领取' || confirm.body.active_profile.note !== '官服主账号') {
+      throw new Error('免费档案凭据确认：应保留用户填写的名称和备注')
     }
     if (confirm.body.active_profile?.skland_binding?.uid !== '87654321') {
       throw new Error('免费档案凭据确认：预期 mismatch-mode UID 绑定')

@@ -20,7 +20,7 @@ export default function AddAccount({ userId, onAdded, onInventory, guided = fals
   const firstBinding = guided && model.features.free_preview
   const methods = <div className="v2-account-methods" role="group" aria-label={ui.methods}>{choices.map((choice) => <button type="button" key={choice.id} aria-label={choice.label} aria-pressed={model.mode === choice.id} onClick={() => { model.setMode(choice.id); model.setError(null) }}><choice.icon size={24} /><strong>{choice.label}</strong><span>{choice.description}</span></button>)}</div>
   const fields = <>
-    <Field label={text.pages_tool_dashboard_RedeemSection_008} value={model.displayName} maxLength={40} onChange={(event) => model.setDisplayName(event.target.value)} placeholder={model.mode === 'preview' ? text.pages_tool_dashboard_RedeemSection_009 : text.pages_tool_dashboard_RedeemSection_010} />
+    <Field label={text.pages_tool_dashboard_RedeemSection_008} value={model.displayName} maxLength={40} onChange={(event) => model.setDisplayName(event.target.value)} placeholder={ui.namePlaceholder} />
     <label className="v2-field"><span>{text.pages_tool_dashboard_RedeemSection_011}</span><textarea className="v2-input" value={model.note} maxLength={500} rows={3} onChange={(event) => model.setNote(event.target.value)} placeholder={text.pages_tool_dashboard_RedeemSection_012} /></label>
   </>
   return <div className={firstBinding ? 'v2-first-account' : 'v2-add-account'}>

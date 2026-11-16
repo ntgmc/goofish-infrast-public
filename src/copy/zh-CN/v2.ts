@@ -108,6 +108,7 @@ export const v2Copy = {
   addAccountDescription: '通过森空岛领取免费档案，或兑换 CDK 添加游戏账号。',
   accountCreation: {
     methods: '选择添加方式',
+    namePlaceholder: '例如：主账号、官服小号',
     freeTitle: '领取免费档案',
     freeSummary: '绑定森空岛，导入干员并开始免费排班。',
     freeDescription: '确认游戏角色后领取免费档案，可生成游戏内轮换排班并保存图片。每个游戏 UID 全站限领一次；MAA 导出、完整计算数据与高级分析需要高级版权益。',
