@@ -31,6 +31,9 @@ export const feedbackRequestSchema = z.strictObject({
   image: imageUploadSchema.optional(),
 })
 
+export const optimizationFailureFeedbackRequestSchema = z.strictObject({ failed_job_id: z.uuid() })
+export type OptimizationFailureFeedbackState = { id: string | null; can_submit: boolean }
+
 export type FeedbackRequest = z.infer<typeof feedbackRequestSchema>
 export type FeedbackCategory = FeedbackRequest['category']
 export const FEEDBACK_STATUSES = ['open', 'processing', 'waiting_user', 'resolved', 'closed'] as const

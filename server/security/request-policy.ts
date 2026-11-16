@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { accountDeletionSurveySchema } from '../../src/lib/account-deletion-contracts'
-import { feedbackRequestSchema, feedbackReplySchema, adminFeedbackUpdateSchema } from '../../src/lib/feedback-contracts'
+import { feedbackRequestSchema, feedbackReplySchema, adminFeedbackUpdateSchema, optimizationFailureFeedbackRequestSchema } from '../../src/lib/feedback-contracts'
 import { giftPackOpeningRuleSchema } from '../../src/lib/admin-inventory-contracts'
 import { qqBotCampaignInputSchema } from '../../src/lib/qqbot-reward-contracts'
 import { qqBotVerificationActionSchema, qqBotVerificationProofSchema } from '../../src/lib/qqbot-verification-contracts'
@@ -145,7 +145,7 @@ export const requestSchemas = {
   }).optional() }).refine((body) => !body.training || body.projects === undefined && body.recommendation === undefined, '培养目标读取不能同时指定养成项目或推荐条件。'),
   depotValue: depotValueRequestSchema,
   adminPublicContentImage: imageUploadSchema,
-  userFeedback: feedbackRequestSchema,
+  userFeedback: z.union([feedbackRequestSchema, optimizationFailureFeedbackRequestSchema]),
   userFeedbackReply: feedbackReplySchema,
   adminFeedbackUpdate: adminFeedbackUpdateSchema,
   adminSession: strict({ username: shortString(64), password: shortString(128) }),
@@ -822,7 +822,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/user/skland/snapshot', route({ GET: none() }, ['profile_id'])],
   ['/api/user/skland/snapshot/refresh', route({ POST: json('standard', requestSchemas.sklandSnapshotRefresh) })],
   ['/api/user/announcements', route({ GET: none(), PATCH: json('standard', requestSchemas.userAnnouncement) }, ['page', 'announcement_id', 'unread_only'])],
-  ['/api/user/feedback', route({ GET: none(), POST: json('feedback', requestSchemas.userFeedback), PATCH: json('standard', requestSchemas.userFeedbackReply) }, ['page', 'page_size', 'feedback_id', 'image_id', 'before_revision'])],
+  ['/api/user/feedback', route({ GET: none(), POST: json('feedback', requestSchemas.userFeedback), PATCH: json('standard', requestSchemas.userFeedbackReply) }, ['page', 'page_size', 'feedback_id', 'image_id', 'before_revision', 'job_id'])],
   ['/api/admin/feedback', route({ GET: none(), PATCH: json('standard', requestSchemas.adminFeedbackUpdate) }, ['page', 'page_size', 'status', 'todo', 'category', 'email', 'min_wait_hours', 'user_id', 'feedback_id', 'image_id', 'before_revision'])],
   ['/api/user/notifications', route({ GET: none(), PATCH: json('standard', requestSchemas.userNotification) }, ['cursor', 'limit'])],
   ['/api/user/profiles', route({ GET: none(), PATCH: json('standard', requestSchemas.profilePatch) })],

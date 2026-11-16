@@ -1,5 +1,6 @@
 import { TasksIcon as Activity, CloseIcon, RefreshIcon } from '../../../components/icons'
 import { useEffect, useRef, type RefObject } from 'react'
+import FeedbackButton from '../../../components/FeedbackDialog'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../../components/ui/dialog'
 import type { OptimizationJobListItem } from '../../../lib/optimization-contracts'
 import { copy, CURRENT_LOCALE } from '../../../copy/index'
@@ -52,6 +53,7 @@ export default function OptimizationTaskCenterDialog({
   onOpenScenario,
   onOpenResult = () => undefined,
   retryEnabled = true,
+  feedbackEnabled = false,
 }: {
   open: boolean;
   controller: OptimizationTaskCenterController;
@@ -60,6 +62,7 @@ export default function OptimizationTaskCenterDialog({
   onOpenScenario: (job: OptimizationJobListItem) => void;
   onOpenResult?: (job: OptimizationJobListItem) => void;
   retryEnabled?: boolean;
+  feedbackEnabled?: boolean;
 }) {
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const { jobs, activeCount, attentionCount, loading, refreshing, loadingMore, error, notice, busyJobId, notificationsEnabled } = controller
@@ -136,6 +139,7 @@ export default function OptimizationTaskCenterDialog({
                         onOpenScenario={() => onOpenScenario(job)}
                         onOpenResult={() => onOpenResult(job)}
                         retryEnabled={retryEnabled}
+                        feedbackEnabled={feedbackEnabled}
                       />
                     ))}
                   </div>
@@ -154,7 +158,7 @@ export default function OptimizationTaskCenterDialog({
   )
 }
 
-function JobRow({ job, busy, onCancel, onRetrySchedule, onOpenScenario, onOpenResult, retryEnabled }: {
+function JobRow({ job, busy, onCancel, onRetrySchedule, onOpenScenario, onOpenResult, retryEnabled, feedbackEnabled }: {
   job: OptimizationJobListItem;
   busy: boolean;
   onCancel: () => void;
@@ -162,6 +166,7 @@ function JobRow({ job, busy, onCancel, onRetrySchedule, onOpenScenario, onOpenRe
   onOpenScenario: () => void;
   onOpenResult: () => void;
   retryEnabled: boolean;
+  feedbackEnabled: boolean;
 }) {
   const terminalFailure = job.status === 'failed' || job.status === 'cancelled' || job.status === 'dead_lettered'
   return (
@@ -191,6 +196,7 @@ function JobRow({ job, busy, onCancel, onRetrySchedule, onOpenScenario, onOpenRe
           )}
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
+          {feedbackEnabled && (job.status === 'failed' || job.status === 'dead_lettered') && <FeedbackButton failureJobId={job.id} />}
           {job.canCancel && <button type="button" disabled={busy} onClick={onCancel} className="tool-secondary-action">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_020}</button>}
           {job.status === 'succeeded' && job.resultAvailable && (job.kind !== 'schedule' || job.historyResultId) && (
             <button type="button" onClick={onOpenResult} className="tool-secondary-action">{copy.optimize.pages_tool_optimize_OptimizationTaskCenter_037}</button>

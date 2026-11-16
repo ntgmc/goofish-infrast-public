@@ -64,6 +64,22 @@ describe('useScenarioComparison', () => {
     expect(apiJson).toHaveBeenCalledTimes(2)
   })
 
+  it('clears the previous failed task before a new submission is rejected', async () => {
+    vi.mocked(apiJson).mockResolvedValueOnce({
+      id: 'previous-failure', kind: 'scenario_comparison', status: 'failed', pollAfterMs: 1000,
+      timestamps: { submittedAt: '2026-11-16T00:00:00Z' }, estimate: { phase: 'failed' }, priority: { kind: 'analysis' },
+      error: { message: '优化计算失败', supportReference: 'OPT-PREVIOUS' },
+    } as never).mockRejectedValueOnce(new Error('权限不足，请检查档案权益'))
+    const { result } = renderHook(() => useScenarioComparison({ profileId: 'profile-retry', operators: [], config: {} as LicenseConfig }))
+    act(() => restoreScenarioComparisonJob('profile-retry', 'previous-failure'))
+    await waitFor(() => expect(result.current.error).toBe('优化计算失败 (OPT-PREVIOUS)'))
+    expect(result.current.job?.id).toBe('previous-failure')
+    await act(async () => result.current.run())
+    expect(result.current.error).toBe('权限不足，请检查档案权益')
+    expect(result.current.job).toBeNull()
+    expect(result.current.loading).toBe(false)
+  })
+
   it.each(['unmount', 'switch profile'])('stops a newly submitted scenario polling loop on %s', async (action) => {
     vi.useFakeTimers()
     const job = { id: 'scenario-new', kind: 'scenario_comparison', status: 'queued', pollAfterMs: 10_000,

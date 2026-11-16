@@ -2,6 +2,14 @@
 
 Users can submit a problem and revisit it through **反馈 → 我的反馈**. Administrators use `/admin/feedback` to select a report, take ownership, keep private investigation notes, reply and publish a result. No email is sent; public progress creates or refreshes a station notification with a link to the report. When notifications are disabled, feedback history remains available.
 
+## Optimization failure feedback
+
+V2 generation, configuration-comparison errors and failed task rows offer **反馈此问题** for unexpected failures. A click creates a `schedule` feedback report and opens its details for optional supplements. The public error message, task ID and verified profile/task context are prefilled by the server. The button then becomes **查看反馈**, including after reloading the page. Reports appear in **我的反馈** and the administrator's existing feedback queue. Internal errors and input payloads remain in task diagnostics.
+
+Permission and authorization failures, unavailable capabilities, account restrictions, insufficient balance, changed pricing and ordinary input validation errors keep their existing recovery actions. They cannot create task-failure reports. Submission rejections, cancellations and intermediate failures awaiting an automatic retry are also excluded. Invalid persisted task payloads and malformed optimizer results remain reportable system failures. Tasks without an associated user profile cannot create an account feedback report.
+
+The report uses the task ID as its feedback ID. Concurrent clicks and retries after a lost response return the same report. The server verifies task ownership and eligibility on both lookup and creation; clients submit only the task ID. Creation uses its own transaction and the existing manual feedback rate limit, independently of task settlement. Merely displaying an error or entering a dead letter creates no report or dialog. Failed submissions stay on the error view and can be retried. Existing reports remain available. The existing tables are reused; no migration or historical backfill is required. Public administrator updates use the existing feedback notification flow.
+
 ## Handling a report
 
 | Status | Meaning |
@@ -50,7 +58,8 @@ Failed saves preserve the reply, private note, status and reason. Refresh replac
 - `GET /api/admin/feedback?status=open&page=1&page_size=25`: administrative queue; omit status for all reports.
 - Either endpoint with `feedback_id=<uuid>`: report and recent timeline. Add `before_revision=<positive integer>` for an older page.
 - Either endpoint with `image_id=<uuid>`: authenticated screenshot.
-- User `POST`: `category`, `message`, optional `image` and optional `context` (`profile_id`, `result_id`, `job_id`).
+- User `GET` with `job_id=<uuid>`: task feedback state `{ id: string | null, can_submit: boolean }`. It cannot be combined with pagination or other filters, and requires ownership of the task's profile.
+- User `POST`: `category`, `message`, optional `image` and optional `context` (`profile_id`, `result_id`, `job_id`); alternatively `{ failed_job_id: <uuid> }` creates or returns the task's prefilled failure report (`201` for creation, `200` for an existing report).
 - User `PATCH`: `feedback_id`, `expected_revision`, `request_key`, `message`.
 - Admin `PATCH`: the same fields plus `status`, `internal_note`, `assignment` (`keep`, `mine`, `unassigned`), `reason` and optional `related_operation` (`source`: `admin` or `inventory`, `id`: UUID).
 - Admin list filters: `todo`, `category`, `email`, `min_wait_hours`, `user_id`, `status`. Filter fields cannot be combined with a detail or image read and are rejected on user history. List responses include `metrics`; detail responses include private `recent_operations`.

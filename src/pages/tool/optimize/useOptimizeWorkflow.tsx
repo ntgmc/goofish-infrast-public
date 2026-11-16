@@ -8,7 +8,7 @@ import { normalizeConfig, validateConfig, validateScheduleConfig, normalizeSched
 import type { ScheduleProgressState } from '../../../components/ScheduleProgress'
 import { describeConfigDiff } from '../../../lib/workspace-history'
 import { mergeOptimizeJobProgress, buildOptimizeJobStorageKey, writeActiveOptimizeJob, readActiveOptimizeJob, isActiveOptimizeJob, clearActiveOptimizeJob, clearLegacyOptimizeJobStorage, isOptimizeJobPollCancelled } from './job-progress'
-import { isOptimizationJobCancelledError, useOptimizationJob } from './useOptimizationJob'
+import { getOptimizationFailureJobId, isOptimizationJobCancelledError, useOptimizationJob } from './useOptimizationJob'
 import type { OptimizePhase, OptimizeSection } from './types'
 import { isFreePreviewProfile, isFreePreviewTrialActive } from '../tool-utils'
 import type { ConfigSyncStatus, WorkspacePatch } from '../useToolSession'
@@ -83,7 +83,7 @@ export function useOptimizeWorkflow(props: Props) {
     flushPendingSync: flushPendingLicenseSync,
   } = useLicenseSync(profileId, license.order_hash)
 
-  const [inlineError, setInlineError] = useState<{ scope: 'generate' | 'apply'; message: string; retry?: 'save' } | null>(null)
+  const [inlineError, setInlineError] = useState<{ scope: 'generate' | 'apply'; message: string; retry?: 'save'; jobId?: string } | null>(null)
   useEffect(() => {
     if (configSyncStatus === 'idle') setInlineError((error) => error?.retry === 'save' ? null : error)
   }, [configSyncStatus])
@@ -450,6 +450,7 @@ export function useOptimizeWorkflow(props: Props) {
               setInlineError({
                 scope: active.mode === 'apply' ? 'apply' : 'generate',
                 message: formatOptimizeError(error instanceof Error ? error.message : String(error)),
+                jobId: getOptimizationFailureJobId(error),
               })
             }
           }
@@ -576,7 +577,7 @@ export function useOptimizeWorkflow(props: Props) {
         })
       } catch (e) {
         if (current() && !isOptimizationJobCancelledError(e)) {
-          setInlineError({ scope: 'generate', message: formatOptimizeError((e as Error).message) })
+          setInlineError({ scope: 'generate', message: formatOptimizeError((e as Error).message), jobId: getOptimizationFailureJobId(e) })
         }
       } finally {
         if (!current()) return

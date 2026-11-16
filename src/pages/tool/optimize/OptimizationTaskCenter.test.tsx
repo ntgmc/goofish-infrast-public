@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '../../../test/private-query-render'
 import userEvent from '@testing-library/user-event'
 import { useRef, useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -7,9 +7,13 @@ import type { OptimizationJobListItem } from '../../../lib/optimization-contract
 import OptimizationTaskCenterDialog, { OptimizationTaskCenterButton } from './OptimizationTaskCenter'
 import type { OptimizationTaskCenterController } from './useOptimizationTaskCenter'
 
+const mocks = vi.hoisted(() => ({ api: vi.fn() }))
+vi.mock('../../../lib/api-client', async (original) => ({ ...await original<typeof import('../../../lib/api-client')>(), apiJson: mocks.api }))
+
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+  vi.unstubAllGlobals()
 })
 
 describe('OptimizationTaskCenter', () => {
@@ -90,6 +94,29 @@ describe('OptimizationTaskCenter', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
+  it('opens user-requested feedback above the V2 task center and returns focus to its task', async () => {
+    vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
+    const jobId = '764b3769-09e4-4261-83b8-d23896419a8f'
+    let submitted = false
+    mocks.api.mockImplementation(async (url, options) => {
+      if (options?.method === 'POST') { submitted = true; return { id: jobId } }
+      if (url.includes('job_id=')) return { id: submitted ? jobId : null, can_submit: true }
+      return { feedback: { id: jobId, category: 'schedule', message: '该任务未能完成', status: 'open', result: null, revision: 0, created_at: '2026-11-16T00:00:00Z' }, entries: [], next_before_revision: null }
+    })
+    const user = userEvent.setup()
+    render(<Harness feedbackEnabled controller={controller({ jobs: [{ ...failedScheduleJob(), id: jobId }], attentionCount: 1 })} />)
+    await user.click(screen.getByRole('button', { name: '查看后台计算，1 个计算未完成' }))
+    const report = await screen.findByRole('button', { name: '反馈此问题' })
+    await waitFor(() => expect(report).toBeEnabled())
+    expect(submitted).toBe(false)
+    await user.click(report)
+    expect(await screen.findByText('该任务未能完成')).toBeVisible()
+    const feedback = screen.getByRole('dialog', { name: '反馈' })
+    await user.click(within(feedback).getByRole('button', { name: '关闭' }))
+    expect(screen.getByRole('dialog', { name: '后台计算' })).toBeVisible()
+    await waitFor(() => expect(screen.getByRole('button', { name: '查看反馈' })).toHaveFocus())
+  })
+
   it('opens a persisted successful schedule result from the task list', async () => {
     const user = userEvent.setup()
     const onOpenResult = vi.fn()
@@ -124,10 +151,11 @@ describe('OptimizationTaskCenter', () => {
   })
 })
 
-function Harness({ controller: taskController, onRetry = vi.fn(), onOpenResult = vi.fn() }: {
+function Harness({ controller: taskController, onRetry = vi.fn(), onOpenResult = vi.fn(), feedbackEnabled = false }: {
   controller: OptimizationTaskCenterController;
   onRetry?: () => void;
   onOpenResult?: () => void;
+  feedbackEnabled?: boolean;
 }) {
   const [open, setOpen] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -142,6 +170,7 @@ function Harness({ controller: taskController, onRetry = vi.fn(), onOpenResult =
       <OptimizationTaskCenterDialog
         open={open}
         controller={taskController}
+        feedbackEnabled={feedbackEnabled}
         onClose={close}
         onRetrySchedule={() => {
           close()

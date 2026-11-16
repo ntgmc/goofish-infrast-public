@@ -1,13 +1,13 @@
 import { z } from 'zod'
 import { FEEDBACK_STATUSES, adminFeedbackFiltersSchema } from '../../src/lib/feedback-contracts'
 import { feedbackCopy as text } from '../../src/copy/zh-CN/feedback'
-import { getFeedbackDetail, getFeedbackImage, listAdminFeedback, listUserFeedback } from '../storage/feedback-store'
+import { getFeedbackDetail, getFeedbackImage, getOptimizationFailureFeedback, listAdminFeedback, listUserFeedback } from '../storage/feedback-store'
 import { parseAdminPageRequest } from './admin-pagination'
 import { RequestInputError } from '../security/request-validation'
 import { jsonResponse } from './license-utils'
 
 const readQuery = adminFeedbackFiltersSchema.extend({
-  feedback_id: z.uuid().optional(), image_id: z.uuid().optional(),
+  feedback_id: z.uuid().optional(), image_id: z.uuid().optional(), job_id: z.uuid().optional(),
   before_revision: z.coerce.number().int().positive().optional(),
   status: z.enum(FEEDBACK_STATUSES).optional(),
 })
@@ -16,9 +16,11 @@ export async function readFeedback(req: Request, userId: string | null, username
   const url = new URL(req.url)
   const input = readQuery.safeParse(Object.fromEntries([...url.searchParams].filter(([key]) => !['page', 'page_size'].includes(key))))
   if (!input.success) throw new RequestInputError('反馈查询参数无效。')
-  const { feedback_id: id, image_id: imageId, before_revision: before, status, todo, ...filters } = input.data
+  const { feedback_id: id, image_id: imageId, job_id: jobId, before_revision: before, status, todo, ...filters } = input.data
   const hasFilters = status || todo || Object.keys(filters).length > 0
-  if ((id && imageId) || (before && !id) || ((userId || id || imageId) && hasFilters)) throw new RequestInputError('反馈查询参数无效。')
+  if ((id && imageId) || (before && !id) || ((userId || id || imageId) && hasFilters)
+    || (jobId && (!userId || id || imageId || before || hasFilters || url.searchParams.has('page') || url.searchParams.has('page_size')))) throw new RequestInputError('反馈查询参数无效。')
+  if (jobId && userId) return jsonResponse(await getOptimizationFailureFeedback(userId, jobId), 200, { 'Cache-Control': 'no-store' })
   if (imageId) {
     const image = await getFeedbackImage(imageId, userId)
     if (!image) return jsonResponse({ error: text.imageNotFound }, 404, { 'Cache-Control': 'no-store' })
