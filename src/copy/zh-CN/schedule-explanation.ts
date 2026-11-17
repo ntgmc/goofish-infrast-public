@@ -17,6 +17,7 @@ export const scheduleExplanationCopy = {
   disclosure: (provider: string) => `点击生成将向 ${provider} 发送本次排班的产出、班次、相关库存和培养建议摘要，消耗 1 次。`,
   saved: '解读已保存，再次查看不消耗次数。',
   pending: '这份排班正在解读中，完成后会自动显示。',
+  streaming: '正在生成解读，内容会逐步显示，完成后自动保存。',
   reason: {
     disabled: 'AI 解读暂未开放。',
     quota: '解读次数已用完，已保存的解读仍可查看。',

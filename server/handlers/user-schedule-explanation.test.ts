@@ -1,6 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest'
 import type { OptimizeResult } from '../../src/lib/types'
 import handler from './user-schedule-explanation'
+import { readServerSentEvents } from '../../src/lib/server-sent-events'
 
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(), profile: vi.fn(), profiles: vi.fn(), authorization: vi.fn(), result: vi.fn(),
@@ -97,6 +98,48 @@ it('does not charge local validation failures that never contact the provider', 
   expect(mocks.settle).toHaveBeenCalledWith(expect.anything(), 'a1', expect.objectContaining({
     cost: 0, costBasis: 'usage', errorCode: 'input_too_large', usage: null,
   }))
+})
+
+it('delivers text before settlement, then sends the saved state only after accounting completes', async () => {
+  const gate = Promise.withResolvers<unknown>()
+  mocks.generate.mockImplementation((_summary, _config, onDelta: (text: string) => void) => { onDelta('**库存**'); return gate.promise })
+  const req = request('POST'); req.headers.set('Accept', 'text/event-stream')
+  const response = await handler(req)
+  expect(response.headers.get('Content-Type')).toContain('text/event-stream')
+  expect(response.headers.get('Cache-Control')).toBe('no-store')
+  expect(response.headers.get('X-Accel-Buffering')).toBe('no')
+  const events = readServerSentEvents(response.body!)
+  expect(JSON.parse((await events.next()).value!)).toEqual({ type: 'delta', text: '**库存**' })
+  expect(mocks.settle).not.toHaveBeenCalled()
+  const saved = { ...state, available: false, explanation: { text: '**库存**', created_at: '2026-11-17T12:00:00.000Z' } }
+  mocks.read.mockResolvedValue(saved)
+  gate.resolve({ text: '**库存**', cost: 600, costBasis: 'usage', usage: null, breakdown: null, providerRequestId: 'req-stream', errorCode: null })
+  expect(JSON.parse((await events.next()).value!)).toEqual({ type: 'state', state: saved })
+  expect(mocks.settle).toHaveBeenCalledExactlyOnceWith(expect.anything(), 'a1', expect.objectContaining({ text: '**库存**', cost: 600 }))
+  expect((await events.next()).done).toBe(true)
+})
+
+it('continues saving and settling a single generation after the browser disconnects', async () => {
+  const gate = Promise.withResolvers<unknown>()
+  mocks.generate.mockImplementation((_summary, _config, onDelta: (text: string) => void) => { onDelta('片段'); return gate.promise })
+  const req = request('POST'); req.headers.set('Accept', 'text/event-stream')
+  const response = await handler(req)
+  await response.body!.cancel()
+  gate.resolve({ text: '完整解读', cost: 123, costBasis: 'usage', usage: null, breakdown: null, providerRequestId: 'req-stream', errorCode: null })
+  await vi.waitFor(() => expect(mocks.settle).toHaveBeenCalledOnce())
+  await vi.waitFor(() => expect(mocks.read).toHaveBeenCalledOnce())
+  expect(mocks.generate).toHaveBeenCalledOnce()
+})
+
+it('emits a safe stream failure after refund settlement and never sends provider error details', async () => {
+  mocks.generate.mockRejectedValue(new Error('secret provider key and private report'))
+  const req = request('POST'); req.headers.set('Accept', 'text/event-stream')
+  const response = await handler(req)
+  const events = []
+  for await (const data of readServerSentEvents(response.body!)) events.push(JSON.parse(data))
+  expect(events).toEqual([{ type: 'error', code: 'ai_generation_failed', error: expect.stringContaining('未扣除次数') }])
+  expect(mocks.settle).toHaveBeenCalledWith(expect.anything(), 'a1', expect.objectContaining({ text: null, cost: 10000, costBasis: 'reserved' }))
+  expect(JSON.stringify(events)).not.toContain('secret')
 })
 
 it('rejects client-supplied prompts and tokens at the request boundary', async () => {

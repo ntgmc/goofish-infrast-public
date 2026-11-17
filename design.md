@@ -165,7 +165,10 @@ it deliberately when changing the shared design.
   Clamp the group within the visible workspace, clear of the desktop navigation
   rail, after dragging, resizing or content growth; scroll the body independently.
   Escape and close return focus to the launcher. Preserve generation state and
-  the current position across closing, scoped to the current report.
+  the current position across closing, scoped to the current report. Render
+  Markdown with readable lists, emphasis, code and horizontally scrollable tables.
+  Show incoming text progressively, preserving it while collapsed; mark it saved
+  only after generation finishes. Keep streamed text out of the shared query cache.
 - Keep generation beside the overview title and export beside result navigation.
   Copper marks the primary action and focus; station colors identify room types
   through the same icon backgrounds on desktop and mobile.

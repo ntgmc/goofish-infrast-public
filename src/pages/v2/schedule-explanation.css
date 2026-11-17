@@ -134,7 +134,20 @@
 .v2-explanation-content p { margin-block: .75rem 0; line-height: 1.8; }
 .v2-explanation-content p:first-child { margin-top: 0; }
 .v2-explanation-heading { display: grid; justify-items: start; gap: 1rem; }
-.v2-explanation-body { margin-block: 1rem; }
+.v2-explanation-body { min-width: 0; margin-block: 1rem; overflow-wrap: anywhere; }
+.v2-explanation-body :is(h1, h2, h3, h4, h5, h6) { margin-block: 1rem .5rem; font-size: var(--text-base); font-weight: 600; }
+.v2-explanation-body :is(ul, ol) { margin-block: .75rem; padding-left: 1.5rem; }
+.v2-explanation-body ul { list-style: disc; }
+.v2-explanation-body ol { list-style: decimal; }
+.v2-explanation-body li + li { margin-top: .375rem; }
+.v2-explanation-body a { color: var(--v2-accent); text-decoration: underline; text-underline-offset: 3px; }
+.v2-explanation-body blockquote { margin-block: .75rem; padding-left: .75rem; border-left: 2px solid var(--v2-line); color: var(--v2-secondary); }
+.v2-explanation-body pre { max-width: 100%; padding: .75rem; overflow-x: auto; background: var(--v2-bg); border-radius: var(--radius-v2-control); }
+.v2-explanation-body code { font-size: .9em; white-space: break-spaces; }
+.v2-explanation-body table { display: block; max-width: 100%; margin-block: .75rem; overflow-x: auto; border-collapse: collapse; font-size: var(--text-sm); }
+.v2-explanation-body :is(th, td) { padding: .375rem .5rem; border: 1px solid var(--v2-line); text-align: left; }
+.v2-explanation-body > :first-child { margin-top: 0; }
+.v2-explanation-body > :last-child { margin-bottom: 0; }
 .v2-explanation-error { color: var(--color-destructive); }
 .v2-explanation-window :focus-visible { outline-offset: -2px; }
 

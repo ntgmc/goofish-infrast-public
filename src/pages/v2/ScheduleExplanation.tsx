@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { CloseIcon } from '../../components/icons'
 import { Dialog, DialogClose, DialogContent, DialogTitle } from '../../components/ui/dialog'
 import { copy } from '../../copy'
-import { apiJson } from '../../lib/api-client'
-import { scheduleExplanationStateSchema } from '../../lib/schedule-explanation'
+import { apiJson, apiStream } from '../../lib/api-client'
+import { readScheduleExplanationResponse, scheduleExplanationStateSchema } from '../../lib/schedule-explanation'
 import type { OptimizeResult } from '../../lib/types'
 import './schedule-explanation.css'
 
@@ -26,7 +28,9 @@ export default function ScheduleExplanation({ userId, profileId, resultId, sampl
 function PersonalExplanation({ userId, profileId, resultId }: { userId: string; profileId: string; resultId: string }) {
   const client = useQueryClient()
   const active = useRef(true)
-  useEffect(() => { active.current = true; return () => { active.current = false } }, [])
+  const streamAbort = useRef<AbortController | null>(null)
+  const [draft, setDraft] = useState('')
+  useEffect(() => { active.current = true; return () => { active.current = false; streamAbort.current?.abort() } }, [])
   const key = ['user', userId, profileId, 'schedule-explanation', resultId]
   const query = useQuery({
     queryKey: key,
@@ -34,33 +38,47 @@ function PersonalExplanation({ userId, profileId, resultId }: { userId: string; 
     refetchInterval: (query) => query.state.data?.pending ? 2500 : false,
   })
   const mutation = useMutation({
-    mutationFn: () => apiJson<unknown>('/api/user/schedule-explanation', {
-      method: 'POST', json: { profile_id: profileId, result_id: resultId }, timeoutMs: 105000, fallbackMessage: text.failed,
-    }).then(parseState),
+    mutationFn: () => {
+      streamAbort.current = new AbortController()
+      return apiStream('/api/user/schedule-explanation', {
+        method: 'POST', json: { profile_id: profileId, result_id: resultId }, headers: { Accept: 'text/event-stream' },
+        signal: streamAbort.current.signal, timeoutMs: 105000, fallbackMessage: text.failed,
+      }, (response) => readScheduleExplanationResponse(response, (delta) => { if (active.current) setDraft((value) => value + delta) }))
+    },
     retry: false,
-    onMutate: () => client.cancelQueries({ queryKey: key }),
+    onMutate: () => { setDraft(''); return client.cancelQueries({ queryKey: key }) },
     onSuccess: async (data) => {
       if (!active.current || !client.getQueryState(key)) return
+      setDraft('')
       client.setQueryData(key, data)
       await client.invalidateQueries({ predicate: (query) => query.queryKey[0] === 'user' && query.queryKey[1] === userId && query.queryKey[3] === 'schedule-explanation' })
     },
-    onError: () => { if (active.current) void query.refetch({ cancelRefetch: false }) },
+    onError: () => { if (active.current) { setDraft(''); void query.refetch({ cancelRefetch: false }) } },
+    onSettled: () => { streamAbort.current = null },
   })
   const state = query.data
   const pending = mutation.isPending || state?.pending
-  const error = mutation.error ?? query.error
+  const error = (state?.explanation ? null : mutation.error) ?? query.error
   return <ExplanationWindow busy={Boolean(pending)}>
     <div className="v2-explanation-heading"><p className="v2-muted">{text.description}</p>
       {!state?.explanation && state?.available && <button className="v2-button v2-button-secondary" type="button" disabled={pending} onClick={() => mutation.mutate()}>{pending ? text.generating : text.generate}</button>}
     </div>
-    {state?.explanation ? <><div className="v2-explanation-body">{state.explanation.text.split(/\n+/).filter(Boolean).map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div><p className="v2-muted">{text.saved} {text.estimate}</p></> : <>
-      {(query.isPending || pending || state?.reason) && <p role="status">{query.isPending ? text.loading : pending ? text.pending : state?.reason ? text.reason[state.reason] : ''}</p>}
+    {state?.explanation ? <><ExplanationMarkdown>{state.explanation.text}</ExplanationMarkdown><p className="v2-muted">{text.saved} {text.estimate}</p></> : <>
+      {draft && <ExplanationMarkdown>{draft}</ExplanationMarkdown>}
+      {(query.isPending || pending || state?.reason) && <p role="status">{query.isPending ? text.loading : pending ? draft ? text.streaming : text.pending : state?.reason ? text.reason[state.reason] : ''}</p>}
       {state && <p className="v2-muted">{text.quota(state.quota.remaining, state.quota.limit, state.quota.kind === 'monthly')}
         {state.quota.resets_at && <> {text.reset(new Date(state.quota.resets_at).toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai' }))}</>}</p>}
       {state?.available && state.provider && <p className="v2-muted">{text.disclosure(state.provider)}</p>}
     </>}
     {error && <p role="alert" className="v2-explanation-error">{error.message} <button type="button" className="v2-text-button" onClick={() => { mutation.reset(); void query.refetch({ cancelRefetch: false }) }}>{text.retry}</button></p>}
   </ExplanationWindow>
+}
+
+function ExplanationMarkdown({ children }: { children: string }) {
+  return <div className="v2-explanation-body"><ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml unwrapDisallowed
+    allowedElements={['p', 'strong', 'em', 'del', 'a', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'br']}
+    components={{ a: ({ href, children }) => href && /^https?:\/\//i.test(href)
+      ? <a href={href} target="_blank" rel="noopener noreferrer">{children}</a> : children }}>{children}</ReactMarkdown></div>
 }
 
 function ExplanationWindow({ children, sample = false, busy = false }: { children: ReactNode; sample?: boolean; busy?: boolean }) {
