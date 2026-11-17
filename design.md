@@ -431,7 +431,9 @@ it deliberately when changing the shared design.
 - `SharedCardDialog` provides card-to-detail transitions with shared layout IDs and the morph
   spring (320ms, no bounce) for both opening and return. Keep the close target at 44px and the
   scrolling content at its natural size throughout the transition; track the scroll offset for
-  nested shared elements. Keep the original card mounted and explicitly hidden throughout the modal's
+  nested shared elements. Mark the dialog and decorative return portals as Motion projection
+  roots so they do not inherit the drawer's scroll coordinates through the React tree.
+  Keep the original card mounted and explicitly hidden throughout the modal's
   lifetime, including changes to motion preferences, and restore it on dismissal for the return.
   Facility cards use it for their background, icon and title. Facility
   details put product, efficiency and shift production first, then compact operator rows with

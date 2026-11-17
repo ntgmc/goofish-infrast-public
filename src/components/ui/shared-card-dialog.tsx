@@ -43,7 +43,7 @@ export default function SharedCardDialog({ layoutId, source, onClose, closeLabel
         onCloseAutoFocus={(event) => {
           if (opener.current?.isConnected) { event.preventDefault(); opener.current.focus({ preventScroll: true }) }
         }}>
-        <motion.div ref={surface} layoutId={reduced || stationaryContent ? undefined : layoutId}
+        <motion.div ref={surface} layoutId={reduced || stationaryContent ? undefined : layoutId} data-framer-portal-id={layoutId}
           className={`v2-dialog shared-card-dialog ${className}`} data-stationary-content={stationaryContent || undefined}
           style={{ borderRadius: 8 }} initial={false}
           transition={reduced ? { duration: 0 } : motionTokens.morph}>
