@@ -2085,7 +2085,7 @@ describe('V2 feature continuity', () => {
     expect(await screen.findByRole('link', { name: new RegExp(copy.tools.manualSchedule.title) })).toHaveAttribute('href', expect.stringContaining('section=manual-tool'))
   })
 
-  it('returns from pricing to generation while retaining the active profile without submitting a task', async () => {
+  it('opens current paid entitlements from pricing while retaining the active profile without submitting a task', async () => {
     const workflow = connect()
     const user = userEvent.setup()
     mount()
@@ -2094,9 +2094,9 @@ describe('V2 feature continuity', () => {
     expect(await screen.findByRole('heading', { name: cloneDefaultPublicContentSettings().pricing.title, level: 1 })).toBeInTheDocument()
     expect(screen.getByTestId('route-location')).toHaveTextContent('section=pricing&profile_id=profile-1')
     expect(footer.getByRole('link', { name: copy.v2.comparePlans })).toBeInTheDocument()
-    await user.click(screen.getByRole('link', { name: copy.public.pricing_choice.free_action }))
-    expect(await screen.findByRole('heading', { name: copy.v2.generation, level: 1 })).toBeInTheDocument()
-    expect(screen.getByTestId('route-location')).toHaveTextContent('section=generation&profile_id=profile-1')
+    await user.click(screen.getByRole('link', { name: copy.public.pricing_choice.manage_action }))
+    expect(await screen.findByRole('heading', { name: sectionLabels.profiles, level: 1 })).toBeInTheDocument()
+    expect(screen.getByTestId('route-location')).toHaveTextContent('section=profiles&profile_id=profile-1')
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
   })
 
@@ -2105,6 +2105,43 @@ describe('V2 feature continuity', () => {
     mount('/v2?section=pricing')
     expect(await screen.findByRole('button', { name: copy.public.pricing_choice.free_unavailable })).toBeDisabled()
     expect(screen.queryByRole('link', { name: copy.public.pricing_choice.free_action })).not.toBeInTheDocument()
+  })
+
+  it('takes a free profile from a pricing purchase to in-place redemption without creating another profile', async () => {
+    const workflow = connect()
+    session.activeProfile!.kind = 'free_preview'
+    session.activeProfile!.permission = 'growth'
+    const content = cloneDefaultPublicContentSettings()
+    content.pricing.plans.single_account_monthly.purchase_url = 'https://example.com/monthly'
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => Response.json(String(url).includes('/api/site/public-content') ? content : { notifications: [], unread_count: 0, next_cursor: null }))
+    const user = userEvent.setup()
+    render(<MemoryRouter initialEntries={['/v2?section=pricing&profile_id=profile-1']}><PublicContentProvider><V2Page /><RouteLocation /></PublicContentProvider></MemoryRouter>, { wrapper: MotionPreferenceProvider })
+    expect(await screen.findByRole('link', { name: copy.public.purchase.upgrade_redeem })).toHaveAttribute('href', '/v2?section=add-account&profile_id=profile-1&mode=upgrade')
+    await user.click(await screen.findByRole('button', { name: copy.public.pricing_purchase_labels.single_account_monthly }))
+    const dialog = within(await screen.findByRole('dialog', { name: copy.public.purchase.title }))
+    const redemption = dialog.getByRole('link', { name: copy.public.purchase.upgrade_redeem })
+    expect(redemption).toHaveAttribute('href', '/v2?section=add-account&profile_id=profile-1&mode=upgrade')
+    await user.click(redemption)
+    expect(await screen.findByRole('form', { name: copy.v2.profileUpgrade.title })).toBeVisible()
+    expect(screen.getByTestId('route-location')).toHaveTextContent('section=add-account&profile_id=profile-1&mode=upgrade')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(fetch.mock.calls.some(([url]) => String(url).includes('/cdk/redeem'))).toBe(false)
+    expect(workflow.handleGenerate).not.toHaveBeenCalled()
+  })
+
+  it.each(['term', 'expired', 'lifetime', 'frozen-free'] as const)('shows current pricing entitlements and the correct account path for %s', async (state) => {
+    connect()
+    const profile = session.activeProfile!
+    profile.expires_at = state === 'term' ? '2099-01-01T00:00:00Z' : state === 'expired' ? '2020-01-01T00:00:00Z' : null
+    if (state === 'frozen-free') { profile.kind = 'free_preview'; profile.status = 'frozen' }
+    mount('/v2?section=pricing&profile_id=profile-1')
+    expect(await screen.findByRole('link', { name: copy.public.pricing_choice.manage_action })).toHaveAttribute('href', '/v2?section=profiles&profile_id=profile-1')
+    expect(screen.queryByRole('link', { name: copy.public.pricing_choice.free_action })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: copy.public.purchase.upgrade_redeem })).not.toBeInTheDocument()
+    if (state === 'term' || state === 'expired') expect(screen.getByRole('link', { name: copy.public.pricing_choice.renew_action })).toBeVisible()
+    if (state === 'expired') expect(screen.getByRole('region', { name: copy.public.pricing_choice.current_profile })).toHaveTextContent('已于')
+    if (state === 'lifetime') expect(screen.getByText(copy.public.pricing_choice.no_expiry)).toBeVisible()
+    if (state === 'frozen-free') expect(screen.queryByRole('region', { name: copy.public.pricing_choice.current_profile })).not.toBeInTheDocument()
   })
 
   it.each([false, true])('keeps configured maintenance purchases and unavailable plans correct (mobile: %s)', async (mobile) => {
@@ -2117,35 +2154,72 @@ describe('V2 feature continuity', () => {
     content.pricing.lifetime_upgrade.purchase_url = 'https://example.com/upgrade'
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(content), { headers: { 'Content-Type': 'application/json' } }))
     const user = userEvent.setup()
-    render(<MemoryRouter initialEntries={['/v2?section=pricing']}><PublicContentProvider><V2Page /></PublicContentProvider></MemoryRouter>, { wrapper: MotionPreferenceProvider })
-    await screen.findByRole('link', { name: copy.public.pricing_purchase_labels.single_account_monthly })
+    render(<MemoryRouter initialEntries={['/v2?section=pricing&profile_id=profile-1']}><PublicContentProvider><V2Page /><RouteLocation /></PublicContentProvider></MemoryRouter>, { wrapper: MotionPreferenceProvider })
+    await screen.findByRole('button', { name: copy.public.pricing_purchase_labels.single_account_monthly })
     const cards = within(screen.getByRole('region', { name: copy.v2.planChoice }))
     expect(cards.getAllByRole('article')).toHaveLength(mobile ? 1 : 4)
     for (const id of ['single_account_monthly', 'single_account_annual', 'single_account_lifetime'] as const) {
       if (mobile) await user.click(screen.getByRole('radio', { name: new RegExp(copy.public.pricing_choice.term_labels[id]) }))
-      const purchase = cards.getByRole('link', { name: copy.public.pricing_purchase_labels[id] })
-      expect(purchase).toHaveAttribute('href', `/v2?section=purchase&offer=${id}`)
-      expect(purchase).not.toHaveAttribute('target')
+      const purchase = cards.getByRole('button', { name: copy.public.pricing_purchase_labels[id] })
+      expect(purchase).toHaveAttribute('aria-haspopup', 'dialog')
       expect(purchase).toHaveAccessibleDescription(expect.stringContaining(content.pricing.plans[id].account_scope))
-      expect(purchase).toHaveAccessibleDescription(expect.stringContaining(copy.public.pricing_redemption.activation))
+      expect(purchase).toHaveAccessibleDescription(expect.stringContaining(mobile ? copy.public.pricing_redemption.activation : copy.public.pricing_cards.purchase_terms))
       if (mobile) {
-        expect(cards.getAllByRole('link')).toHaveLength(1)
+        expect(cards.getAllByRole('button')).toHaveLength(1)
         expect(cards.getByText(content.pricing.plans[id].account_scope)).toBeVisible()
         expect(cards.getByText(getSku(id).audience)).toBeVisible()
         await waitFor(() => expect(cards.getByText(content.pricing.plans[id].display_price.split('/')[0]!.trim())).toBeVisible())
       }
+      await user.click(purchase)
+      const dialog = within(await screen.findByRole('dialog', { name: copy.public.purchase.title }))
+      expect(dialog.getByRole('link', { name: copy.public.purchase.open })).toHaveAttribute('href', content.pricing.plans[id].purchase_url)
+      expect(dialog.getByRole('heading', { name: content.pricing.plans[id].label.replace(/\s*CDK$/u, '') })).toBeVisible()
+      expect(dialog.getByRole('link', { name: copy.public.purchase.redeem_action })).toHaveAttribute('href', '/v2?section=add-account&profile_id=profile-1&mode=cdk')
+      expect(screen.getByTestId('route-location')).toHaveTextContent('section=pricing&profile_id=profile-1')
+      await user.keyboard('{Escape}')
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+      expect(purchase).toHaveFocus()
     }
     if (mobile) await user.click(screen.getByRole('radio', { name: new RegExp(copy.public.pricing_choice.term_labels.single_account_half_year) }))
     expect(cards.getByRole('button', { name: copy.public.pricing_purchase_unavailable })).toBeDisabled()
-    expect(cards.queryByRole('link', { name: copy.public.pricing_purchase_labels.single_account_half_year })).not.toBeInTheDocument()
+    expect(cards.queryByRole('button', { name: copy.public.pricing_purchase_labels.single_account_half_year })).not.toBeInTheDocument()
     await user.click(screen.getByText(copy.public.pricing_cards.rules))
-    expect(screen.getByRole('link', { name: copy.public.pricing_upgrade_purchase })).toHaveAttribute('href', '/v2?section=purchase&offer=lifetime_upgrade')
-    await user.click(screen.getByRole('link', { name: copy.public.pricing_upgrade_purchase }))
-    expect(await screen.findByRole('heading', { name: copy.public.purchase.title, level: 1 })).toBeVisible()
+    await user.click(screen.getByRole('button', { name: copy.public.pricing_upgrade_purchase }))
+    expect(await screen.findByRole('dialog', { name: copy.public.purchase.title })).toBeVisible()
     expect(await screen.findByRole('link', { name: copy.public.purchase.open })).toHaveAttribute('href', 'https://example.com/upgrade')
     expect(screen.getByText(copy.public.purchase.upgrade_steps[0].description)).toBeVisible()
     expect(screen.getByRole('link', { name: copy.public.purchase.check_profiles })).toBeVisible()
-    expect(screen.queryByRole('link', { name: copy.public.pricing_redemption.action })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: copy.public.purchase.redeem_action })).not.toBeInTheDocument()
+  })
+
+  it.each([false, true])('merges adjacent equal comparison values while preserving configured differences and archive quotas (mobile: %s)', async (mobile) => {
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: mobile && ['(max-width: 40rem)', '(max-width: 60rem)'].includes(query), addEventListener: vi.fn(), removeEventListener: vi.fn() }))
+    const content = cloneDefaultPublicContentSettings()
+    content.pricing.comparison_rows.push({ id: 'custom-benefit', feature: '自定义权益', free_preview: '不支持', single_account_monthly: '支持', single_account_half_year: '需人工确认', single_account_annual: '支持', single_account_lifetime: '支持' })
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json(content))
+    const user = userEvent.setup()
+    render(<MemoryRouter initialEntries={['/v2?section=pricing']}><PublicContentProvider><V2Page /></PublicContentProvider></MemoryRouter>, { wrapper: MotionPreferenceProvider })
+    await user.click(await screen.findByText(copy.public.pricing_choice.full_comparison))
+    const table = within(await screen.findByRole('table', { name: content.pricing.comparison_heading }))
+    await table.findByRole('rowheader', { name: '自定义权益' })
+    const allPlans = within(table.getByRole('rowheader', { name: '基建预设' }).closest('tr')!).getAllByRole('cell')
+    expect(allPlans).toHaveLength(1)
+    expect(allPlans[0]).toHaveAttribute('colspan', '5')
+    const skland = within(table.getByRole('rowheader', { name: copy.publicContent.pricing_comparison_skland }).closest('tr')!).getAllByRole('cell')
+    expect(skland).toHaveLength(1)
+    expect(skland[0]).toHaveAttribute('colspan', '5')
+    expect(table.getAllByRole('rowheader').map((header) => header.textContent)).toEqual([...copy.public.pricing_choice.comparison_order.filter((feature) => content.pricing.comparison_rows.some((row) => row.feature === feature) || feature === copy.public.pricing_cards.archive_comparison), '自定义权益'])
+    const paidPlans = within(table.getByRole('rowheader', { name: 'MAA JSON 一键下载' }).closest('tr')!).getAllByRole('cell')
+    expect(paidPlans).toHaveLength(2)
+    expect(paidPlans[1]).toHaveAttribute('colspan', '4')
+    const custom = within(table.getByRole('rowheader', { name: '自定义权益' }).closest('tr')!).getAllByRole('cell')
+    expect(custom.map((cell) => cell.textContent)).toEqual(['不支持', '支持', '需人工确认', '支持'])
+    expect(custom.map((cell) => cell.getAttribute('colspan'))).toEqual(['1', '1', '1', '2'])
+    expect(custom[3]).toHaveAttribute('data-label', `${copy.public.pricing_choice.term_labels.single_account_annual}、${copy.public.pricing_choice.term_labels.single_account_lifetime}`)
+    const archives = within(table.getByRole('rowheader', { name: copy.public.pricing_cards.archive_comparison }).closest('tr')!).getAllByRole('cell')
+    expect(archives.map((cell) => cell.textContent?.trim())).toEqual([copy.public.pricing_cards.archive_not_included, copy.public.pricing_cards.archive_gift(1), copy.public.pricing_cards.archive_gift(3)])
+    expect(archives.map((cell) => cell.getAttribute('colspan'))).toEqual(['1', '3', '1'])
+    expect(archives.map((cell) => cell.querySelector('[data-marker]')?.getAttribute('data-marker'))).toEqual(['❌', '✅', '✅'])
   })
 
   it.each([true, false])('opens CDK redemption from purchase and retains the destination through login: signed in %s', async (signedIn) => {
@@ -2160,7 +2234,7 @@ describe('V2 feature continuity', () => {
     ))
     const user = userEvent.setup()
     const page = mount(signedIn ? '/v2?section=purchase&profile_id=profile-1' : '/v2?section=purchase')
-    const redemption = await screen.findByRole('link', { name: copy.public.pricing_redemption.action })
+    const redemption = await screen.findByRole('link', { name: copy.public.purchase.redeem_action })
     expect(redemption).toHaveAttribute('href', signedIn ? '/v2?section=add-account&profile_id=profile-1&mode=cdk' : '/v2?section=add-account&mode=cdk')
     await user.click(redemption)
     if (!signedIn) {
@@ -2182,7 +2256,7 @@ describe('V2 feature continuity', () => {
     mocks.features.mockReturnValue({ status: 'ready', features: { ...DEFAULT_SITE_FEATURES, cdk_redemption: false }, retry: vi.fn() })
     mount('/v2?section=pricing')
     expect(await screen.findByText(copy.public.pricing_redemption.unavailable)).toBeVisible()
-    expect(screen.queryByRole('link', { name: copy.public.pricing_redemption.action })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: copy.public.purchase.redeem_action })).not.toBeInTheDocument()
   })
 
   it('opens full account settings inside V2 and shares the existing animation preferences', async () => {

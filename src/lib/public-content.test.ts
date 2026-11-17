@@ -11,6 +11,48 @@ import {
 } from './public-content'
 
 describe('public content settings', () => {
+  it('simplifies saved account rules while preserving custom content, removed rules, and the stored input', () => {
+    const stored = { ...cloneDefaultPublicContentSettings(), defaults_revision: 17, updated_at: '2026-11-16T12:00:00.000Z' }
+    stored.pricing.disclosures = [
+      copy.publicContent.legacy_pricing_account_rule,
+      copy.publicContent.legacy_pricing_prepaid_rule,
+      copy.publicContent.lifetime_existing_rights_disclosure,
+      copy.publicContent.legacy_pricing_anomaly_rule,
+      copy.publicContent.legacy_pricing_review_rule,
+      copy.publicContent.pricing_transfer_disclosure,
+      copy.publicContent.legacy_pricing_unlimited_rule,
+      '管理员自定义规则',
+    ]
+    const original = structuredClone(stored)
+    const migrated = normalizePublicContentSettings(stored)
+    expect(migrated.pricing.disclosures).toEqual([...DEFAULT_PUBLIC_CONTENT_DRAFT.pricing.disclosures, '管理员自定义规则'])
+    expect(migrated.updated_at).toBe(stored.updated_at)
+    expect(migrated.pricing.plans).toEqual(stored.pricing.plans)
+    expect(stored).toEqual(original)
+    expect(normalizePublicContentSettings(migrated)).toEqual(migrated)
+
+    stored.pricing.disclosures = ['管理员自定义账号限制', copy.publicContent.legacy_pricing_review_rule]
+    expect(normalizePublicContentSettings(stored).pricing.disclosures).toEqual(['管理员自定义账号限制', DEFAULT_PUBLIC_CONTENT_DRAFT.pricing.disclosures[2]])
+    stored.defaults_revision = PUBLIC_CONTENT_DEFAULTS_REVISION
+    expect(normalizePublicContentSettings(stored).pricing.disclosures).toEqual(stored.pricing.disclosures)
+  })
+
+  it('updates saved free Skland comparison defaults without replacing custom descriptions or mutating the input', () => {
+    const stored = { ...cloneDefaultPublicContentSettings(), defaults_revision: 16 }
+    const row = stored.pricing.comparison_rows.find((entry) => entry.feature === copy.publicContent.pricing_comparison_skland)!
+    row.free_preview = copy.publicContent.legacy_free_skland_comparison
+    row.single_account_annual = '管理员自定义导入说明'
+    const original = structuredClone(stored)
+    const migrated = normalizePublicContentSettings(stored)
+    const updated = migrated.pricing.comparison_rows.find((entry) => entry.id === row.id)!
+    expect(updated.free_preview).toBe(row.single_account_monthly)
+    expect(updated.single_account_annual).toBe('管理员自定义导入说明')
+    expect(stored).toEqual(original)
+    expect(normalizePublicContentSettings(migrated)).toEqual(migrated)
+    row.free_preview = '管理员自定义免费导入说明'
+    expect(normalizePublicContentSettings(stored).pricing.comparison_rows.find((entry) => entry.id === row.id)!.free_preview).toBe(row.free_preview)
+  })
+
   it('updates saved V1 workspace FAQ defaults while preserving order, removed entries, and the stored input', () => {
     const stored = { ...cloneDefaultPublicContentSettings(), defaults_revision: 15, updated_at: '2026-11-05T00:00:00.000Z' }
     stored.faq.items = copy.publicContent.legacy_v1_workspace_faq.map((item) => ({ ...item, action: 'none' as const })).reverse()
@@ -148,7 +190,6 @@ describe('public content settings', () => {
     expect(parsePublicContentDraft(draft).pricing.lifetime_upgrade).toEqual({
       purchase_url: 'https://example.com/upgrade',
       share_image_url: '',
-      qr_code_url: '',
       service_fee: '3.50 元',
     })
 
@@ -191,16 +232,13 @@ describe('public content settings', () => {
     for (const id of PUBLIC_PRICING_PLAN_IDS) {
       Reflect.deleteProperty(legacy.pricing.plans[id], 'purchase_url')
       Reflect.deleteProperty(legacy.pricing.plans[id], 'share_image_url')
-      Reflect.deleteProperty(legacy.pricing.plans[id], 'qr_code_url')
     }
     Reflect.deleteProperty(legacy.cdk_purchase, 'share_image_url')
-    Reflect.deleteProperty(legacy.cdk_purchase, 'qr_code_url')
     Reflect.deleteProperty(legacy.cdk_purchase, 'instructions')
     Reflect.deleteProperty(legacy.pricing.lifetime_upgrade, 'share_image_url')
-    Reflect.deleteProperty(legacy.pricing.lifetime_upgrade, 'qr_code_url')
     const parsed = parsePublicContentDraft(legacy)
     for (const id of PUBLIC_PRICING_PLAN_IDS) {
-      expect(parsed.pricing.plans[id]).toMatchObject({ purchase_url: '', share_image_url: '', qr_code_url: '' })
+      expect(parsed.pricing.plans[id]).toMatchObject({ purchase_url: '', share_image_url: '' })
       expect(parsed.pricing.plans[id].display_price).toBe(DEFAULT_PUBLIC_CONTENT_DRAFT.pricing.plans[id].display_price)
     }
     expect(resolvePublicContentSettings({ ...cloneDefaultPublicContentSettings(), ...legacy }).isFallback).toBe(false)
@@ -228,20 +266,34 @@ describe('public content settings', () => {
   it.each(['http://example.com/qr.png', 'javascript:alert(1)', 'data:image/png;base64,AA', '//example.com/qr.png', '/assets/../api/private', '/assets/qr.png?token=private', '/api/user/feedback?image_id=private', '/api/site/public-content-image?id=bad', `/api/site/public-content-image?id=${'a'.repeat(64)}&extra=1`])('rejects unsafe purchase media %s for every product', (url) => {
     const draft = structuredClone(DEFAULT_PUBLIC_CONTENT_DRAFT)
     for (const target of [draft.cdk_purchase, draft.pricing.plans.single_account_monthly, draft.pricing.lifetime_upgrade]) {
-      for (const field of ['share_image_url', 'qr_code_url'] as const) {
-        target[field] = url
-        expect(() => parsePublicContentDraft(draft)).toThrow()
-        target[field] = ''
-      }
+      target.share_image_url = url
+      expect(() => parsePublicContentDraft(draft)).toThrow()
+      target.share_image_url = ''
     }
   })
 
-  it('accepts uploaded image URLs for every purchase product and preserves them through normalization', () => {
+  it('discards retired QR uploads in saved settings while preserving every product link and share image', () => {
+    const stored = cloneDefaultPublicContentSettings()
+    const targets = [stored.cdk_purchase, ...Object.values(stored.pricing.plans), stored.pricing.lifetime_upgrade]
+    for (const [index, target] of targets.entries()) {
+      Object.assign(target, { qr_code_url: `https://example.com/old-qr-${index}.png`, share_image_url: `https://example.com/share-${index}.png` })
+    }
+    stored.pricing.plans.single_account_monthly.purchase_url = 'https://example.com/monthly'
+    const resolved = resolvePublicContentSettings(stored)
+    expect(resolved.isFallback).toBe(false)
+    expect(resolved.content.pricing.plans.single_account_monthly.purchase_url).toBe('https://example.com/monthly')
+    for (const [index, target] of [resolved.content.cdk_purchase, ...Object.values(resolved.content.pricing.plans), resolved.content.pricing.lifetime_upgrade].entries()) {
+      expect(target).not.toHaveProperty('qr_code_url')
+      expect(target.share_image_url).toBe(`https://example.com/share-${index}.png`)
+    }
+    expect(normalizePublicContentSettings(resolved.content)).toEqual(resolved.content)
+  })
+
+  it('accepts uploaded share image URLs for every purchase product and preserves them through normalization', () => {
     const stored = cloneDefaultPublicContentSettings()
     const url = `/api/site/public-content-image?id=${'a'.repeat(64)}`
     for (const target of [stored.cdk_purchase, stored.pricing.plans.single_account_monthly, stored.pricing.lifetime_upgrade]) {
       target.share_image_url = url
-      target.qr_code_url = url
     }
     const resolved = resolvePublicContentSettings(stored)
     expect(resolved.isFallback).toBe(false)
@@ -331,7 +383,7 @@ describe('public content settings', () => {
       discount_fold: 10,
       purchase_url: 'https://example.com/lifetime',
     })
-    expect(migrated.pricing.disclosures).toEqual(['已购终身卡继续保留原有长期权益。', '管理员自定义提醒'])
+    expect(migrated.pricing.disclosures).toEqual([DEFAULT_PUBLIC_CONTENT_DRAFT.pricing.disclosures[1], '管理员自定义提醒'])
     expect(migrated.pricing.plans.single_account_monthly).toEqual(original.pricing.plans.single_account_monthly)
     expect(migrated.updated_at).toBe(stored.updated_at)
     expect(migrated.faq).toEqual(stored.faq)
@@ -472,7 +524,7 @@ describe('public content settings', () => {
     ]
     const migrated = normalizePublicContentSettings(stored)
     expect(migrated.pricing.intro).toBe(DEFAULT_PUBLIC_CONTENT_DRAFT.pricing.intro)
-    expect(migrated.pricing.disclosures).toEqual(['MaaTool 账号、CDK 和档案均不可转让或转售。', '管理员自定义提醒'])
+    expect(migrated.pricing.disclosures).toEqual([DEFAULT_PUBLIC_CONTENT_DRAFT.pricing.disclosures[3], '管理员自定义提醒'])
     expect(migrated.pricing.comparison_rows).toEqual(stored.pricing.comparison_rows)
     expect(normalizePublicContentSettings(migrated)).toEqual(migrated)
 

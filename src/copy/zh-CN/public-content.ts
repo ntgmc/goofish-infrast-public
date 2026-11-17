@@ -1,5 +1,7 @@
 export const publicContentCopy = {
   pricing_comparison_presets: '基建预设',
+  pricing_comparison_skland: '森空岛扫码导入',
+  legacy_free_skland_comparison: '✅ 扫码绑定 UID，导入干员与练度',
   pricing_comparison_manual: '手动排班',
   pricing_comparison_bound_account: '更换游戏账号',
   legacy_account_binding: {
@@ -42,6 +44,11 @@ export const publicContentCopy = {
   retired_personal_disclosure: '个人按次档案仅限本人非商业使用；商用档案仅可处理数据权利人已授权的数据。',
   retired_commercial_disclosure: '商用主排班按成功任务计费；MaaTool 账号、CDK、档案和积分均不可转让或转售。',
   pricing_transfer_disclosure: 'MaaTool 账号、CDK 和档案均不可转让或转售。',
+  legacy_pricing_account_rule: '30 天尝鲜维护包、90 天版本维护卡、365 天年度维护卡和终身卡 CDK 均仅用于一个游戏账号；绑定森空岛 UID 后不支持自行更换。',
+  legacy_pricing_prepaid_rule: '30 天、90 天和 365 天维护包均为一次性预付，不自动续费；终身卡指在服务持续提供且授权正常的前提下长期维护同一账号。',
+  legacy_pricing_anomaly_rule: '干员归属、练度或干员池出现异常变化时可能先拦截；重复异常可能冻结档案。',
+  legacy_pricing_review_rule: '干员数据误拦截需要通过 MaaTool 官方 QQ 群人工核验。',
+  legacy_pricing_unlimited_rule: '30 天、90 天和 365 天 CDK 可在有效期内不限次数生成完整个人排班和使用个人增量重算，终身卡可长期不限次数使用。',
   retired_commercial_comparison: '批量报告导出 / 商用授权',
   retired_comparison_unavailable: '不支持',
   legacy_pricing_plans: {
@@ -197,8 +204,7 @@ export const publicContentCopy = {
   admin_purchase_instructions: '购买补充说明',
   admin_purchase_instructions_help: '显示在所有购买页的流程下方，可填写发货方式、联系说明等；留空则隐藏。',
   admin_share_image_url: '闲鱼分享图',
-  admin_qr_code_url: '购买二维码',
-  admin_purchase_media_help: '可直接上传 JPG、PNG 或 WebP 图片，每张不超过 1 MB，保留原图清晰度。请使用当前商品对应的分享图和二维码，保存并发布后生效。',
+  admin_purchase_media_help: '填写商品链接后，购买页会自动生成对应的二维码。分享图可上传 JPG、PNG 或 WebP，每张不超过 1 MB，保存并发布后生效。',
   admin_image_upload: '上传图片',
   admin_image_replace: '更换图片',
   admin_image_uploading: '正在上传…',
