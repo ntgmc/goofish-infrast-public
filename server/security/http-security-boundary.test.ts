@@ -96,6 +96,24 @@ describe('HTTP security boundary', () => {
     }
   })
 
+  it.each([
+    'page=1&page_size=25&from=2026-11-01T00%3A00%3A00.000Z',
+    new URLSearchParams({ page: '2', page_size: '50', from: '2026-11-01T00:00:00.000Z', to: '2026-11-17T00:00:00.000Z',
+      status: 'succeeded', user_id: 'user-1', provider: '测试服务商', model: 'test-model' }).toString(),
+    'id=attempt-1',
+  ])('allows AI usage list, filter, pagination and detail queries through the HTTP boundary (%s)', (query) => {
+    expect(inspectIncomingRequest(incomingGet(`/api/admin/ai-usage?${query}`, 'localhost:3001')).allowed).toBe(true)
+  })
+
+  it.each(['page=1&unexpected=true', 'page=1&page=2', 'id=attempt-1&id=attempt-2'])('rejects unknown or duplicate AI usage query parameters (%s)', async (query) => {
+    const decision = inspectIncomingRequest(incomingGet(`/api/admin/ai-usage?${query}`, 'localhost:3001'))
+    expect(decision.allowed).toBe(false)
+    if (!decision.allowed) {
+      expect(decision.response.status).toBe(400)
+      await expect(decision.response.json()).resolves.toMatchObject({ code: 'invalid_request' })
+    }
+  })
+
   it.each(Object.keys(operationsCohortLabels) as OperationsCohort[])('allows overview user lists through the HTTP boundary (%s)', (cohort) => {
     const target = operationsUsersPath(createOperationsOverview(), cohort, cohort === 'failed' ? 'optimizer_runtime_error' : undefined)
     const url = new URL(`/api${target}`, 'http://localhost:3001')

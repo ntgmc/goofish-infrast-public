@@ -34,6 +34,7 @@ const mocks = vi.hoisted(() => ({
   pageVisit: vi.fn(),
 }))
 vi.mock('../../lib/usage-tracking', () => ({ reportPageVisit: mocks.pageVisit }))
+vi.mock('./ScheduleExplanation', () => ({ default: () => null }))
 vi.mock('../../lib/admin-api-client', () => ({ adminApiJson: vi.fn(async () => ({ user: null })), ADMIN_SESSION_EXPIRED_EVENT: 'goofish:admin-session-expired' }))
 vi.mock('../../components/result-panel/ManualScheduleEditor', () => ({ default: mocks.manual }))
 vi.mock('../../components/result-panel/schedule-image', () => ({ downloadScheduleImage: mocks.image }))

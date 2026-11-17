@@ -284,7 +284,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_023: "上述信息仅用于提供登录、账号管理、排班计算、结果保存、客服排障和服务安全。MaaTool 官方不会出售你的个人信息，也不会将游戏数据用于与本服务无关的广告投放。",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_024: "森空岛授权和数据导入需要连接鹰角网络或森空岛服务，密码重置邮件会通过邮件服务商发送。我们仅会传输完成对应功能所需的信息。",
+  pages_PublicInfoPage_024: "森空岛授权和数据导入需要连接鹰角网络或森空岛服务，密码重置邮件会通过邮件服务商发送。主动生成 AI 排班解读时，本次排班的产出、班次、相关库存和培养建议摘要会发送给按钮旁注明的 AI 服务商；不会发送邮箱、游戏 UID、CDK 或森空岛凭据。解读随对应排班结果保存和删除，用量记录用于次数与费用核算，管理员可查看调用状态、token 用量、费用及已保存的解读；注销后去除账号关联，保留匿名用量和费用记录。我们仅会传输完成对应功能所需的信息。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_025: "存储、安全与权利",
   // src/pages/PublicInfoPage.tsx

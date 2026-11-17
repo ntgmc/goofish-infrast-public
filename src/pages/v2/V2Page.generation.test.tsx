@@ -18,6 +18,8 @@ import { buildOptimizeSignature } from '../tool/optimize/workflow-utils'
 import { SAMPLE_CONFIG, SAMPLE_OPERATORS, SAMPLE_RESULT } from './sample-result'
 import V2Page from './V2Page'
 
+vi.mock('./ScheduleExplanation', () => ({ default: () => null }))
+
 vi.mock('../../lib/api-client', async (original) => ({
   ...await original<typeof import('../../lib/api-client')>(),
   apiJson: vi.fn(),

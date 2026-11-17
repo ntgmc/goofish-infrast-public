@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_SITE_FEATURE_SETTINGS, computeEffectiveSiteFeatures } from '../../src/lib/site-features'
+import { DEFAULT_AI_SETTINGS } from '../../src/lib/ai-settings'
 
 const auth = vi.hoisted(() => ({ authenticateAdminRequest: vi.fn() }))
 const store = vi.hoisted(() => ({ getSiteFeatureSettings: vi.fn(), saveSiteFeatureSettings: vi.fn() }))
-const { routeHandler } = vi.hoisted(() => ({ routeHandler: vi.fn() }))
+const { routeHandler, getAdminAiSettings } = vi.hoisted(() => ({ routeHandler: vi.fn(), getAdminAiSettings: vi.fn() }))
 
 vi.mock('./admin-auth', () => auth)
 vi.mock('../storage/feature-settings-store', () => store)
+vi.mock('../storage/ai-settings-store', () => ({ getAdminAiSettings }))
 vi.mock('../routes', () => ({ API_ROUTES: [['/api/admin/feature-settings', routeHandler]] }))
 
 import handler from './admin-feature-settings'
@@ -22,6 +24,7 @@ describe('admin feature settings handler', () => {
     store.getSiteFeatureSettings.mockReset().mockResolvedValue(settings)
     store.saveSiteFeatureSettings.mockReset().mockResolvedValue({ ...settings, revision: 3 })
     routeHandler.mockReset().mockImplementation(handler)
+    getAdminAiSettings.mockReset().mockResolvedValue({ settings: DEFAULT_AI_SETTINGS, has_api_key: false })
   })
 
   it('reads and writes a complete revisioned feature map', async () => {
@@ -29,6 +32,15 @@ describe('admin feature settings handler', () => {
     const response = await handler(jsonRequest({ features: settings.features, expected_revision: 2 }))
     expect(response.status).toBe(200)
     expect(store.saveSiteFeatureSettings).toHaveBeenCalledWith(settings.features, 2)
+  })
+
+  it('requires usable AI settings before enabling its feature switch, while always allowing closure', async () => {
+    const features = { ...settings.features, ai_schedule_explanation: true }
+    expect((await handler(jsonRequest({ features, expected_revision: 2 }))).status).toBe(400)
+    expect(store.saveSiteFeatureSettings).not.toHaveBeenCalled()
+    getAdminAiSettings.mockResolvedValueOnce({ settings: { ...DEFAULT_AI_SETTINGS, provider: '测试', model: 'chat', baseURL: 'https://example.test/v1', inputPrice: 1, outputPrice: 2 }, has_api_key: true })
+    expect((await handler(jsonRequest({ features, expected_revision: 2 }))).status).toBe(200)
+    expect((await handler(jsonRequest({ features: settings.features, expected_revision: 2 }))).status).toBe(200)
   })
 
   it('publishes a saved V1 switch without disabling V2 or shared scheduling capabilities', async () => {

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { adminAiSettingsUpdateSchema } from '../../src/lib/ai-settings'
 import { accountDeletionSurveySchema } from '../../src/lib/account-deletion-contracts'
 import { feedbackRequestSchema, feedbackReplySchema, adminFeedbackUpdateSchema, optimizationFailureFeedbackRequestSchema } from '../../src/lib/feedback-contracts'
 import { giftPackOpeningRuleSchema } from '../../src/lib/admin-inventory-contracts'
@@ -145,6 +146,7 @@ export const requestSchemas = {
   }).optional() }).refine((body) => !body.training || body.projects === undefined && body.recommendation === undefined, '培养目标读取不能同时指定养成项目或推荐条件。'),
   depotValue: depotValueRequestSchema,
   adminPublicContentImage: imageUploadSchema,
+  scheduleExplanation: strict({ profile_id: shortString(128), result_id: shortString(128) }),
   userFeedback: z.union([feedbackRequestSchema, optimizationFailureFeedbackRequestSchema]),
   userFeedbackReply: feedbackReplySchema,
   adminFeedbackUpdate: adminFeedbackUpdateSchema,
@@ -269,6 +271,7 @@ export const requestSchemas = {
     password_reset_email_reserve: z.number().int().min(0).max(300),
   }),
   adminFeatureSettings: strict({ features: siteFeaturesSchema, expected_revision: expectedRevisionSchema }),
+  adminAiSettings: adminAiSettingsUpdateSchema,
   adminPublicContent: publicContentDraftSchema.extend({ expected_revision: expectedRevisionSchema }),
   adminRegistrationInvitationCreate: strict({
     reason: inventoryReasonSchema,
@@ -757,6 +760,8 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/admin/invitation-settings', route({ GET: none(), PUT: json('admin', requestSchemas.adminInvitationSettings), PATCH: json('admin', requestSchemas.adminInvitationSettings) })],
   ['/api/admin/registration-settings', route({ GET: none(), PUT: json('admin', requestSchemas.adminRegistrationSettings) })],
   ['/api/admin/feature-settings', route({ GET: none(), PUT: json('admin', requestSchemas.adminFeatureSettings) })],
+  ['/api/admin/ai-settings', route({ GET: none(), PUT: json('admin', requestSchemas.adminAiSettings) })],
+  ['/api/admin/ai-usage', route({ GET: none() }, ['page', 'page_size', 'from', 'to', 'status', 'user_id', 'provider', 'model', 'id'])],
   ['/api/admin/public-content', route({ GET: none(), PUT: json('admin', requestSchemas.adminPublicContent) })],
   ['/api/admin/public-content-image', route({ POST: json('image', requestSchemas.adminPublicContentImage) })],
   ['/api/admin/registration-invitations', route({
@@ -850,6 +855,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/user/onboarding-tasks', route({ GET: none() })],
   ['/api/user/onboarding-tasks/claim', route({ POST: json('standard', requestSchemas.onboardingTaskClaim) })],
   ['/api/user/results', route({ GET: none() }, ['profile_id', 'scope', 'cursor', 'limit'])],
+  ['/api/user/schedule-explanation', route({ GET: none(), POST: json('standard', requestSchemas.scheduleExplanation) }, ['profile_id', 'result_id'])],
   ['/api/user/maa-export', route({ POST: json('standard', requestSchemas.maaExport) })],
   ['/api/user/full-result-export', route({ POST: json('standard', requestSchemas.fullResultExport) })],
   ['/api/user/result-archive', route({ POST: json('standard', requestSchemas.resultArchive) })],

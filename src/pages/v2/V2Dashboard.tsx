@@ -31,6 +31,7 @@ import ScheduleBoard from './ScheduleBoard'
 import ScheduleContext from './ScheduleContext'
 import IncomeAnalysis from './IncomeAnalysis'
 import ProductionSummary from './ProductionSummary'
+import ScheduleExplanation from './ScheduleExplanation'
 import ResultExportDrawer from './ResultExportDrawer'
 import ManualResultExport from './ManualResultExport'
 import OptionsDrawer, { type OptionPanel, type V2Session } from './OptionsDrawer'
@@ -373,6 +374,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
             )}
           </V2Transition>
           </div>
+          {view !== 'manual' && <ScheduleExplanation userId={session.user?.id} profileId={session.activeProfile?.id} resultId={exportResultId} sample={sample} result={result} />}
           {view === 'schedule' && <ScheduleContext result={result} prepared={prepared} config={config} operators={owned} sampleOperators={sampleOperators}
             onConfigure={() => openPanel('config')} onOperators={() => openPanel('operators')} />}
           </div>

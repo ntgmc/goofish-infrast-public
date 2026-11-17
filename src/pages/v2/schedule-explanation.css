@@ -1,0 +1,34 @@
+.v2-explanation {
+  grid-column: 1 / -1;
+  padding-block: 1.5rem;
+  border-top: 1px solid var(--v2-line);
+  overflow-wrap: anywhere;
+}
+
+.v2-explanation h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.v2-explanation p {
+  margin-block: 0.65rem 0;
+  line-height: 1.7;
+}
+
+.v2-explanation-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.v2-explanation-body {
+  max-width: 70ch;
+  margin-block: 1rem;
+}
+
+.v2-explanation-error {
+  color: var(--color-destructive);
+}

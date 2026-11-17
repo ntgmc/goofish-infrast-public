@@ -8,6 +8,8 @@ export const PERSONAL_DATA_EXPORT_COVERAGE = {
   skland_snapshots: { disposition: 'export', field: 'skland_snapshots' },
   user_profile_workspaces: { disposition: 'export', field: 'workspaces' },
   optimization_result_history: { disposition: 'export', field: 'optimization_results' },
+  ai_schedule_explanations: { disposition: 'export', field: 'ai_schedule_explanations' },
+  ai_schedule_usage: { disposition: 'export', field: 'ai_schedule_usage' },
   user_workspaces: { disposition: 'export', field: 'legacy_workspace' },
   usage_events: { disposition: 'export', field: 'usage_events' },
   optimize_jobs: { disposition: 'export', field: 'optimize_jobs' },

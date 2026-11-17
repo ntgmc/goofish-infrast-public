@@ -1,0 +1,16 @@
+.ai-usage .ai-table-scroll {
+  max-inline-size: 100%;
+  max-block-size: 36rem;
+  overflow: auto;
+  border: 1px solid var(--color-v2-line);
+  border-radius: var(--radius-v2-panel);
+}
+.ai-usage table { inline-size: 100%; border-collapse: separate; border-spacing: 0; text-align: start; font-size: .8125rem; line-height: 1.65; }
+.ai-usage th, .ai-usage td { padding: .8rem 1rem; border-block-end: 1px solid var(--color-v2-line); text-align: start; vertical-align: top; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ai-usage thead th { position: sticky; inset-block-start: 0; background: var(--color-v2-surface); z-index: 1; color: var(--color-v2-secondary); font-weight: 500; }
+.ai-usage tbody th { font-weight: 500; }
+.ai-usage tbody tr:last-child > * { border-block-end: 0; }
+.ai-usage small { display: block; margin-block-start: .25rem; color: var(--color-v2-muted); font-size: .75rem; }
+.ai-usage .ai-model-name { display: block; min-inline-size: 8rem; max-inline-size: 16rem; white-space: normal; overflow-wrap: anywhere; }
+.ai-usage .ai-record-id { display: block; max-inline-size: 15rem; white-space: normal; overflow-wrap: anywhere; }
+.ai-usage .ai-table-scroll:focus-visible { outline: 2px solid var(--color-v2-focus); outline-offset: 3px; }
