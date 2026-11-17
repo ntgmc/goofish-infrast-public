@@ -5785,6 +5785,11 @@
     "group": "other",
     "sort": 5000038
   },
+  "voucher_full_crosly": {
+    "name": "弑君者的私人信件",
+    "group": "other",
+    "sort": 5000039
+  },
   "uni_set_guitar": {
     "name": "火蓝之心家具收藏包",
     "group": "other",
@@ -5882,6 +5887,11 @@
   },
   "uni_set_trainStation": {
     "name": "追迹日落以西家具收藏包",
+    "group": "other",
+    "sort": -10000
+  },
+  "uni_set_tailorShop": {
+    "name": "揭幕者们家具收藏包",
     "group": "other",
     "sort": -10000
   },
@@ -8134,6 +8144,11 @@
   },
   "itempack_material_t2": {
     "name": "罗德岛基础物资补给II",
+    "group": "other",
+    "sort": -10000
+  },
+  "act46side_token_detector_rep_1": {
+    "name": "雪地用多功能探测器",
     "group": "other",
     "sort": -10000
   },
