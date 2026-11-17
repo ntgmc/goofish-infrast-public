@@ -156,6 +156,16 @@ it deliberately when changing the shared design.
   below the schedule in a native disclosure; keep its DOM order aligned with its position.
   Below 40rem, place the schedule before the production strip so facilities are
   visible on entry. Operator portraits and efficiency carry the visual weight.
+- AI schedule explanations use a bottom-right character portrait with a short
+  speech label and a small AI badge. Reuse the local Amiya portrait and V2 copper
+  accent. Open an independent floating dialog so the schedule remains usable,
+  with the same portrait, a draggable title bar and a close control. Support
+  pointer dragging and arrow keys on both the launcher and title bar. Move the
+  portrait and window as one group, preserving the portrait's anchor on closing.
+  Clamp the group within the visible workspace, clear of the desktop navigation
+  rail, after dragging, resizing or content growth; scroll the body independently.
+  Escape and close return focus to the launcher. Preserve generation state and
+  the current position across closing, scoped to the current report.
 - Keep generation beside the overview title and export beside result navigation.
   Copper marks the primary action and focus; station colors identify room types
   through the same icon backgrounds on desktop and mobile.

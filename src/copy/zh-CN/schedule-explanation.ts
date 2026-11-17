@@ -1,5 +1,9 @@
 export const scheduleExplanationCopy = {
   title: 'AI 排班解读',
+  close: '收起 AI 排班解读',
+  launcher: '排班解读',
+  collapse: '收起解读',
+  moveHint: '拖动解读窗口，也可使用方向键移动',
   description: '找出需要关注的库存问题，结合收益和投入比较培养建议，明确下一步。',
   generate: '解读这份排班',
   generating: '正在生成解读…',
