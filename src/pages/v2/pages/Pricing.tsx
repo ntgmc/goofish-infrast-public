@@ -148,7 +148,7 @@ function PricingAccount({ profile }: { profile: UserGameAccount }) {
   const expiresAt = profile.expires_at
   return <section className="v2-pricing-account" aria-label={choice.current_profile}>
     <div className="v2-pricing-account-heading"><AccountIcon size={20} aria-hidden="true" /><div><span>{choice.current_profile}</span><strong>{profile.display_name || copy.v2.account}</strong></div><span className="v2-pricing-account-type">{getProfileAccessLabel(profile)}</span></div>
-    <p className="v2-pricing-account-validity">{profile.archived_at ? choice.archived : profile.status !== 'active' ? choice.profile_states[profile.status] : expiresAt ? new Date(expiresAt).getTime() <= Date.now() ? choice.expired(formatShanghaiDateTime(expiresAt)) : choice.until(formatShanghaiDateTime(expiresAt)) : profile.kind === 'cdk' ? choice.no_expiry : null}</p>
+    <p className="v2-pricing-account-validity">{profile.archived_at ? choice.archived : profile.status !== 'active' ? choice.profile_states[profile.status] : expiresAt ? new Date(expiresAt).getTime() <= Date.now() ? choice.expired(formatShanghaiDateTime(expiresAt)) : choice.until(formatShanghaiDateTime(expiresAt)) : profile.kind === 'cdk' ? choice.lifetime_card : null}</p>
     <div className="v2-pricing-account-actions">
       {features.site && features.profiles && <Link to={v2Path('profiles', profile.id)} className="v2-text-button">{choice.manage_action}<ArrowRight size={14} aria-hidden="true" /></Link>}
       {profile.kind === 'cdk' && expiresAt && features.support && <FeedbackLink className="v2-text-button">{choice.renew_action}</FeedbackLink>}

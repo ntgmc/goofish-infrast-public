@@ -2141,7 +2141,7 @@ describe('V2 feature continuity', () => {
     expect(screen.queryByRole('link', { name: copy.public.purchase.upgrade_redeem })).not.toBeInTheDocument()
     if (state === 'term' || state === 'expired') expect(screen.getByRole('link', { name: copy.public.pricing_choice.renew_action })).toBeVisible()
     if (state === 'expired') expect(screen.getByRole('region', { name: copy.public.pricing_choice.current_profile })).toHaveTextContent('已于')
-    if (state === 'lifetime') expect(screen.getByText(copy.public.pricing_choice.no_expiry)).toBeVisible()
+    if (state === 'lifetime') expect(within(screen.getByRole('region', { name: copy.public.pricing_choice.current_profile })).getByText(copy.public.pricing_choice.lifetime_card)).toBeVisible()
     if (state === 'frozen-free') expect(screen.queryByRole('region', { name: copy.public.pricing_choice.current_profile })).not.toBeInTheDocument()
   })
 

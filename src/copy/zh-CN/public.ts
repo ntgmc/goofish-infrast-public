@@ -441,7 +441,7 @@ export const publicCopy = {
     renew_action: "续费或升级咨询",
     until: (date: string) => `有效期至 ${date}`,
     expired: (date: string) => `已于 ${date} 到期`,
-    no_expiry: "不设到期日",
+    lifetime_card: "终身卡",
     profile_states: { frozen: "已冻结", revoked: "已撤销" },
     archived: "已归档",
     choose_plan: "选择维护方案",
