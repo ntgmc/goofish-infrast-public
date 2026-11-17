@@ -16,6 +16,7 @@ vi.mock('../../lib/api-client', async (original) => ({ ...await original<object>
   },
 }))
 const text = copy.scheduleExplanation
+const paragraph = (value: string) => (_text: string, element: Element | null) => element?.tagName === 'P' && element.textContent === value
 const report: OptimizeResult = { author: 'test', title: 'test', description: '', buildingType: 243, planTimes: '', plans: [], raw_results: [],
   daily_production: { trading: { LMD: 50000 }, manufacturing: { 'Battle Record': 30 } } }
 const initial: ScheduleExplanationState = { explanation: null, pending: false, available: true, reason: null,
@@ -50,13 +51,13 @@ it('reads state without generating, then creates one answer only after an explic
   expect(mocks.api.mock.calls.every((call) => call[1].method !== 'POST')).toBe(true)
   expect(screen.getByText(text.disclosure('测试服务商'))).toBeVisible()
   fireEvent.click(generate)
-  expect(await screen.findByText('第一段解读。')).toBeVisible()
-  expect(screen.getByText('第二段解读。')).toBeVisible()
+  expect(await screen.findByText(paragraph('第一段解读。'))).toBeVisible()
+  expect(screen.getByText(paragraph('第二段解读。'))).toBeVisible()
   expect(screen.queryByRole('button', { name: text.generate })).not.toBeInTheDocument()
   mounted.unmount()
   render(mounted.tree('u1'))
   fireEvent.click(screen.getByRole('button', { name: text.title }))
-  expect(await screen.findByText('第一段解读。')).toBeVisible()
+  expect(await screen.findByText(paragraph('第一段解读。'))).toBeVisible()
   expect(mocks.api.mock.calls.filter((call) => call[1].method === 'POST')).toHaveLength(1)
 })
 
@@ -106,10 +107,11 @@ it('keeps an in-flight generation across closing and reopening without submittin
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   expect(screen.getByRole('button', { name: text.title })).toHaveFocus()
   await user.click(screen.getByRole('button', { name: text.title }))
-  expect(screen.getByRole('button', { name: text.generating })).toBeDisabled()
+  expect(screen.getByRole('status')).toHaveTextContent(text.pending)
+  expect(screen.queryByRole('button', { name: text.generate })).not.toBeInTheDocument()
   state = { ...state, available: false, explanation: { text: '收起后完成的解读', created_at: new Date().toISOString() } }
   await act(async () => finish(state))
-  expect(await screen.findByText('收起后完成的解读')).toBeVisible()
+  expect(await screen.findByText(paragraph('收起后完成的解读'))).toBeVisible()
   expect(mocks.api.mock.calls.filter((call) => call[1].method === 'POST')).toHaveLength(1)
 })
 
@@ -123,13 +125,13 @@ it('renders streaming Markdown before settlement and preserves it across closing
   await user.click(await screen.findByRole('button', { name: text.generate }))
   const emit = (event: unknown) => producer.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(event)}\n\n`))
   await act(async () => emit({ type: 'delta', text: '**先看库存**\n\n- 核对赤金' }))
-  expect(await screen.findByText('先看库存')).toHaveProperty('tagName', 'STRONG')
+  await waitFor(() => expect(document.querySelector('.v2-explanation-body strong')).toHaveTextContent('先看库存'))
   expect(screen.getByRole('listitem')).toHaveTextContent('核对赤金')
   expect(screen.getByText(text.streaming)).toBeVisible()
   expect(screen.queryByText(text.saved)).not.toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: text.close }))
   await user.click(screen.getByRole('button', { name: text.title }))
-  expect(screen.getByText('先看库存')).toBeVisible()
+  expect(document.querySelector('.v2-explanation-body strong')).toHaveTextContent('先看库存')
   state = { ...state, available: false, explanation: { text: '**先看库存**\n\n- 核对赤金\n- 再培养', created_at: new Date().toISOString() } }
   await act(async () => { emit({ type: 'state', state }); producer.close() })
   expect(await screen.findByText(/解读已保存/)).toBeVisible()
@@ -146,7 +148,7 @@ it('recovers a disconnected stream by reading the saved result without keeping p
   fireEvent.click(await screen.findByRole('button', { name: text.generate }))
   await waitFor(() => expect(producer).toBeDefined())
   await act(async () => producer.enqueue(new TextEncoder().encode('data: {"type":"delta","text":"未完成的片段"}\n\n')))
-  expect(await screen.findByText('未完成的片段')).toBeVisible()
+  await waitFor(() => expect(document.querySelector('.v2-explanation-body')).toHaveTextContent('未完成的片段'))
   state = { ...state, available: false, explanation: { text: '**恢复的完整正文**', created_at: new Date().toISOString() } }
   await act(async () => producer.error(new Error('connection lost')))
   expect(await screen.findByText('恢复的完整正文')).toBeVisible()

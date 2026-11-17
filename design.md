@@ -169,6 +169,19 @@ it deliberately when changing the shared design.
   Markdown with readable lists, emphasis, code and horizontally scrollable tables.
   Show incoming text progressively, preserving it while collapsed; mark it saved
   only after generation finishes. Keep streamed text out of the shared query cache.
+  Layer the assistant surface with 2–3% ink mixes instead of a strong perimeter or
+  table grid. Use tabular lining numerals, pretty body wrapping, balanced headings
+  and nonbreaking short CJK paragraph tails to avoid a single trailing character.
+  Lower body/medium/emphasis weights from 400/500/580 to 350/450/500 in dark mode.
+  Before generation show the action and transmission/allowance details; during
+  and after generation let the answer lead, with saved notes below.
+  Reveal only new streamed text with a short staggered Gaussian blur/opacity ink
+  effect, bounded to 24 fragments and 108ms delay; preserve number/Latin-word
+  groups and do not replay old text on reopening. Keep drag coordinates immediate
+  and clamped; use a small spring on opening and damped release feedback only on
+  the portrait image. Keep the window, body text and launcher label at their native
+  scale on release, with no positional inertia. Disable spatial/ink effects for
+  the app or system reduced-motion setting.
 - Keep generation beside the overview title and export beside result navigation.
   Copper marks the primary action and focus; station colors identify room types
   through the same icon backgrounds on desktop and mobile.
