@@ -7,6 +7,7 @@ const entryPoints = {
   migrate: 'server/migrate.ts',
   routes: 'server/http-server.ts',
   'cultivation-worker': 'server/cultivation/cultivation-worker.ts',
+  'skland-connector': 'server/skland-connector-process.ts',
   'import-prts-planning': 'scripts/import-prts-planning.mjs',
   'sync-prts-planning': 'scripts/sync-prts-planning.mjs',
 }

@@ -1,0 +1,25 @@
+[Unit]
+Description=Goofish Skland login and import connector
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ntgmc
+Group=ntgmc
+WorkingDirectory=/opt/goofish-skland/current
+EnvironmentFile=/etc/goofish-skland/connector.env
+ExecStart=/usr/bin/node /opt/goofish-skland/current/server/dist/skland-connector.js
+Restart=always
+RestartSec=5
+TimeoutStopSec=35
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+MemoryMax=192M
+MemorySwapMax=0
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

@@ -10,6 +10,8 @@ export const ARTIFACT_KINDS = Object.freeze({
       'server/dist/routes.js.map',
       'server/dist/cultivation-worker.js',
       'server/dist/cultivation-worker.js.map',
+      'server/dist/skland-connector.js',
+      'server/dist/skland-connector.js.map',
       'server/dist/import-prts-planning.js',
       'server/dist/import-prts-planning.js.map',
       'server/dist/sync-prts-planning.js',

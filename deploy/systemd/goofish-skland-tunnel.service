@@ -1,0 +1,33 @@
+[Unit]
+Description=Goofish Skland connector SSH tunnel to the API server
+After=network-online.target goofish-skland-connector.service
+Wants=network-online.target goofish-skland-connector.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=ntgmc
+Group=ntgmc
+EnvironmentFile=/etc/goofish-skland/tunnel.env
+ExecStart=/usr/bin/ssh -N -T \
+  -i ${SKLAND_TUNNEL_SSH_KEY} \
+  -o BatchMode=yes \
+  -o ConnectTimeout=10 \
+  -o ExitOnForwardFailure=yes \
+  -o IdentitiesOnly=yes \
+  -o ServerAliveInterval=15 \
+  -o ServerAliveCountMax=3 \
+  -o StrictHostKeyChecking=yes \
+  -o UserKnownHostsFile=${SKLAND_TUNNEL_KNOWN_HOSTS} \
+  -R 127.0.0.1:${SKLAND_TUNNEL_API_PORT}:127.0.0.1:3300 \
+  ${SKLAND_TUNNEL_REMOTE_USER}@${SKLAND_TUNNEL_REMOTE_HOST}
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

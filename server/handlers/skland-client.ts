@@ -1,10 +1,10 @@
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from 'node:crypto'
 import type { LicenseOperator } from '../../src/lib/types'
+import { fetchSkland, SklandConnectorError } from '../skland-transport'
 
 const APP_CODE = '4ca99fa6b56cc2ba'
 const HYPERGRYPH_BASE = 'https://as.hypergryph.com'
 const SKLAND_BASE = 'https://zonai.skland.com'
-const REQUEST_TIMEOUT_MS = 25000
 const SKLAND_USER_AGENT = 'Skland/1.21.0 (com.hypergryph.skland; build:102100065; iOS 17.6.0; ) Alamofire/5.7.1'
 
 export type SklandClientErrorCode = 'credential_invalid' | 'credential_format_invalid' | 'request_failed'
@@ -13,6 +13,7 @@ export type SklandClientPublicErrorCode =
   | 'skland_player_data_failed'
   | 'skland_player_data_invalid'
   | 'skland_upstream_http_error'
+  | 'skland_connector_unavailable'
 
 export class SklandClientError extends Error {
   constructor(
@@ -528,9 +529,11 @@ function readRetryAfter(value: string | null): number | undefined {
 }
 
 async function fetchJson<T>(url: string, init: RequestInit): Promise<T> {
-  const response = await fetch(url, {
-    ...init,
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  const response = await fetchSkland(url, init).catch((error: unknown) => {
+    if (error instanceof SklandConnectorError) {
+      throw new SklandClientError('request_failed', error.message, 503, 'skland_connector_unavailable')
+    }
+    throw error
   })
   let data: unknown = null
   try {

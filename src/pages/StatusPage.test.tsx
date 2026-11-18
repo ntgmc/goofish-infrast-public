@@ -31,7 +31,7 @@ describe('StatusPage', () => {
     expect(componentSection).not.toBeNull()
     expect(componentSection).toHaveTextContent('正常')
     expect(componentSection).toHaveTextContent('森空岛导入')
-    expect(componentSection).toHaveTextContent('干员、仓库数据导入服务')
+    expect(componentSection).toHaveTextContent('扫码登录、账号绑定及干员、仓库数据导入')
     expect(componentSection).not.toHaveTextContent('等待任务')
     expect(componentSection).not.toHaveTextContent('运行中')
     expect(componentSection).not.toHaveTextContent('并发容量')

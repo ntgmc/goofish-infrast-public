@@ -1,4 +1,5 @@
 import { ensureSklandCredentialSecret } from './handlers/skland-client'
+import { getSklandConnectorConfiguration } from './skland-transport'
 
 const MIN_UID_HASH_SECRET_LENGTH = 32
 
@@ -15,6 +16,7 @@ export function ensureSklandServiceConfiguration(): void {
   try {
     ensureSklandCredentialSecret()
     getFreePreviewUidHashSecret()
+    getSklandConnectorConfiguration()
   } catch (error) {
     if (error instanceof SklandConfigurationError) throw error
     throw new SklandConfigurationError()
