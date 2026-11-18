@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
 import { Navigate, useLocation, useSearchParams } from 'react-router'
 import { BackIcon as ArrowLeft, NextIcon as ArrowRight } from '../../components/icons'
 import { Link } from 'react-router'
+import GuestAccountLink from '../../components/GuestAccountLink'
 import { authPath } from '../../lib/auth-navigation'
 import { copy } from '../../copy'
 import { useSiteFeatures } from '../../lib/site-feature-context'
@@ -15,7 +16,6 @@ import { sectionLabels, V2_GUEST_SECTIONS, v2Path, v2SectionAvailable, type V2Se
 import { V2SectionLoading } from './V2LoadingScreen'
 import FirstScheduleGuide from './FirstScheduleGuide'
 import ProfileUpgrade, { ProfileUpgradeEntry } from './ProfileUpgrade'
-import { SectionTitle } from './components/WorkspaceUI'
 
 const Profiles = lazy(() => import('./pages/Accounts'))
 const AddAccount = lazy(() => import('./pages/AddAccount'))
@@ -98,14 +98,9 @@ export default function WorkspaceSections({ section, session, workflow, generati
     <div className="v2-section-body">
       <Suspense fallback={<V2SectionLoading label={section === 'inventory' ? copy.inventory.loading : undefined} />}>
         {section === 'overview' ? null : !available ? <p className="v2-panel v2-section-loading" role="status">{copy.v2.featureUnavailable}</p>
-          : section === 'generation' && !signedIn ? <section className="v2-first-schedule-task">
-            <SectionTitle title={copy.v2.firstSchedule.login} description={copy.v2.firstSchedule.loginContinue} />
-            <div className="v2-actions">
-              {features.login && <Link className="v2-button v2-button-primary" to={authPath('login', `${location.pathname}${location.search}${location.hash}`)}>{copy.auth.components_AuthForm_008}</Link>}
-              {features.registration && <Link className={`v2-button ${features.login ? 'v2-button-secondary' : 'v2-button-primary'}`} to={authPath('register', `${location.pathname}${location.search}${location.hash}`)}>{copy.auth.components_AuthForm_009}</Link>}
-              {!features.login && !features.registration && <p role="status">{copy.features.closed_body}</p>}
-            </div>
-          </section>
+          : section === 'generation' && !signedIn ? <div className="v2-first-schedule-task">
+            <GuestAccountLink label={features.registration ? copy.v2.guestAccount.firstSchedule : copy.auth.components_AuthForm_008} description={copy.v2.guestAccount.firstScheduleHelp} />
+          </div>
           : needsLogin ? <Navigate to={authPath('login', `${location.pathname}${location.search}${location.hash}`, undefined, location.state?.authBackTo)} replace />
             : needsWorkspace ? section === 'generation' && session.activeProfile && isSchedulableProfile(session.activeProfile)
               ? <div className="v2-panel v2-section-loading"><p>{copy.v2.generationImport}</p><button className="v2-button v2-button-primary" type="button" onClick={onOperators}>{copy.public.pages_LandingPage_001}</button></div>

@@ -1,4 +1,5 @@
 .v2-schedule-comparison { min-width: 0; }
+.v2-schedule-comparison > .guest-account-row { margin-block-start: var(--space-sm); }
 .v2-schedule-comparison-profile { max-width: 28rem; margin-block: var(--space-lg); }
 .v2-schedule-comparison-inputs {
   display: grid;

@@ -1,0 +1,52 @@
+.guest-account-link {
+  display: inline-flex;
+  min-height: 44px;
+  max-width: 100%;
+  align-items: center;
+  gap: var(--space-2xs);
+  border-radius: var(--radius-v2-control);
+  color: var(--v2-accent, var(--color-brand-primary));
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.guest-account-link > span {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.guest-account-link strong { font-weight: 600; }
+.guest-account-link > svg { flex: none; }
+.guest-account-link:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+}
+
+.guest-account-row {
+  display: flex;
+  width: min(100%, 35rem);
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--v2-line, var(--color-rule-2));
+  background: var(--v2-paper, var(--color-paper-2));
+}
+
+.guest-account-row-inset {
+  padding: var(--space-2xs) 0;
+  border: 0;
+  background: transparent;
+}
+
+.guest-account-description {
+  display: block;
+  margin-top: var(--space-3xs);
+  color: var(--v2-secondary, var(--color-ink-2));
+  line-height: 1.65;
+}
+.guest-account-unavailable { color: var(--v2-secondary, var(--color-ink-2)); font-size: var(--text-sm); }
+
+@media (hover: hover) {
+  .guest-account-link:hover strong { text-decoration: underline; text-underline-offset: .18em; }
+  .guest-account-row:not(.guest-account-row-inset):hover { background: var(--v2-bg, var(--color-paper-3)); }
+}

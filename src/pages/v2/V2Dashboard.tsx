@@ -378,7 +378,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
           {view === 'schedule' && <ScheduleContext result={result} prepared={prepared} config={config} operators={owned} sampleOperators={sampleOperators}
             onConfigure={() => openPanel('config')} onOperators={() => openPanel('operators')} />}
           </div>
-          <div className="v2-sample-notice"><span className="v2-notice-icon"><Sparkles size={16} /></span><p>{sample && <>{text.sampleHint} </>}{text.estimateNotice}</p>{sample && <button type="button" onClick={() => openPanel('account')}>{session.user ? text.account : text.login}<ArrowRight size={14} /></button>}</div>
+          <div className="v2-sample-notice"><span className="v2-notice-icon"><Sparkles size={16} /></span><p>{text.estimateNotice}</p>{sample && signedIn && <button type="button" onClick={() => openPanel('account')}>{text.account}<ArrowRight size={14} /></button>}</div>
           </div>
           </>}</V2PageTransition>
           <footer className="v2-footer"><span>{text.brand}</span><nav>{(['pricing', 'status', 'support', 'terms', 'privacy', 'disclaimer'] as const).filter((entry) => v2SectionAvailable(entry, features)).map((entry) => <Link key={entry} to={v2Path(entry, session.activeProfile?.id)}>{sectionLabels[entry]}</Link>)}</nav></footer>

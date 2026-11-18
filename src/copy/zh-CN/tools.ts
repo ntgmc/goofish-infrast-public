@@ -20,8 +20,6 @@ export const toolsCopy = {
     load: '读取森空岛练度',
     loadingData: '正在对比练度与作业需求…',
     failed: '读取推荐数据失败，请重试。',
-    login: '登录后，选择已绑定森空岛的档案，即可对比练度与作业需求。',
-    loginAction: '前往登录与档案管理',
     noProfile: '请先创建档案并绑定森空岛，再读取练度对比。',
     profile: '游戏档案', parameters: '推荐条件', unapplied: '待更新',
     views: { priorities: '培养推荐', comparison: '练度对照', special: '培养与自选' },
@@ -76,7 +74,7 @@ export const toolsCopy = {
     title: '感谢庆典特别招募推荐',
     description: '按四个特别招募队列查看当前档案的拥有情况与干员评分。每个队列会随机获得一名干员，队列评分越高，整体越值得选择。',
     back: '返回工具页', loading: '正在加载特别招募推荐', loadingData: '正在计算队列评分…', failed: '读取特别招募推荐失败，请重试。',
-    login: '登录后，选择已绑定森空岛的档案，即可查看干员拥有情况和队列推荐。', loginAction: '前往登录与档案管理', noProfile: '请先创建档案并绑定森空岛，再查看特别招募推荐。',
+    noProfile: '请先创建档案并绑定森空岛，再查看特别招募推荐。',
     profile: '游戏档案', refresh: '刷新练度', unavailable: '当前练度数据中没有完整的活动干员名单，请稍后重新导入。',
     recommended: '推荐选择', expectedScore: (score: number) => score.toFixed(1), ownership: (owned: number, unowned: number, total: number) => `已拥有 ${owned} · 未拥有 ${unowned}/${total}`,
     owned: '已拥有', notOwned: '未拥有', score: (score: number) => `评分 ${score.toFixed(1)}`, scoreHint: '干员评分结合精二、专三、模组养成情况和作业需求计算。已拥有干员按评分的 10% 计入队列评分。',
@@ -218,7 +216,7 @@ export const toolsCopy = {
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_027: "正在确认登录状态...",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_028: "登录或注册后会自动创建一个仅用于仓库分析的免费档案，然后继续绑定森空岛。",
+  pages_DepotValuePage_028: "绑定森空岛时，系统会为仓库分析创建一份免费档案。",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_029: "正在读取...",
   // src/pages/DepotValuePage.tsx

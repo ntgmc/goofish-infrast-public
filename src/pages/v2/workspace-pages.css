@@ -124,7 +124,8 @@ textarea.v2-input { resize: vertical; }
 .v2-first-schedule-guide li[aria-current="step"] { color: var(--v2-ink); }
 .v2-first-schedule-guide li[aria-current="step"] .v2-first-schedule-node { background: var(--v2-accent); color: var(--color-v2-accent-ink); border-color: var(--v2-accent); }
 .v2-first-schedule-guide li[data-complete="true"] .v2-first-schedule-node { background: var(--v2-accent-soft); color: var(--v2-accent); border-color: var(--v2-accent); }
-.v2-first-schedule-task { padding-block: var(--space-md); }
+.v2-first-schedule-task .guest-account-row { padding-block: var(--space-md); }
+.v2-first-schedule-task .guest-account-row strong { font-size: var(--text-md); }
 .v2-first-account { min-width: 0; }
 .v2-first-schedule-layout .v2-generation-flow { grid-template-columns: minmax(0, 1fr); }
 .v2-first-schedule-layout .v2-generation-execution { padding: var(--space-sm) 0 0; border-left: 0; border-top: 1px solid var(--v2-line); }
@@ -434,7 +435,6 @@ textarea.v2-input { resize: vertical; }
   .v2-first-schedule-layout { gap: var(--space-sm); }
   .v2-first-schedule-guide { padding: var(--space-3xs) var(--space-xs); }
   .v2-first-schedule-guide details[open] { padding-bottom: var(--space-xs); }
-  .v2-first-schedule-task { padding-top: 0; }
   .v2-page-section .v2-login-panel { padding: var(--space-sm); }
   .v2-generation-state { margin-bottom: var(--space-xs); }
   .v2-generation-flow { gap: 0; }

@@ -1,5 +1,5 @@
-import { Link, useLocation, useNavigate } from 'react-router'
-import { authPath } from '../lib/auth-navigation'
+import { Link, useNavigate } from 'react-router'
+import GuestAccountLink from '../components/GuestAccountLink'
 import { NextIcon as ArrowRight, BalancedResourcesIcon as Check, RefreshIcon as RefreshCw, ResourceRatioIcon as Scale, ResourceStockIcon as Wallet } from '../components/icons'
 import BrandLogo from '../components/BrandLogo'
 import ThemeSwitcher from '../components/ThemeSwitcher'
@@ -36,7 +36,6 @@ function StandaloneTrainingRatio() {
 }
 
 function TrainingRatioContent({ session, embedded }: { session: Session; embedded: boolean }) {
-  const location = useLocation()
   const m = useTrainingRatio(session)
   const navigate = useNavigate()
   const { features } = useSiteFeatures()
@@ -68,7 +67,9 @@ function TrainingRatioContent({ session, embedded }: { session: Session; embedde
           </Tabs.List>
           <Tabs.Content value="imported" forceMount hidden={m.source !== 'imported'}>
           {session.user && session.profiles.length > 0 && <label className="training-ratio-field"><span>{text.account}</span><select className="tool-field" value={profile?.id ?? ''} onChange={(event) => navigate(embedded ? v2Path('training-ratio', event.target.value) : profileScopedPath('/tools/training-ratio', event.target.value))}><option value="" disabled>{text.account}</option>{session.profiles.filter((row) => row.status === 'active' && !row.archived_at).map((row) => <option key={row.id} value={row.id}>{row.display_name}</option>)}</select></label>}
-          {m.canImport ? <div className="training-ratio-actions"><button type="button" className="tool-secondary-action training-ratio-import" disabled={m.busy} aria-busy={m.busy} onClick={() => void m.load()}><RefreshCw size={16} aria-hidden="true" />{m.busy ? copy.skland.refreshing : copy.skland.refresh}</button></div> : session.authLoading ? <p role="status" aria-busy="true" className="tool-loading-status">{text.accountLoading}</p> : <p>{text.loginHint} <Link className="training-ratio-link" to={!session.user ? authPath('login', `${location.pathname}${location.search}${location.hash}`) : v2Path('profiles', profile?.id)}>{text.accountEntry}<ArrowRight size={14} /></Link></p>}
+          {m.canImport ? <div className="training-ratio-actions"><button type="button" className="tool-secondary-action training-ratio-import" disabled={m.busy} aria-busy={m.busy} onClick={() => void m.load()}><RefreshCw size={16} aria-hidden="true" />{m.busy ? copy.skland.refreshing : copy.skland.refresh}</button></div> : session.authLoading ? <p role="status" aria-busy="true" className="tool-loading-status">{text.accountLoading}</p> : session.authStatus === 'error' ? <p role="alert">{session.authError?.message ?? copy.v2.loginServiceUnavailable} <button type="button" className="training-ratio-link" onClick={session.retryAuth}>{copy.v2.retry}</button></p>
+            : session.authStatus === 'anonymous' ? <GuestAccountLink inset label={copy.v2.guestAccount.training} description={copy.v2.guestAccount.trainingHelp} />
+              : <p>{text.bindingHint} <Link className="training-ratio-link" to={v2Path('profiles', profile?.id)}>{text.accountEntry}<ArrowRight size={14} aria-hidden="true" /></Link></p>}
           {m.data && <><ResourceStock inventory={m.data.inventory} /><p>{text.importedAt} {new Date(m.data.importedAt).toLocaleString('zh-CN')}</p></>}
           {m.error && <p role="alert" className="training-ratio-error">{m.error}</p>}
           <TrainingRatioGoals model={m} />

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type RefObject } from 'react'
-import { Link, useLocation } from 'react-router'
-import { authPath } from '../lib/auth-navigation'
+import { Link } from 'react-router'
+import GuestAccountLink from '../components/GuestAccountLink'
 import { useTaskDraft } from '../lib/task-drafts'
 import BrandLogo from '../components/BrandLogo'
 import ThemeSwitcher from '../components/ThemeSwitcher'
@@ -264,7 +264,6 @@ export function useDepotValue(session?: ReturnType<typeof useToolSession>) {
 }
 
 export default function DepotValuePage({ embedded = false, session }: { embedded?: boolean; session?: ReturnType<typeof useToolSession> } = {}) {
-  const location = useLocation()
   const PageRoot = embedded ? 'section' : 'main'
   const { canvasRef, depotText, setDepotText, auth, authLoading, authError, setAuthLoadRevision, depotProfile,
     selectedProfileId, setSelectedProfileId, result, setResult, loading, profilePreparing, sklandDialogOpen, setSklandDialogOpen,
@@ -383,10 +382,7 @@ export default function DepotValuePage({ embedded = false, session }: { embedded
                   </button>
                 </div>
               ) : !auth?.user ? (
-                <div className="tool-inset mt-4 p-4">
-                  <p>{copy.tools.pages_DepotValuePage_028}</p>
-                  <Link className="tool-primary-action mt-3 inline-flex" to={authPath('login', `${location.pathname}${location.search}${location.hash}`)}>{copy.v2.login}</Link>
-                </div>
+                <div className="mt-4"><GuestAccountLink inset label={copy.v2.guestAccount.depot} description={copy.tools.pages_DepotValuePage_028} /></div>
               ) : (
                 <div className="mt-4 space-y-3">
                   {sklandProfiles.length > 0 && (

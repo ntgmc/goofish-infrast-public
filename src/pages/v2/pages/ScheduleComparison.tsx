@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation } from 'react-router'
-import { authPath } from '../../../lib/auth-navigation'
+import GuestAccountLink from '../../../components/GuestAccountLink'
 import { ScheduleComparisonIcon, UploadIcon } from '../../../components/icons'
 import FacilityLayoutEditor from '../../../components/FacilityLayoutEditor'
 import { OperatorAvatarTile } from '../../../components/result-panel/OperatorAvatarStrip'
@@ -37,7 +36,6 @@ export default function ScheduleComparison({ session, onOpenProfile }: {
   session: V2Session
   onOpenProfile: (profile: V2Session['profiles'][number]) => Promise<void>
 }) {
-  const location = useLocation()
   const { features } = useSiteFeatures()
   const available = session.profiles.filter((profile) => isManualScheduleProfileAvailable(profile) &&
     (features.metered_billing || !profile.kind.startsWith('metered_')))
@@ -48,7 +46,8 @@ export default function ScheduleComparison({ session, onOpenProfile }: {
   return <div className="v2-schedule-comparison">
     <p className="v2-lead">{text.description}</p>
     {session.authLoading ? <Notice>{manual.loading}</Notice> : session.authStatus === 'error' ? <Notice error>{session.authError?.message}<button className="v2-text-button" onClick={session.retryAuth}>{copy.v2.retry}</button></Notice>
-      : !profile ? <Notice>{text.unavailable}{!session.user && <Link className="v2-button v2-button-primary" to={authPath('login', `${location.pathname}${location.search}${location.hash}`)}>{copy.v2.login}</Link>}</Notice> : <>
+      : session.authStatus === 'anonymous' ? <GuestAccountLink label={copy.v2.guestAccount.selectProfile} description={copy.v2.guestAccount.comparisonHelp} />
+        : !profile ? <Notice>{text.unavailable}</Notice> : <>
         <label className="v2-field v2-schedule-comparison-profile"><span>{manual.profile}</span>
           <select className="v2-input" value={ready ? profile.id : ''} disabled={Boolean(session.openingProfileId)} onChange={(event) => {
             const next = available.find((entry) => entry.id === event.target.value)

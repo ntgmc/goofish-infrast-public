@@ -123,7 +123,7 @@ it.each([false, true])('continues from login and Skland import through saved con
   expect(within(tutorial).getByRole('progressbar')).toHaveAttribute('value', '0')
   expect(within(tutorial).getByRole('progressbar')).toBeVisible()
   expect(screen.queryByLabelText(copy.auth.components_AuthForm_011)).not.toBeInTheDocument()
-  await user.click(within(tutorial).getByRole('link', { name: copy.auth.components_AuthForm_008 }))
+  await user.click(within(tutorial).getByRole('link', { name: copy.v2.guestAccount.firstSchedule }))
   expect(await screen.findByRole('heading', { name: copy.auth.pageTitle })).toBeVisible()
   fireEvent.change(screen.getByLabelText(copy.auth.components_AuthForm_011), { target: { value: 'doctor@example.test' } })
   fireEvent.change(screen.getByLabelText(copy.auth.components_AuthForm_012), { target: { value: 'password123' } })

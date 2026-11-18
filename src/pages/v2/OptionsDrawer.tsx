@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import ConfigCapabilityPreview from '../../components/ConfigCapabilityPreview'
+import GuestAccountLink from '../../components/GuestAccountLink'
 import type { ConfigDiffItem } from '../../lib/workspace-history'
 import { BalanceIcon, BillingIcon, InventoryIcon, LoadingIcon, NextIcon as ArrowRight, SelectedIcon as Check, SettingsIcon, LogoutIcon as LogOut, AccountIcon as UserRound, SuccessIcon } from '../../components/icons'
 import SklandIcon from '../../components/SklandIcon'
@@ -141,8 +142,7 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
                 </section>}
               </>
             ) : (
-              <div className="v2-empty-state"><UserRound size={30} /><p>{text.signInRequired}</p>
-                <button type="button" className="v2-button v2-button-primary" onClick={onAccount}>{text.login}</button></div>
+              <GuestAccountLink label={text.login} />
             )}
           </div>
         )}

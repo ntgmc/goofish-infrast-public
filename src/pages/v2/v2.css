@@ -2213,16 +2213,6 @@ html:has(.v2-page-transition[data-page-entering="native"]) {
   .v2-account-links button:hover { background: var(--color-v2-hover); }
 }
 
-.v2-empty-state {
-  display: flex;
-  align-items: center;
-  flex-direction: column;
-  gap: 20px;
-  padding: 35px 10px;
-  color: var(--v2-secondary);
-  text-align: center;
-}
-
 .v2-error {
   color: var(--color-v2-error);
   font-size: var(--text-sm);

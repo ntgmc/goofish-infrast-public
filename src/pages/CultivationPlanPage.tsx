@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useLocation, useSearchParams } from 'react-router'
-import { authPath } from '../lib/auth-navigation'
+import { Link, useSearchParams } from 'react-router'
+import GuestAccountLink from '../components/GuestAccountLink'
 import { useTaskDraft } from '../lib/task-drafts'
 import BrandLogo from '../components/BrandLogo'
 import ThemeSwitcher from '../components/ThemeSwitcher'
@@ -139,7 +139,6 @@ export function useCultivation(session: ReturnType<typeof useToolSession>) {
 }
 
 function CultivationContent({ session, embedded = false }: { session: ReturnType<typeof useToolSession>; embedded?: boolean }) {
-  const location = useLocation()
   const ContentRoot = embedded ? 'div' : 'main'
   const { profiles, profileId, setChosenProfile, data, busy, error, options, setOptions, appliedOptions,
     limit, setLimit, recommendations, load, exclude, changed, apply } = useCultivation(session)
@@ -154,7 +153,8 @@ function CultivationContent({ session, embedded = false }: { session: ReturnType
       <section className="workspace-cultivation-source tool-panel space-y-5 p-5 sm:p-6">
         <div>{!embedded && <h1 className="text-2xl font-semibold text-ink-primary">{label.title}</h1>}<p className="mt-2 max-w-3xl text-sm leading-6 text-ink-secondary">{label.description}</p></div>
         {session.authLoading ? <p role="status">{label.loading}</p> : session.authStatus === 'error' ? <div role="alert"><p>{session.authError?.message}</p><button className="tool-secondary-action mt-3" onClick={session.retryAuth}>{copy.tools.pages_DepotValuePage_086}</button></div>
-          : session.authStatus !== 'authenticated' || !profiles.length ? <div className="tool-inset space-y-3 p-4"><p className="text-sm">{session.authStatus !== 'authenticated' ? label.login : label.noProfile}</p><Link to={!session.user ? authPath('login', `${location.pathname}${location.search}${location.hash}`) : v2Path('profiles', session.activeProfile?.id)} className="tool-secondary-action inline-flex">{label.loginAction}</Link></div>
+          : session.authStatus === 'anonymous' ? <GuestAccountLink inset label={copy.v2.guestAccount.cultivation} description={copy.v2.guestAccount.cultivationHelp} />
+            : !profiles.length ? <div className="tool-inset space-y-3 p-4"><p className="text-sm">{label.noProfile}</p><Link to={v2Path('profiles', session.activeProfile?.id)} className="tool-secondary-action inline-flex">{copy.v2.manageProfiles}</Link></div>
             : <div className="flex flex-wrap items-end gap-4">
               <label className="min-w-0 flex-1 space-y-2 text-sm"><span className="block">{label.profile}</span><select className="tool-field" value={profileId} onChange={(event) => setChosenProfile(event.target.value)}>{profiles.map((row) => <option key={row.id} value={row.id}>{row.display_name}</option>)}</select></label>
               <button className="tool-primary-action max-w-full whitespace-nowrap" disabled={busy} onClick={() => void load()}>{busy ? label.loadingData : copy.skland.refresh}</button>
