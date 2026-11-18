@@ -1,6 +1,6 @@
 import type { LicenseConfig, LicenseFile, LicenseOperator, PermissionMode, UserGameAccount } from '../../lib/types'
 import { copy, CURRENT_LOCALE } from '../../copy/index'
-import { getPermissionProfile, normalizeRuntimePermission } from '../../lib/product-catalog'
+import { getPermissionProfile, isProfileExpired, normalizeRuntimePermission } from '../../lib/product-catalog'
 import { AUTH_PASSWORD_MAX_LENGTH, AUTH_PASSWORD_MIN_LENGTH } from '../../lib/auth-constraints'
 import { METERED_BILLING_AVAILABLE } from '../../lib/site-features'
 
@@ -25,12 +25,16 @@ export function isFreePreviewProfile(profile: UserGameAccount): boolean {
   return profile.kind === 'free_preview'
 }
 
+export function hasFreePreviewAccess(profile: UserGameAccount): boolean {
+  return isFreePreviewProfile(profile) || isProfileExpired(profile)
+}
+
 export function isFreePreviewTrialActive(profile: UserGameAccount): boolean {
-  return isFreePreviewProfile(profile) && profile.trial?.active === true
+  return isFreePreviewProfile(profile) && !isProfileExpired(profile) && profile.trial?.active === true
 }
 
 export function getEffectiveProfilePermission(profile: UserGameAccount): PermissionMode {
-  return profile.trial?.effective_permission ?? profile.permission
+  return isProfileExpired(profile) ? 'recommended' : profile.trial?.effective_permission ?? profile.permission
 }
 
 export function isSchedulableProfile(profile: UserGameAccount): boolean {
@@ -40,7 +44,7 @@ export function isSchedulableProfile(profile: UserGameAccount): boolean {
 
 export function getProfileAccessLabel(profile: UserGameAccount): string {
   if (isFreePreviewTrialActive(profile)) return copy.workspace.pages_tool_tool_utils_001
-  if (isFreePreviewProfile(profile)) return copy.workspace.pages_tool_tool_utils_002
+  if (hasFreePreviewAccess(profile)) return copy.workspace.pages_tool_tool_utils_002
   return getPermissionProfile(profile.permission).label
 }
 

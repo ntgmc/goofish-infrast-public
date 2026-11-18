@@ -60,11 +60,27 @@ beforeEach(() => {
   vi.clearAllMocks()
   mocks.features.mockResolvedValue(DEFAULT_SITE_FEATURE_SETTINGS)
   mocks.session.mockResolvedValue({ user: { id: 'user-1' }, tokenHash: 'session' })
-  mocks.authorization.mockResolvedValue({ ok: true, permission: 'advanced', cdkRecord: null })
+  mocks.authorization.mockImplementation(async (profile) => ({ ok: true, permission: 'advanced', cdkRecord: null, subject: { ...profile, permission: 'advanced' } }))
   mocks.profile.mockResolvedValue({ id: 'profile-1', kind: 'cdk', permission: 'advanced' })
   mocks.baseline.mockResolvedValue({ id: 'history-1', result: source, config, archived_at: null })
 })
 describe('manual schedule admission', () => {
+  it('queues expired paid profiles with free limits and personal-use confirmation', async () => {
+    mocks.profile.mockResolvedValue({ id: 'profile-1', kind: 'cdk', permission: 'advanced', expires_at: '2020-01-01', skland_binding: { uid: '123' } })
+    mocks.authorization.mockResolvedValue({ ok: true, permission: 'recommended', cdkRecord: null,
+      subject: { kind: 'free_preview', permission: 'recommended', expires_at: '2020-01-01' } })
+    const result = await prepareOptimizeJob(request({ manualSchedule: undefined }))
+    expect(result.ok).toBe(true)
+    if (!result.ok) throw new Error('Expected free preview admission')
+    expect(result.prepared).toMatchObject({ source: 'free_preview', permission: 'free_preview', priority: 'standard',
+      personalUseAudit: { userId: 'user-1', profileId: 'profile-1' },
+      payload: { configPermission: 'free_preview', cdkUsageRef: null } })
+    const diagnosis = await prepareOptimizeJob(request({ manualSchedule: undefined, includeUpgradeSuggestions: true, use_items: ['training_diagnosis_coupon'] }))
+    expect(diagnosis.ok).toBe(false)
+    if (diagnosis.ok) throw new Error('Expected diagnosis rejection')
+    await expect(diagnosis.response.json()).resolves.toMatchObject({ error: { code: 'capability_not_available' } })
+  })
+
   it.each([
     ['manual_schedule', { manualSchedule: { baselineHistoryId: 'history-1', plans: createManualPlans(source) } }],
     ['scenario_comparison', { kind: 'scenario_comparison', manualSchedule: undefined, includeUpgradeSuggestions: undefined,
@@ -105,7 +121,7 @@ describe('manual schedule admission', () => {
     expect(result.ok).toBe(true)
     if (!result.ok || 'kind' in result.prepared.payload) throw new Error('Expected comparison admission')
     expect(result.prepared.payload.request).toMatchObject({ manual_schedule_purpose: 'comparison', manual_schedule: { title: standalone.title } })
-    mocks.authorization.mockResolvedValueOnce({ ok: true, permission: 'recommended', cdkRecord: null })
+    mocks.authorization.mockResolvedValueOnce({ ok: true, permission: 'recommended', cdkRecord: null, subject: { kind: 'cdk', permission: 'recommended' } })
     const denied = await prepareOptimizeJob(request(body))
     expect(denied.ok).toBe(false)
     if (denied.ok) throw new Error('Expected permission rejection')
@@ -116,12 +132,12 @@ describe('manual schedule admission', () => {
   it('requires current advanced authorization for standalone sources and admits active advanced trials', async () => {
     const standalone = createBlankManualSchedule(normalizeConfig(config))
     const body = { manualSchedule: { source: standalone, plans: createManualPlans(standalone) } }
-    mocks.authorization.mockResolvedValueOnce({ ok: true, permission: 'recommended', cdkRecord: null })
+    mocks.authorization.mockResolvedValueOnce({ ok: true, permission: 'recommended', cdkRecord: null, subject: { kind: 'cdk', permission: 'recommended' } })
     const denied = await prepareOptimizeJob(request(body))
     expect(denied.ok).toBe(false)
     if (denied.ok) throw new Error('Expected permission rejection')
     expect(denied.response.status).toBe(403)
-    mocks.authorization.mockResolvedValueOnce({ ok: false, status: 403, code: 'profile_expired', message: 'Expired' })
+    mocks.authorization.mockResolvedValueOnce({ ok: true, permission: 'recommended', cdkRecord: null, subject: { kind: 'free_preview', permission: 'recommended', expires_at: '2020-01-01' } })
     expect((await prepareOptimizeJob(request(body))).ok).toBe(false)
     mocks.profile.mockResolvedValueOnce({
       id: 'profile-1', kind: 'free_preview', permission: 'recommended', temporary_permission: {

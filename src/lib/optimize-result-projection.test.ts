@@ -71,6 +71,17 @@ describe('projectOptimizeResultForCapabilities', () => {
     }
   })
 
+  it('projects expired paid results as free preview even with a previous diagnosis entitlement', () => {
+    const stored = result()
+    const projected = projectOptimizeResultForCapabilities(stored, {
+      kind: 'cdk', permission: 'advanced', expires_at: '2020-01-01',
+    }, true)
+    expect(projected).toEqual(projectOptimizeResultForCapabilities(stored, { kind: 'free_preview', permission: 'recommended' }))
+    expect(projected).not.toHaveProperty('upgrade_suggestions')
+    expect(stored.upgrade_suggestions).toHaveLength(1)
+    expect(stored.raw_results).toHaveLength(1)
+  })
+
   it('keeps the complete result for advanced profiles', () => {
     const input = result()
     const projected = projectOptimizeResultForCapabilities(input, {

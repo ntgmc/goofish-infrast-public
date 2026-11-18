@@ -32,14 +32,14 @@ export default async function userScheduleExplanationHandler(req: Request): Prom
     if (!authorization.ok) return jsonResponse({ error: authorization.message, code: authorization.code }, authorization.status)
     const stored = await getProfileOptimizationResult(profile.id, ids.result_id)
     if (!stored) return jsonResponse({ error: '排班结果不存在。' }, 404)
-    const result = projectOptimizeResultForCapabilities(parseOptimizeResult(stored.result), {
-      kind: normalizeProfileKind(profile), permission: authorization.permission,
-    }, Boolean(stored.job_id) && await hasTrainingDiagnosisEntitlement(stored.job_id!))
+    const result = projectOptimizeResultForCapabilities(parseOptimizeResult(stored.result), authorization.subject, Boolean(stored.job_id) && await hasTrainingDiagnosisEntitlement(stored.job_id!))
     const summary = buildScheduleExplanationSummary(result)
     const config = await getScheduleExplanationConfig()
     let monthly = false
     for (const candidate of await listStoredProfilesForUser(auth.user.id)) {
-      if (normalizeProfileKind(candidate) === 'cdk' && (await resolveProfileAuthorization(candidate)).ok) { monthly = true; break }
+      if (normalizeProfileKind(candidate) !== 'cdk') continue
+      const candidateAccess = await resolveProfileAuthorization(candidate)
+      if (candidateAccess.ok && candidateAccess.subject.kind === 'cdk') { monthly = true; break }
     }
     const input = {
       userId: auth.user.id, profileId: profile.id, resultId: stored.id, config, monthly,

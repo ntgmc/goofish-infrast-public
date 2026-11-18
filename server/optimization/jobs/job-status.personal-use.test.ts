@@ -30,7 +30,7 @@ vi.mock('../../storage/user-store', () => ({
   normalizeProfileKind: (profile: { kind: string }) => profile.kind,
 }))
 vi.mock('../../handlers/profile-authorization', () => ({
-  resolveProfileAuthorization: async (profile: { permission: string }) => ({ ok: true, permission: profile.permission }),
+  resolveProfileAuthorization: async (profile: { permission: string }) => ({ ok: true, permission: profile.permission, subject: profile }),
 }))
 vi.mock('../../storage/personal-use-declaration-store', () => ({
   PersonalUseDeclarationRequiredError: class PersonalUseDeclarationRequiredError extends Error {

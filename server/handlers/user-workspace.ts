@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { isProfileExpired } from '../../src/lib/product-catalog'
 import type { LicenseOperator, PermissionMode } from '../../src/lib/types'
 import { WORKSPACE_RESULT_HISTORY_LIMIT, WORKSPACE_SAVED_CONFIG_LIMIT } from '../../src/lib/workspace-limits'
 import {
@@ -6,7 +7,6 @@ import {
   getProfileForUser,
   getProfileWorkspace,
   isDepotValueProfile,
-  isFreePreviewProfile,
   toPublicWorkspace,
   updateProfileWorkspaceAtomically,
   updateProfileWorkspaceInTransaction,
@@ -76,8 +76,8 @@ export default async (req: Request): Promise<Response> => {
     const authorization = await resolveProfileAuthorization(profile)
     if (!authorization.ok) return jsonResponse({ error: authorization.message, code: authorization.code }, authorization.status)
 
-    const isPreviewProfile = isFreePreviewProfile(profile)
-    const isPreviewTrial = isFreePreviewTrialActive(profile)
+    const isPreviewProfile = authorization.subject.kind === 'free_preview'
+    const isPreviewTrial = !isProfileExpired(authorization.subject) && isFreePreviewTrialActive(profile)
     const effectivePermission = authorization.permission
     const isRestrictedPreview = isPreviewProfile && !isPreviewTrial
     const capacityLimits = await getWorkspaceCapacityLimits(profile.id)

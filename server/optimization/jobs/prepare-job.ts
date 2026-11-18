@@ -2,7 +2,7 @@ import type { LicenseConfig, LicenseFile, OptimizeResult } from "../../../src/li
 import type { CreateOptimizationJobRequest } from "../../../src/lib/optimization-contracts";
 import { canUseUpgradeFeatures, evaluateOperatorRisk, formatOperatorRiskBlockMessage, recordOperatorFingerprint, recordSoftBlockedRiskEvent, getPermissionMode, getRiskControlSettings, isProfileCdkRecord, type CdkRecord, normalizePermissionMode, resolveConfigForPermission, resolveFreePreviewConfig } from "../../handlers/license-utils";
 import { resolveProfileAuthorization } from '../../handlers/profile-authorization';
-import { getProfileForUser, isDepotValueProfile, isFreePreviewProfile, normalizeProfileKind } from "../../storage/user-store";
+import { getProfileForUser, isDepotValueProfile, normalizeProfileKind } from "../../storage/user-store";
 import { getProfileOptimizationResult } from '../../storage/optimization-result-store';
 import { requireUserSession } from "../../handlers/user-auth";
 import type { OptimizeJobPriority } from "../../storage/optimize-job-store";
@@ -13,7 +13,7 @@ import { recordScheduleGenerate, scheduleFailure } from './entitlements';
 import { getOptimizeEstimateBucket, getEstimateScheduleMode, isEstimateFiammettaEnabled, resolveOptimizeDurationEstimate, buildScenarioComparisonEstimate } from './job-estimates';
 import { expandScenarioComparison } from '../../../src/lib/scenario-comparison';
 import { isFreePreviewTrialActive } from '../../free-preview-trial';
-import { hasCapability } from '../../../src/lib/product-catalog';
+import { hasCapability, isProfileExpired } from '../../../src/lib/product-catalog';
 import { requestSchemas } from '../../security/request-policy';
 import { getValidatedJson } from '../../security/request-validation';
 import { formatOptimizeJobHardTimeout, getOptimizeJobHardTimeoutMs } from '../../optimize-job-config';
@@ -114,9 +114,6 @@ export async function prepareOptimizeJob(
         return fail({ error: '仓库分析档案不能用于生成排班。' }, 403);
       }
       const profileKind = normalizeProfileKind(profile);
-      if (profileKind === 'free_preview' || profileKind === 'metered_personal') {
-        personalUseAudit = { userId: auth.user.id, profileId: activeProfileId };
-      }
       const meteredFeatureGate = await requireMeteredBillingFeature(profileKind);
       if (meteredFeatureGate) return { ok: false, response: meteredFeatureGate };
       if (profile.archived_at) {
@@ -139,6 +136,13 @@ export async function prepareOptimizeJob(
         return fail({ error: authorization.message, code: authorization.code }, authorization.status);
       }
       checkedCdkRecord = authorization.cdkRecord;
+      isPreviewProfile = authorization.subject.kind === 'free_preview';
+      if (isPreviewProfile || profileKind === 'metered_personal') {
+        personalUseAudit = { userId: auth.user.id, profileId: activeProfileId };
+      }
+      if (isProfileExpired(authorization.subject) && requestedItems.has('training_diagnosis_coupon')) {
+        return fail({ error: '当前档案为免费预览，续期后可查看培养建议。', code: 'capability_not_available' }, 403);
+      }
       if (body.kind === 'schedule' && body.manualSchedule) {
         if ((!('source' in body.manualSchedule) && profileKind === 'free_preview') ||
           !hasCapability({ permission: authorization.permission }, 'edit_full_config')) {
@@ -172,7 +176,7 @@ export async function prepareOptimizeJob(
           ...('source' in body.manualSchedule && { purpose: body.manualSchedule.purpose }),
         };
       }
-      if (profileKind === 'free_preview' && isScenarioComparison) {
+      if (isPreviewProfile && isScenarioComparison) {
         scheduleUsage = scheduleFailure('permission_denied', { profile_id: activeProfileId, permission: profile.permission, source: 'account_profile' });
         return fail({ error: '免费预览档案不开放场景对比实验室。', code: 'capability_not_available' }, 403);
       }
@@ -192,9 +196,8 @@ export async function prepareOptimizeJob(
           },
         };
       }
-      isPreviewProfile = isFreePreviewProfile(profile);
       activeProfileUid = profile.skland_binding?.uid ?? null;
-      isPreviewTrial = isFreePreviewTrialActive(profile);
+      isPreviewTrial = !isProfileExpired(authorization.subject) && isFreePreviewTrialActive(profile);
       const includedCdkService = includesCdkIncrementalRecompute(checkedCdkRecord);
       const hasBillingQuoteFields = Boolean(body.billing_quote_id || body.pricing_version || body.accepted_max_points);
       if (billingOperation === 'scenario_comparison' && profileKind === 'cdk' && hasBillingQuoteFields) {

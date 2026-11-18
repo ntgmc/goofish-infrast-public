@@ -10,6 +10,7 @@ export type ProductPolicy = typeof catalogJson.policies
 export interface CapabilitySubject {
   kind?: UserGameAccountKind
   permission?: RawPermissionMode | null
+  expires_at?: string | null
 }
 
 export const productPolicies: ProductPolicy = catalogJson.policies
@@ -43,8 +44,12 @@ export function getPermissionRank(permission: RawPermissionMode | null | undefin
   return getPermissionProfile(permission).admin_rank
 }
 
+export function isProfileExpired(subject: Pick<CapabilitySubject, 'expires_at'>, now = Date.now()): boolean {
+  return Boolean(subject.expires_at && !(Date.parse(subject.expires_at) > now))
+}
+
 export function hasCapability(subject: CapabilitySubject, capability: CapabilityId): boolean {
-  const permission = normalizeRuntimePermission(subject.permission)
+  const permission = isProfileExpired(subject) ? 'recommended' : normalizeRuntimePermission(subject.permission)
   const profile = catalogJson.runtime_permissions[permission]
   if ((profile.capabilities as string[]).includes(capability)) return true
   if (subject.kind === 'free_preview') {

@@ -58,10 +58,11 @@ vi.mock('./user-auth', () => ({
   requireUserSession: mocks.requireUserSession,
 }))
 vi.mock('./profile-authorization', () => ({
-  resolveProfileAuthorization: vi.fn(async (profile: { permission: string }) => ({
+  resolveProfileAuthorization: vi.fn(async (profile: { kind?: string; permission: string }) => ({
     ok: true,
     permission: profile.permission,
     cdkRecord: null,
+    subject: profile,
   })),
 }))
 

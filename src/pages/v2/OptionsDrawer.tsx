@@ -13,7 +13,7 @@ import { useSiteFeatures } from '../../lib/site-feature-context'
 import { METERED_BILLING_AVAILABLE } from '../../lib/site-features'
 import type { LicenseConfig, LicenseOperator, PermissionMode } from '../../lib/types'
 import type { useToolSession } from '../tool/useToolSession'
-import { getProfileAccessLabel, isFreePreviewProfile } from '../tool/tool-utils'
+import { getProfileAccessLabel, hasFreePreviewAccess } from '../tool/tool-utils'
 import ConfigSaveStatus from '../tool/workspace/ConfigSaveStatus'
 import V2Transition from './V2Transition'
 import OperatorManagementPanel from './OperatorManagementPanel'
@@ -91,8 +91,8 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
           <>
             <ConfigCapabilityPreview config={config} enabled={!canEditConfig}>
             <ConfigEditor showOrundumPreference profileId={session.activeProfile?.id} config={config} canEdit={canEditConfig} readOnly={configReadOnly} canEditIntermediateInventory={canUseIntermediateConfig}
-              canSelectPreset={canUseIntermediateConfig} canEditFixedShiftHours={canEditConfig || Boolean(session.activeProfile && isFreePreviewProfile(session.activeProfile))} permission={permission}
-              note={session.activeProfile && isFreePreviewProfile(session.activeProfile) && !canEditConfig
+              canSelectPreset={canUseIntermediateConfig} canEditFixedShiftHours={canEditConfig || Boolean(session.activeProfile && hasFreePreviewAccess(session.activeProfile))} permission={permission}
+              note={session.activeProfile && hasFreePreviewAccess(session.activeProfile) && !canEditConfig
                 ? `${copy.common.components_ConfigEditor_024}${getProfileAccessLabel(session.activeProfile)}${copy.common.components_ConfigEditor_025}`
                 : undefined}
               validation={validation} onUpdate={onUpdateConfig} embedded hideHeader hideValidation />

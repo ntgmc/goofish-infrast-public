@@ -8,7 +8,7 @@ import { filterSearch } from '../../lib/search'
 import { useSiteFeatures } from '../../lib/site-feature-context'
 import type { LicenseConfig, LicenseOperator } from '../../lib/types'
 import { extensibleLicenseOperatorsSchema } from '../../lib/workspace-validation'
-import { countOwnedOperators, isFreePreviewProfile, parseOperatorsText, sortOperatorsForPreview } from '../tool/tool-utils'
+import { countOwnedOperators, hasFreePreviewAccess, parseOperatorsText, sortOperatorsForPreview } from '../tool/tool-utils'
 import OperatorRows from './OperatorRows'
 import type { V2Session } from './OptionsDrawer'
 
@@ -39,7 +39,7 @@ export default function OperatorManagementPanel({ session, config, operators, bu
   const profile = session.activeProfile
   const binding = profile?.skland_binding
   const invalid = binding?.credential_status === 'invalid' || credentialInvalid
-  const canUpload = !profile || !isFreePreviewProfile(profile)
+  const canUpload = !profile || !hasFreePreviewAccess(profile)
   const disabled = busy || action !== null || sklandOpen
   const sortedOperators = useMemo(() => sortOperatorsForPreview(operators)
     .sort((left, right) => Number(right.own !== false) - Number(left.own !== false)), [operators])

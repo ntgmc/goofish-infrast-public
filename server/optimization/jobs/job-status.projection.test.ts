@@ -44,8 +44,8 @@ describe('optimization job result projection', () => {
     mocks.requestCancel.mockResolvedValue(jobRecord())
     mocks.query.mockResolvedValue({ rows: [{ entitled: false }] })
     mocks.findIdempotentJob.mockResolvedValue(jobRecord())
-    mocks.resolveProfileAuthorization.mockImplementation(async (profile: { permission: string }) => ({
-      ok: true, permission: profile.permission, cdkRecord: null,
+    mocks.resolveProfileAuthorization.mockImplementation(async (profile: { kind?: string; permission: string; expires_at?: string }) => ({
+      ok: true, permission: profile.permission, cdkRecord: null, subject: profile,
     }))
     mocks.getQueuePosition.mockResolvedValue(null)
     mocks.listJobsByProfile.mockResolvedValue([{ job: jobSummary(), resultAvailable: true, queuePosition: null }])
@@ -123,6 +123,26 @@ describe('optimization job result projection', () => {
       expect(snapshot.result).not.toHaveProperty('total_efficiency')
     }
     expect(mocks.query).toHaveBeenCalledWith(expect.stringContaining("reward_type = 'training_diagnosis_coupon'"), ['job-1'])
+  })
+
+  it('downgrades expired paid job reads and idempotent replays despite purchased diagnosis', async () => {
+    mocks.getProfileForUser.mockResolvedValue({ id: 'profile-1', kind: 'cdk', permission: 'advanced', expires_at: '2020-01-01' })
+    mocks.query.mockResolvedValue({ rows: [{ entitled: true }] })
+    for (const [response, status] of [[await getOptimizationJob(request(), 'job-1'), 200], [await submitOptimizationJob(replayRequest()), 202]] as const) {
+      expect(response.status).toBe(status)
+      const body = await response.json()
+      const snapshot = body.job ?? body
+      expect(snapshot.result.raw_results).toEqual([])
+      expect(snapshot.result).not.toHaveProperty('upgrade_suggestions')
+      expect(snapshot.result.daily_production).not.toHaveProperty('details')
+    }
+  })
+
+  it('keeps expired scenario results stored but denies access to the paid comparison', async () => {
+    mocks.getProfileForUser.mockResolvedValue({ id: 'profile-1', kind: 'cdk', permission: 'advanced', expires_at: '2020-01-01' })
+    mocks.getJob.mockResolvedValue({ ...jobRecord(), source: 'scenario_comparison', payload_json: { kind: 'scenario_comparison' } })
+    const response = await getOptimizationJob(request(), 'job-1')
+    expect(response.status).toBe(403)
   })
 
   it('projects a successful result returned by cancellation after a running snapshot', async () => {

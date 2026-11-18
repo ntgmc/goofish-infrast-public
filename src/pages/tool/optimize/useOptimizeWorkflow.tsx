@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef, type FormEvent } from 'react'
 import type { Announcement, AuthSuccessResponse, LicenseConfig, LicenseFile, OptimizeResult, UpgradeSuggestion, UserGameAccount, UserWorkspace, WorkspaceResultHistoryItem } from '../../../lib/types'
 import type { SystemItemCode } from '../../../lib/inventory-contracts'
-import { canEditConfig, canUseScenarioComparison, canUseUpgradeFeatures, getPermissionMode, mergeOperators } from '../../../lib/license'
+import { getPermissionMode, mergeOperators } from '../../../lib/license'
 import { canonicalJson } from '../../../lib/crypto'
 import { apiJson } from '../../../lib/api-client'
 import { normalizeConfig, validateConfig, validateScheduleConfig, normalizeScheduleMode, normalizeDormitoryRule, resolveConfigLayout } from '../../../lib/config'
@@ -10,14 +10,14 @@ import { describeConfigDiff } from '../../../lib/workspace-history'
 import { mergeOptimizeJobProgress, buildOptimizeJobStorageKey, writeActiveOptimizeJob, readActiveOptimizeJob, isActiveOptimizeJob, clearActiveOptimizeJob, clearLegacyOptimizeJobStorage, isOptimizeJobPollCancelled } from './job-progress'
 import { getOptimizationFailureJobId, isOptimizationJobCancelledError, useOptimizationJob } from './useOptimizationJob'
 import type { OptimizePhase, OptimizeSection } from './types'
-import { isFreePreviewProfile, isFreePreviewTrialActive } from '../tool-utils'
+import { hasFreePreviewAccess, isFreePreviewTrialActive } from '../tool-utils'
 import type { ConfigSyncStatus, WorkspacePatch } from '../useToolSession'
 import { useLicenseSync } from './useLicenseSync'
 import { useOptimizeWorkspace } from './useOptimizeWorkspace'
 import { buildOptimizeSignature, formatConfigPresetLabel, waitForProgressCompletion, formatOptimizeError, normalizeUpgradeSuggestions, resolveLatestHistoryConfig } from './workflow-utils'
 import { useInventoryBalances } from './useInventoryBalances'
 import { copy } from '../../../copy/index'
-import { hasCapability } from '../../../lib/product-catalog'
+import { hasCapability, isProfileExpired } from '../../../lib/product-catalog'
 import { usePersonalUseDeclaration } from '../../../hooks/usePersonalUseDeclaration'
 import { upgradeProfileWithCdk } from '../profile-redemption'
 import { useResultDownloads } from './useResultDownloads'
@@ -126,7 +126,7 @@ export function useOptimizeWorkflow(props: Props) {
   const configToastTimerRef = useRef<number | null>(null)
   const configToastIdRef = useRef(0)
 
-  const isPreviewProfile = isFreePreviewProfile(profile)
+  const isPreviewProfile = hasFreePreviewAccess(profile)
   const isPreviewTrial = isFreePreviewTrialActive(profile)
   const isRestrictedPreview = isPreviewProfile && !isPreviewTrial
   const { guard: guardPersonalUseDeclaration, declarationDialog } = usePersonalUseDeclaration({
@@ -138,15 +138,15 @@ export function useOptimizeWorkflow(props: Props) {
     await guardPersonalUseDeclaration('generated_result_export', run, profileId, onError)
   }, [guardPersonalUseDeclaration, profileId])
 
-  const permission = getPermissionMode(license)
-  const userCanEditConfig = canEditConfig(license)
+  const permission = isProfileExpired(profile) ? 'recommended' : getPermissionMode(license)
+  const userCanEditConfig = hasCapability({ permission }, 'edit_full_config')
   const userCanUseIntermediateAutoConfig = isPreviewProfile || hasCapability({ permission }, 'use_intermediate_auto_config')
   const userCanDownloadFullResult = hasCapability({ kind: profile.kind, permission }, 'export_full_result_json')
   const userCanExportMaaWithoutCoupon = hasCapability({ kind: profile.kind, permission }, 'export_maa_json')
   const userCanViewFullData = hasCapability({ kind: profile.kind, permission }, 'view_full_data')
   const userCanApplyConfigOverride = true
-  const userCanUseUpgradeFeatures = !isRestrictedPreview && canUseUpgradeFeatures(license)
-  const userHasScenarioLabCapability = !isRestrictedPreview && canUseScenarioComparison(license)
+  const userCanUseUpgradeFeatures = !isRestrictedPreview && hasCapability({ permission }, 'view_upgrade_suggestions')
+  const userHasScenarioLabCapability = !isRestrictedPreview && hasCapability({ permission }, 'run_scenario_comparison')
   const scenarioCouponRequired = !userHasScenarioLabCapability && !scenarioQuoteRequired
   const userCanUseScenarioLab = userHasScenarioLabCapability
     || profile.kind === 'metered_personal'
@@ -542,7 +542,7 @@ export function useOptimizeWorkflow(props: Props) {
       const selectedItems: SystemItemCode[] = []
       if (billingOperation === 'main_schedule') {
         if (usePriorityCoupon && (priorityCouponBalance?.available ?? 0) > 0) selectedItems.push('priority_compute_coupon')
-        if (useTrainingDiagnosisCoupon && !userCanUseUpgradeFeatures && (itemBalances.training_diagnosis_coupon ?? 0) > 0) selectedItems.push('training_diagnosis_coupon')
+        if (!isProfileExpired(profile) && useTrainingDiagnosisCoupon && !userCanUseUpgradeFeatures && (itemBalances.training_diagnosis_coupon ?? 0) > 0) selectedItems.push('training_diagnosis_coupon')
       }
       try {
         const generated = await runOptimize(
@@ -595,7 +595,7 @@ export function useOptimizeWorkflow(props: Props) {
         }
       }
       })
-    }, [configValidationMessage, flushConfigSave, flushPendingLicenseSync, guardPersonalUseDeclaration, hasResult, itemBalances.training_diagnosis_coupon, lastGeneratedSignature, latestWorkspaceResult, licenseSyncing, loading, optimizeSignature, priorityCouponBalance?.available, refreshInventory, refreshWorkspaceResults, runOptimize, showConfigValidationToast, usePriorityCoupon, useTrainingDiagnosisCoupon, userCanUseUpgradeFeatures])
+    }, [configValidationMessage, flushConfigSave, flushPendingLicenseSync, guardPersonalUseDeclaration, hasResult, itemBalances.training_diagnosis_coupon, lastGeneratedSignature, latestWorkspaceResult, licenseSyncing, loading, optimizeSignature, priorityCouponBalance?.available, profile, refreshInventory, refreshWorkspaceResults, runOptimize, showConfigValidationToast, usePriorityCoupon, useTrainingDiagnosisCoupon, userCanUseUpgradeFeatures])
 
   const handleGenerate = useCallback(() => executeGeneration('main_schedule'), [executeGeneration])
   const handleIncrementalRecompute = useCallback(() => executeGeneration('incremental_recompute'), [executeGeneration])

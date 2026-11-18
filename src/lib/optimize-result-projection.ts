@@ -1,4 +1,4 @@
-import { hasCapability, type CapabilitySubject } from './product-catalog'
+import { hasCapability, isProfileExpired, type CapabilitySubject } from './product-catalog'
 import type { OptimizeResult } from './types'
 
 /**
@@ -10,6 +10,7 @@ export function projectOptimizeResultForCapabilities(
   subject: CapabilitySubject,
   upgradeSuggestionsAllowed = false,
 ): OptimizeResult {
+  if (isProfileExpired(subject)) subject = { ...subject, kind: 'free_preview', permission: 'recommended' }
   let projected = result
 
   if (!hasCapability(subject, 'view_full_data')) {
@@ -59,7 +60,7 @@ export function projectOptimizeResultForCapabilities(
     projected = { ...projected, raw_results: [] }
   }
 
-  if (!upgradeSuggestionsAllowed && !hasCapability(subject, 'view_upgrade_suggestions')) {
+  if ((isProfileExpired(subject) || !upgradeSuggestionsAllowed) && !hasCapability(subject, 'view_upgrade_suggestions')) {
     const {
       upgrade_suggestions: _upgradeSuggestions,
       upgrade_suggestions_status: _upgradeSuggestionsStatus,

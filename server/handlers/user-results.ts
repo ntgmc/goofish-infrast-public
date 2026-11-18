@@ -13,7 +13,6 @@ import {
   getProfileForUser,
   isDepotValueProfile,
   isFreePreviewProfile,
-  normalizeProfileKind,
   toPublicWorkspace,
   updateProfileWorkspaceInTransaction,
 } from '../storage/user-store'
@@ -88,10 +87,7 @@ export async function handleUserResultsRequest(
       return jsonResponse({
         item: {
           ...stored,
-          result: projectOptimizeResultForCapabilities(result, {
-            kind: normalizeProfileKind(profile),
-            permission: authorization.permission,
-          }, Boolean(stored.job_id) && await hasTrainingDiagnosisEntitlement(stored.job_id!)),
+          result: projectOptimizeResultForCapabilities(result, authorization.subject, Boolean(stored.job_id) && await hasTrainingDiagnosisEntitlement(stored.job_id!)),
         },
       })
     }
@@ -104,10 +100,7 @@ export async function handleUserResultsRequest(
       if (access.response) return access.response
       const profile = access.profile!
       const authorization = access.authorization!
-      if (!hasCapability({
-        kind: normalizeProfileKind(profile),
-        permission: authorization.permission,
-      }, 'export_full_result_json')) {
+      if (!hasCapability(authorization.subject, 'export_full_result_json')) {
         return jsonResponse({
           error: '当前档案不支持下载完整计算数据。',
           code: 'full_result_export_forbidden',
@@ -157,10 +150,7 @@ export async function handleUserResultsRequest(
       if (historyItem.result.schedule_mode === 'rotation') {
         return jsonResponse({ error: '轮班制结果不能导出为 MAA JSON。' }, 409)
       }
-      const canExportWithoutCoupon = hasCapability({
-        kind: normalizeProfileKind(profile),
-        permission: authorization.permission,
-      }, 'export_maa_json')
+      const canExportWithoutCoupon = hasCapability(authorization.subject, 'export_maa_json')
       if (!canExportWithoutCoupon && body.use_coupon !== true) {
         return jsonResponse({
           error: '当前档案需要使用 1 张 MAA 导出体验券，请确认后重试。',
@@ -168,7 +158,7 @@ export async function handleUserResultsRequest(
         }, 403)
       }
       const result = buildMaaExportPayload(historyItem.result)
-      const behaviorDeclaration = isFreePreviewProfile(profile) || profile.kind === 'metered_personal'
+      const behaviorDeclaration = authorization.subject.kind === 'free_preview' || profile.kind === 'metered_personal'
         ? await recordPersonalUseDeclarationUsage({
             userId: auth.user.id,
             profileId: profile.id,

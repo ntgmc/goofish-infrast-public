@@ -14,7 +14,7 @@ import { prepareResult } from '../../components/result-panel/formatters'
 import InventoryDepletionWarning from '../../components/result-panel/InventoryDepletionWarning'
 import { getMaaExportNotice } from '../tool/optimize/maa-export-notice'
 import { manualSourceKey } from '../../lib/manual-schedule'
-import { hasCapability } from '../../lib/product-catalog'
+import { hasCapability, isProfileExpired } from '../../lib/product-catalog'
 import { FIRST_SCHEDULE_INTENT_KEY } from '../../lib/first-schedule'
 import { canonicalJson } from '../../lib/crypto'
 import { NotificationBell } from '../../components/NotificationCenter'
@@ -35,7 +35,7 @@ import ScheduleExplanation from './ScheduleExplanation'
 import ResultExportDrawer from './ResultExportDrawer'
 import ManualResultExport from './ManualResultExport'
 import OptionsDrawer, { type OptionPanel, type V2Session } from './OptionsDrawer'
-import { isFreePreviewProfile, isFreePreviewTrialActive, sortOperatorsForPreview } from '../tool/tool-utils'
+import { hasFreePreviewAccess, isFreePreviewTrialActive, sortOperatorsForPreview } from '../tool/tool-utils'
 import V2Transition, { V2PageTransition } from './V2Transition'
 import { useSiteFeatures } from '../../lib/site-feature-context'
 import ThemeSwitcher from '../../components/ThemeSwitcher'
@@ -156,11 +156,11 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
   useEffect(() => {
     if (params.get('feedback') === 'new' && !session.user) void navigate(authPath('login', returnTo), { replace: true })
   }, [params, session.user, navigate, returnTo])
-  const restrictedPreview = Boolean(session.activeProfile && isFreePreviewProfile(session.activeProfile) && !isFreePreviewTrialActive(session.activeProfile))
+  const restrictedPreview = Boolean(session.activeProfile && hasFreePreviewAccess(session.activeProfile) && !isFreePreviewTrialActive(session.activeProfile))
   const canManual = Boolean(features.manual_schedule && !sample && session.activeProfile && session.activeProfile.kind !== 'free_preview' && !result.preview_limit
     && hasCapability({ kind: session.activeProfile.kind, permission }, 'edit_full_config') && result.plans.length)
   const showManual = canManual || (features.manual_schedule && restrictedPreview)
-  const canViewTraining = Boolean(workflow?.userCanUseUpgradeFeatures || workflow?.suggestions?.length)
+  const canViewTraining = Boolean(!isProfileExpired(session.activeProfile ?? {}) && (workflow?.userCanUseUpgradeFeatures || workflow?.suggestions?.length))
   const manualKey = useMemo(() => manualSourceKey(result), [result])
   const exportResultId = workflow?.currentResult || workflow?.finalResult ? workflow.progress?.historyResultId ?? workflow.progress?.jobId : workflow?.historyItem?.id ?? workflow?.latestWorkspaceResult?.id
   const resultGrid = useRef<HTMLDivElement>(null)
