@@ -114,7 +114,7 @@ export default function Pricing({ session }: { session: V2Session }) {
     </section>
     <PricingBenefits />
     <div className="v2-pricing-return"><p>{choice.after_story}</p><a href="#pricing-plans" className="v2-button v2-button-primary">{choice.choose_plan}<ArrowRight size={16} aria-hidden="true" /></a></div>
-    <details className="v2-pricing-details">
+    <details className="v2-pricing-details" open>
       <summary><h2>{choice.full_comparison}</h2><ChevronDown size={20} aria-hidden="true" /></summary>
       <table className="v2-pricing-comparison" aria-label={pricing.comparison_heading}>
         <thead><tr><th scope="col">{text.pages_PricingPage_008}</th><th scope="col">{choice.free_title}</th>{planIds.map((id) => <th scope="col" key={id}>{choice.term_labels[id]}</th>)}</tr></thead>
@@ -122,7 +122,7 @@ export default function Pricing({ session }: { session: V2Session }) {
       </table>
       <p className="v2-muted">{choice.export_note}</p>
     </details>
-    <details className="v2-pricing-details">
+    <details className="v2-pricing-details" open>
       <summary><h2>{text.pricing_cards.rules}</h2><ChevronDown size={20} aria-hidden="true" /></summary>
       <section className="v2-pricing-policy"><SectionTitle title={pricing.policy_heading} description={text.pricing_redemption.instructions} /><ul>{pricing.disclosures.map((disclosure, index) => <li key={index}>{disclosure}</li>)}</ul></section>
       <section className="v2-pricing-upgrade"><SectionTitle title={text.pricing_upgrade_title} description={text.pricing_upgrade_description(pricing.lifetime_upgrade.service_fee)} /><p>{text.pricing_upgrade_process}</p><div className="v2-actions">{features.support && <Link to="/support" className="v2-button v2-button-secondary">{text.pricing_upgrade_contact}</Link>}{pricing.lifetime_upgrade.purchase_url || pricing.lifetime_upgrade.share_image_url ? <button type="button" onClick={() => setPurchaseOffer('lifetime_upgrade')} aria-haspopup="dialog" className="v2-button v2-button-primary">{text.pricing_upgrade_purchase}</button> : <button disabled className="v2-button v2-button-primary">{text.pricing_upgrade_unavailable}</button>}</div></section>
