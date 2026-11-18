@@ -21,9 +21,13 @@ try {
   try {
     if (apply) await client.query('begin')
     const { rows } = await client.query(
-      `select id, display_name, note from user_game_accounts
-       where kind = 'cdk' and (display_name = $1 or note = $2)
-       order by id${apply ? ' for update' : ''}`,
+      apply
+        ? `select id, display_name, note from user_game_accounts
+           where kind = 'cdk' and (display_name = $1 or note = $2)
+           order by id for update`
+        : `select id, display_name, note from user_game_accounts
+           where kind = 'cdk' and (display_name = $1 or note = $2)
+           order by id`,
       [LEGACY_FREE_PROFILE_DISPLAY_NAME, LEGACY_FREE_PROFILE_NOTE],
     )
     const changes = rows.map((row) => ({
