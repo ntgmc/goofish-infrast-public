@@ -52,4 +52,7 @@ jobs:
         run: pnpm audit --prod
 
       - name: Audit development dependencies
-        run: pnpm audit
+        # Remove this exception when the lockfile picks up a patched picomatch release.
+        run: |
+          pnpm audit --ignore GHSA-fc5q-39xc-vjpf
+          pnpm audit
