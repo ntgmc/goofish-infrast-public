@@ -2193,32 +2193,38 @@ describe('V2 feature continuity', () => {
     expect(screen.queryByRole('link', { name: copy.public.purchase.redeem_action })).not.toBeInTheDocument()
   })
 
-  it.each([false, true])('merges adjacent equal comparison values while preserving configured differences and archive quotas (mobile: %s)', async (mobile) => {
+  it.each([false, true])('renders comparison rows in the saved order and still merges adjacent equal values (mobile: %s)', async (mobile) => {
     vi.stubGlobal('matchMedia', (query: string) => ({ matches: mobile && ['(max-width: 40rem)', '(max-width: 60rem)'].includes(query), addEventListener: vi.fn(), removeEventListener: vi.fn() }))
     const content = cloneDefaultPublicContentSettings()
-    content.pricing.comparison_rows.push({ id: 'custom-benefit', feature: '自定义权益', free_preview: '不支持', single_account_monthly: '支持', single_account_half_year: '需人工确认', single_account_annual: '支持', single_account_lifetime: '支持' })
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json(content))
+    const rows = content.pricing.comparison_rows
+    const archiveIndex = rows.findIndex((row) => row.feature === copy.public.pricing_cards.archive_comparison)
+    const archive = rows.splice(archiveIndex, 1)[0]!
+    rows.splice(1, 0,
+      { id: 'custom-benefit', feature: '每小时生成限制', free_preview: '2 次 / 6 小时', single_account_monthly: '12 次 / 小时', single_account_half_year: '需人工确认', single_account_annual: '12 次 / 小时', single_account_lifetime: '12 次 / 小时' },
+      { ...archive, id: 'custom-archive', free_preview: '❌ 免费版可使用封存道具扩容' },
+    )
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({ ...content, defaults_revision: 18 }))
     const user = userEvent.setup()
     render(<MemoryRouter initialEntries={['/v2?section=pricing']}><PublicContentProvider><V2Page /></PublicContentProvider></MemoryRouter>, { wrapper: MotionPreferenceProvider })
     await user.click(await screen.findByText(copy.public.pricing_choice.full_comparison))
     const table = within(await screen.findByRole('table', { name: content.pricing.comparison_heading }))
-    await table.findByRole('rowheader', { name: '自定义权益' })
+    await table.findByRole('rowheader', { name: '每小时生成限制' })
     const allPlans = within(table.getByRole('rowheader', { name: '基建预设' }).closest('tr')!).getAllByRole('cell')
     expect(allPlans).toHaveLength(1)
     expect(allPlans[0]).toHaveAttribute('colspan', '5')
     const skland = within(table.getByRole('rowheader', { name: copy.publicContent.pricing_comparison_skland }).closest('tr')!).getAllByRole('cell')
     expect(skland).toHaveLength(1)
     expect(skland[0]).toHaveAttribute('colspan', '5')
-    expect(table.getAllByRole('rowheader').map((header) => header.textContent)).toEqual([...copy.public.pricing_choice.comparison_order.filter((feature) => content.pricing.comparison_rows.some((row) => row.feature === feature) || feature === copy.public.pricing_cards.archive_comparison), '自定义权益'])
+    expect(table.getAllByRole('rowheader').map((header) => header.textContent)).toEqual(rows.map((row) => row.feature))
     const paidPlans = within(table.getByRole('rowheader', { name: 'MAA JSON 一键下载' }).closest('tr')!).getAllByRole('cell')
     expect(paidPlans).toHaveLength(2)
     expect(paidPlans[1]).toHaveAttribute('colspan', '4')
-    const custom = within(table.getByRole('rowheader', { name: '自定义权益' }).closest('tr')!).getAllByRole('cell')
-    expect(custom.map((cell) => cell.textContent)).toEqual(['不支持', '支持', '需人工确认', '支持'])
+    const custom = within(table.getByRole('rowheader', { name: '每小时生成限制' }).closest('tr')!).getAllByRole('cell')
+    expect(custom.map((cell) => cell.textContent)).toEqual(['2 次 / 6 小时', '12 次 / 小时', '需人工确认', '12 次 / 小时'])
     expect(custom.map((cell) => cell.getAttribute('colspan'))).toEqual(['1', '1', '1', '2'])
     expect(custom[3]).toHaveAttribute('data-label', `${copy.public.pricing_choice.term_labels.single_account_annual}、${copy.public.pricing_choice.term_labels.single_account_lifetime}`)
     const archives = within(table.getByRole('rowheader', { name: copy.public.pricing_cards.archive_comparison }).closest('tr')!).getAllByRole('cell')
-    expect(archives.map((cell) => cell.textContent?.trim())).toEqual([copy.public.pricing_cards.archive_not_included, copy.public.pricing_cards.archive_gift(1), copy.public.pricing_cards.archive_gift(3)])
+    expect(archives.map((cell) => cell.textContent?.trim())).toEqual(['免费版可使用封存道具扩容', copy.public.pricing_cards.archive_gift(1), copy.public.pricing_cards.archive_gift(3)])
     expect(archives.map((cell) => cell.getAttribute('colspan'))).toEqual(['1', '3', '1'])
     expect(archives.map((cell) => cell.querySelector('[data-marker]')?.getAttribute('data-marker'))).toEqual(['❌', '✅', '✅'])
   })

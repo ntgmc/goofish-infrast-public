@@ -91,7 +91,9 @@ describe('public content settings', () => {
     const original = structuredClone(stored)
 
     const migrated = normalizePublicContentSettings(stored)
-    expect(migrated.pricing.comparison_rows).toEqual([...DEFAULT_PUBLIC_CONTENT_DRAFT.pricing.comparison_rows].reverse())
+    const defaults = DEFAULT_PUBLIC_CONTENT_DRAFT.pricing.comparison_rows
+    const archive = defaults.find((row) => row.feature === copy.public.pricing_cards.archive_comparison)!
+    expect(migrated.pricing.comparison_rows).toEqual([...defaults.filter((row) => row !== archive).reverse(), archive])
     expect(migrated.pricing.plans).toEqual(original.pricing.plans)
     expect(migrated.updated_at).toBe(original.updated_at)
     expect(normalizePublicContentSettings(migrated)).toEqual(migrated)
@@ -120,6 +122,22 @@ describe('public content settings', () => {
     expect(migrated.pricing.comparison_rows).not.toContainEqual(expect.objectContaining({ feature: '基建预设' }))
     expect(migrated.pricing.comparison_rows.find((row) => row.id === custom.id)).toEqual(custom)
     expect(normalizePublicContentSettings({ ...stored, defaults_revision: PUBLIC_CONTENT_DEFAULTS_REVISION }).pricing.comparison_rows).toEqual(stored.pricing.comparison_rows)
+  })
+
+  it('moves the archive comparison into saved content without replacing a configured row or its position', () => {
+    const defaults = cloneDefaultPublicContentSettings()
+    const archive = defaults.pricing.comparison_rows.find((row) => row.feature === copy.public.pricing_cards.archive_comparison)!
+    const rows = defaults.pricing.comparison_rows.filter((row) => row.id !== archive.id).reverse()
+    const stored = { ...defaults, defaults_revision: 18, pricing: { ...defaults.pricing, comparison_rows: rows } }
+
+    expect(normalizePublicContentSettings(stored).pricing.comparison_rows).toEqual([...rows, archive])
+
+    const configuredArchive = { ...archive, id: 'custom-archive', single_account_annual: '管理员自定义封存说明' }
+    stored.pricing.comparison_rows = [configuredArchive, ...rows]
+    expect(normalizePublicContentSettings(stored).pricing.comparison_rows).toEqual([configuredArchive, ...rows])
+
+    stored.pricing.comparison_rows = rows
+    expect(normalizePublicContentSettings({ ...stored, defaults_revision: PUBLIC_CONTENT_DEFAULTS_REVISION }).pricing.comparison_rows).toEqual(rows)
   })
 
   it('updates saved default account binding copy without changing prices, links, or the stored input', () => {

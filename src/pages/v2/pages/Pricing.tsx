@@ -25,7 +25,6 @@ const quotas = productPolicies.metered_billing.scenario_quotas
 const comparisonQuotas = { single_account_monthly: quotas.month, single_account_half_year: quotas.half_year, single_account_annual: quotas.year, single_account_lifetime: quotas.lifetime }
 const archiveQuotas = { single_account_monthly: 1, single_account_half_year: 1, single_account_annual: 1, single_account_lifetime: 3 }
 const comparisonLabels = [text.pricing_choice.free_title, ...planIds.map((id) => text.pricing_choice.term_labels[id])]
-const comparisonOrder = new Map<string, number>(text.pricing_choice.comparison_order.map((feature, index) => [feature, index]))
 
 export default function Pricing({ session }: { session: V2Session }) {
   const { content } = usePublicContent()
@@ -46,14 +45,6 @@ export default function Pricing({ session }: { session: V2Session }) {
     return () => query.removeEventListener('change', update)
   }, [])
   const pricing = content.pricing
-  const comparisonRows = [...pricing.comparison_rows, {
-    id: 'archive-quota', feature: text.pricing_cards.archive_comparison,
-    free_preview: `❌ ${text.pricing_cards.archive_not_included}`,
-    single_account_monthly: `✅ ${text.pricing_cards.archive_gift(archiveQuotas.single_account_monthly)}`,
-    single_account_half_year: `✅ ${text.pricing_cards.archive_gift(archiveQuotas.single_account_half_year)}`,
-    single_account_annual: `✅ ${text.pricing_cards.archive_gift(archiveQuotas.single_account_annual)}`,
-    single_account_lifetime: `✅ ${text.pricing_cards.archive_gift(archiveQuotas.single_account_lifetime)}`,
-  }].sort((left, right) => (comparisonOrder.get(left.feature) ?? comparisonOrder.size) - (comparisonOrder.get(right.feature) ?? comparisonOrder.size))
   const free = pricing.plans.free_preview
   const choice = text.pricing_choice
   const freeAvailable = features.free_preview && features.skland && features.schedule_generation
@@ -127,7 +118,7 @@ export default function Pricing({ session }: { session: V2Session }) {
       <summary><h2>{choice.full_comparison}</h2><ChevronDown size={20} aria-hidden="true" /></summary>
       <table className="v2-pricing-comparison" aria-label={pricing.comparison_heading}>
         <thead><tr><th scope="col">{text.pages_PricingPage_008}</th><th scope="col">{choice.free_title}</th>{planIds.map((id) => <th scope="col" key={id}>{choice.term_labels[id]}</th>)}</tr></thead>
-        <tbody>{comparisonRows.map((row) => <ComparisonRow key={row.id} feature={row.feature} values={PUBLIC_PRICING_PLAN_IDS.map((id) => row[id] ?? '—')} />)}</tbody>
+        <tbody>{pricing.comparison_rows.map((row) => <ComparisonRow key={row.id} feature={row.feature} values={PUBLIC_PRICING_PLAN_IDS.map((id) => row[id] ?? '—')} />)}</tbody>
       </table>
       <p className="v2-muted">{choice.export_note}</p>
     </details>
