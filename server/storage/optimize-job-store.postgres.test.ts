@@ -166,7 +166,7 @@ describe('user-initiated optimization failure feedback', () => {
     } else if (failure === 'retry_exhausted') {
       await expect(store.retryFailedAttempt(job.id, 1, 'feedback-worker', firstLock, 'worker_crash', 'private diagnostic details', 2)).resolves.toBe('queued')
       expect((await listUserFeedback(userId, 1, 25)).items).toHaveLength(0)
-      await query('update optimize_jobs set next_attempt_at = now() where id = $1', [job.id])
+      await query("update optimize_jobs set next_attempt_at = now() - interval '1 second' where id = $1", [job.id])
       const second = await claim(secondLock)
       expect(second?.id).toBe(job.id)
       await expect(store.retryFailedAttempt(job.id, 2, 'feedback-worker', secondLock, 'worker_crash', 'private diagnostic details', 2)).resolves.toBe('dead_lettered')
