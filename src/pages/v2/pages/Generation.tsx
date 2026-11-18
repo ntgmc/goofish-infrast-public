@@ -9,6 +9,7 @@ import { getMaaExportNotice } from '../../tool/optimize/maa-export-notice'
 import type { V2Workflow } from '../WorkspaceSections'
 import type { V2Section } from '../navigation'
 import GenerationProgressDemo from '../GenerationProgressDemo'
+import FeedbackButton from '../../../components/FeedbackDialog'
 import { Facts, Notice, SectionTitle } from '../components/WorkspaceUI'
 
 const text = copy.optimize
@@ -69,7 +70,7 @@ export default function Generation({ workflow: w, progress: progressContent, dis
         </div>
         <GenerationProgressDemo />
         {w.resultIsCurrent && <p className="v2-muted">{text.pages_tool_optimize_GenerateControlBar_031}</p>}
-        <Notice error>{error && <>{error.message}<div className="v2-actions"><button type="button" className="v2-button v2-button-secondary" disabled={busy || saving} onClick={() => error.retry === 'save' ? w.retryConfigSave() : void w.handleGenerate()}>{saving ? text.generation.saving : error.retry === 'save' ? text.generation.retry_save : copy.v2.generationPage.retry}</button>{error.retry !== 'save' && <button type="button" className="v2-text-button" onClick={onOperators}>{copy.v2.operators}</button>}</div></>}</Notice>
+        <Notice error>{error && <>{error.message}<div className="v2-actions"><button type="button" className="v2-button v2-button-secondary" disabled={busy || saving} onClick={() => error.retry === 'save' ? w.retryConfigSave() : void w.handleGenerate()}>{saving ? text.generation.saving : error.retry === 'save' ? text.generation.retry_save : copy.v2.generationPage.retry}</button>{error.retry !== 'save' && <button type="button" className="v2-text-button" onClick={onOperators}>{copy.v2.operators}</button>}{error.jobId && <FeedbackButton key={error.jobId} failureJobId={error.jobId} className="v2-button v2-button-secondary" />}</div></>}</Notice>
       </div>
     </div>
     {progressContent && <div className="v2-generation-progress">{progressContent}</div>}

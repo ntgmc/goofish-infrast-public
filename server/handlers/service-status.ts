@@ -10,6 +10,7 @@ import {
 import { isServiceReady } from '../lifecycle'
 import { getOptimizeStatusQueuePickupGraceMs, getOptimizeWorkerAutoscalingConfiguration } from '../optimize-job-config'
 import { ensureSklandServiceConfiguration } from '../skland-config'
+import { isSklandConnectorReady } from '../skland-transport'
 import { getAdminOptimizationQueueSnapshot } from '../storage/optimize-job-store'
 import { getServiceStatusHistory, listPublicServiceStatusIncidents } from '../storage/service-status-store'
 import { jsonResponse } from './user-auth'
@@ -64,7 +65,7 @@ export default async function serviceStatusHandler(req: Request): Promise<Respon
       },
       components: [
         { id: 'optimization', status },
-        { id: 'skland_import', status: resolveSklandImportStatus(serviceReady) },
+        { id: 'skland_import', status: await resolveSklandImportStatus(serviceReady) },
       ],
       thresholds: { queue_congested_at: QUEUE_CONGESTION_THRESHOLD, queue_overloaded_at: QUEUE_OVERLOAD_THRESHOLD },
       history,
@@ -73,18 +74,18 @@ export default async function serviceStatusHandler(req: Request): Promise<Respon
     return jsonResponse(payload, status === 'unavailable' ? 503 : 200, { 'Cache-Control': 'no-store' })
   } catch (error) {
     console.error('service status error:', error instanceof Error ? error.name : 'UnknownError')
-    return jsonResponse(unavailablePayload(), 503, { 'Cache-Control': 'no-store' })
+    return jsonResponse(await unavailablePayload(), 503, { 'Cache-Control': 'no-store' })
   }
 }
 
-function unavailablePayload(): ServiceStatusResponse {
+async function unavailablePayload(): Promise<ServiceStatusResponse> {
   return {
     generated_at: new Date().toISOString(),
     status: 'unavailable',
     queue: null,
     components: [
       { id: 'optimization', status: 'unavailable' },
-      { id: 'skland_import', status: resolveSklandImportStatus(isServiceReady()) },
+      { id: 'skland_import', status: await resolveSklandImportStatus(isServiceReady()) },
     ],
     thresholds: { queue_congested_at: QUEUE_CONGESTION_THRESHOLD, queue_overloaded_at: QUEUE_OVERLOAD_THRESHOLD },
     history: createEmptyServiceStatusHistory(),
@@ -92,11 +93,11 @@ function unavailablePayload(): ServiceStatusResponse {
   }
 }
 
-function resolveSklandImportStatus(serviceReady: boolean): ServiceStatusLevel {
+async function resolveSklandImportStatus(serviceReady: boolean): Promise<ServiceStatusLevel> {
   if (!serviceReady) return 'unavailable'
   try {
     ensureSklandServiceConfiguration()
-    return 'available'
+    return await isSklandConnectorReady() ? 'available' : 'unavailable'
   } catch {
     return 'unavailable'
   }

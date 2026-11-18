@@ -126,8 +126,8 @@ export default function WorkspaceSections({ section, session, workflow, generati
                 {section === 'commercial' && <Commercial userId={session.user!.id} activeProfileId={session.activeProfile?.id ?? null} onOpen={onOpenProfile} />}
                 {section === 'tools' && <Tools profileId={session.activeProfile?.id} />}
                 {(['help', 'terms', 'privacy', 'disclaimer', 'support'] as V2Section[]).includes(section) && <PublicInfo page={section === 'help' ? 'faq' : section as 'terms' | 'privacy' | 'disclaimer' | 'support'} />}
-                {section === 'pricing' && <Pricing />}
-                {section === 'purchase' && <Purchase />}
+                {section === 'pricing' && <Pricing session={session} />}
+                {section === 'purchase' && <Purchase profile={session.authStatus === 'authenticated' ? session.activeProfile : null} />}
                 {section === 'status' && <Status />}
                 {section === 'benchmarks' && <SiteBenchmark />}
                 {section === 'updates' && <Updates />}

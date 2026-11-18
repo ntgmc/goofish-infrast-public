@@ -156,6 +156,32 @@ it deliberately when changing the shared design.
   below the schedule in a native disclosure; keep its DOM order aligned with its position.
   Below 40rem, place the schedule before the production strip so facilities are
   visible on entry. Operator portraits and efficiency carry the visual weight.
+- AI schedule explanations use a bottom-right character portrait with a short
+  speech label and a small AI badge. Reuse the local Amiya portrait and V2 copper
+  accent. Open an independent floating dialog so the schedule remains usable,
+  with the same portrait, a draggable title bar and a close control. Support
+  pointer dragging and arrow keys on both the launcher and title bar. Move the
+  portrait and window as one group, preserving the portrait's anchor on closing.
+  Clamp the group within the visible workspace, clear of the desktop navigation
+  rail, after dragging, resizing or content growth; scroll the body independently.
+  Escape and close return focus to the launcher. Preserve generation state and
+  the current position across closing, scoped to the current report. Render
+  Markdown with readable lists, emphasis, code and horizontally scrollable tables.
+  Show incoming text progressively, preserving it while collapsed; mark it saved
+  only after generation finishes. Keep streamed text out of the shared query cache.
+  Layer the assistant surface with 2–3% ink mixes instead of a strong perimeter or
+  table grid. Use tabular lining numerals, pretty body wrapping, balanced headings
+  and nonbreaking short CJK paragraph tails to avoid a single trailing character.
+  Lower body/medium/emphasis weights from 400/500/580 to 350/450/500 in dark mode.
+  Before generation show the action and transmission/allowance details; during
+  and after generation let the answer lead, with saved notes below.
+  Reveal only new streamed text with a short staggered Gaussian blur/opacity ink
+  effect, bounded to 24 fragments and 108ms delay; preserve number/Latin-word
+  groups and do not replay old text on reopening. Keep drag coordinates immediate
+  and clamped; use a small spring on opening and damped release feedback only on
+  the portrait image. Keep the window, body text and launcher label at their native
+  scale on release, with no positional inertia. Disable spatial/ink effects for
+  the app or system reduced-motion setting.
 - Keep generation beside the overview title and export beside result navigation.
   Copper marks the primary action and focus; station colors identify room types
   through the same icon backgrounds on desktop and mobile.
@@ -210,14 +236,27 @@ it deliberately when changing the shared design.
   experiment before inspecting candidate results. Cultivation separates
   conditions from priority, material, calendar and inventory results. Manual
   scheduling makes account, layout and starting schedule explicit steps.
-- Settings use task navigation and a single visible content region. Pricing
-  keeps four maintenance cards on desktop, showing price, audience, checked benefits
-  and a purchase action leading to the V2 purchase guide. Below 40rem, show free capabilities and generation
-  limits first, list shared maintenance benefits once, and compare all four terms
-  and total prices in a compact native radio group that wraps with the available
-  width. Show only the selected plan's total, audience, archive gift and purchase
-  action, with UID binding and activation
-  conditions immediately above the action. Keep redemption before capability demonstrations.
+- Settings use task navigation and a single visible content region. Pricing opens with
+  the MAA execution outcome and a concise free/maintenance comparison. Keep four cards
+  on desktop, each listing the common maintenance benefits, total price, duration,
+  audience, comparison quota, result retention and purchase action. Purchases open the
+  selected product in a dialog on the current page. Comparison quotas come from the
+  product policy. Explain retention inline by expanding its benefit row.
+  The 30-day and lifetime cards carry compact top-edge recommendation badges.
+  Below 40rem, show common maintenance benefits once and compare all four terms and
+  total prices in a wrapping native radio group,
+  then show the selected plan, with UID binding and activation immediately above its action.
+  New users get free-start and redemption actions. An active free profile gets a single
+  code-redemption entry for upgrading its existing data and configuration. Paid profiles
+  get a compact account summary beside the page introduction: identify the profile with
+  an account icon and name, show the access tier in a quiet badge, and give validity its
+  own line. Group account management and redemption below a divider, with renewal/upgrade
+  consultation for time-limited maintenance. Stack this summary naturally on smaller screens. Preserve
+  profile context without starting a calculation or redeeming a code during navigation.
+  Below the cards, show the purchase flow and binding terms. Explain comparison through
+  its use: compare daily output and shift counts before changing layouts or production
+  strategies, followed by the per-comparison scope. Explain result retention outside
+  automatic history cleanup within each plan's retention row.
   Four capability chapters pair paid configuration controls and a compact MAA file flow with
   readable cultivation results and a measured layout comparison. Screenshots in
   `public/assets/pricing/` capture the real editor's drone strategy section with `SAMPLE_CONFIG`.
@@ -232,17 +271,47 @@ it deliberately when changing the shared design.
   At 80rem and above, native scrolling selects a chapter beside one sticky visual, based on
   current chapter positions at 45% of the viewport. Recalculate on scroll and resize; select the
   last chapter when its bottom is visible. Smaller screens and reduced motion show visuals inline. Keep comparison quotas and
-  current service availability beside the relevant chapter, then the compact benchmark proof strip. On desktop, plan descriptions expand on demand; at every width,
-  the full entitlement comparison, purchase rules and upgrade details are expandable.
-  Purchase guides retain the selected product and profile. Group the product,
-  price, terms, listing action and copy action first, with the raw URL available
-  on demand. Keep redemption before long media; pair this overview with the QR
-  on desktop and place the QR before the buying steps on mobile. Show steps in
-  three columns on desktop and a vertical list on mobile. Share posters expand
-  on demand, showing the full image without cropping; open them by default when
-  they are the only way to reach the product. Each product owns its media;
+  current service availability beside the relevant chapter. Place the compact benchmark
+  proof strip near the cards, before the capability chapters, and a return-to-plans action
+  after the chapters. The return action preserves the selected term. On desktop, plan
+  descriptions expand on demand; at every width, the full entitlement comparison,
+  purchase rules and upgrade details are expandable. Order the standard comparison rows
+  by import, scheduling and strategy, cultivation and comparison, export and retention,
+  then usage terms; retain custom rows after the standard capabilities. In each row,
+  merge consecutive columns with identical values. Skland import and refresh have the
+  same default description across free and maintenance plans. Keep the plan headers
+  visible while scrolling within the comparison table. On mobile, use a compact sticky
+  plan header that wraps to fewer columns when text is enlarged. List the covered plans
+  above each merged value, spanning the available
+  width. Include result archive quotas with support status icons: free previews include
+  none, 30/90/365-day maintenance can retain one result at a time, and lifetime maintenance
+  can retain three. Cards and the table share these quotas. Account rules use one short
+  redemption-and-binding flow followed by four points: one game account and UID binding,
+  lifetime service conditions and existing rights, anomalies and manual review, and
+  transfer restrictions.
+  Purchase dialogs and the independent purchase page share the same content and retain
+  the selected product and profile. Group the product, price, binding terms and listing
+  action first, with copying as a text action and the raw URL available on demand.
+  Show manual-delivery expectations beside the listing action: buy the corresponding
+  duration directly, normally receive the code within ten minutes, and message the seller
+  if it has not arrived. Provide a nearby link to the support page for redemption or usage
+  issues when support is available, preserving the profile context. Upgrade orders retain
+  their amount-confirmation process.
+  Generate a PNG QR locally from the selected product's purchase URL with the existing
+  QR library. Use dark slate modules on a white background, a four-module quiet zone,
+  and a theme-aware frame; allow saving the PNG. Keep direct purchasing available if
+  generation fails, with a retry action. Pair the product with the QR on desktop.
+  On mobile, prioritize the listing action and
+  disclose scanning/saving media on demand; open media initially when it is the only
+  purchase route. Show the share poster when there is no QR; when both exist, expand the
+  complete poster separately when a purchase URL generates a QR. Place redemption in a separate row below the product,
+  directing eligible free profiles to in-place upgrade. Buying steps expand
+  on demand (initially open for upgrades), in three columns on desktop and vertically on
+  mobile. Each product owns its media;
   blank images take no space.
-  Admin image fields support direct upload, preview, replacement and removal,
+  Admins configure a purchase link and optional share poster; QR images are generated
+  from that link. Ignore retired QR upload fields when reading saved content. Share
+  poster fields support direct upload, preview, replacement and removal,
   with optional URL entry. Preserve original image bytes, pause publishing during
   uploads, and retain the previous image after a failed upload. Keep keyboard
   focus clear of the settings save bar.
@@ -326,7 +395,8 @@ it deliberately when changing the shared design.
   keep native scrolling and immediate access to prices and actions. The desktop capability
   illustration follows a fine pointer with a low-opacity copper spotlight and at most 2deg
   tilt per axis, returning to rest on leave. The lifetime card automatically traces its edge
-  every four seconds on desktop and touch, using a 3px copper band with a bright core.
+  every eight seconds on desktop and touch. Light mode uses a 2px muted gold band and
+  champagne core on a lightly tinted surface; dark mode uses a 3px copper band with a bright core.
   Its purchase action sweeps once on hover or focus. Pointer tilt and spotlight stay off
   on touch; reduced motion keeps the card and illustration static.
 - V2 data waits use a 16px copper ring beside the readable status, with a longer-wait message
@@ -361,7 +431,9 @@ it deliberately when changing the shared design.
 - `SharedCardDialog` provides card-to-detail transitions with shared layout IDs and the morph
   spring (320ms, no bounce) for both opening and return. Keep the close target at 44px and the
   scrolling content at its natural size throughout the transition; track the scroll offset for
-  nested shared elements. Keep the original card mounted and explicitly hidden throughout the modal's
+  nested shared elements. Mark the dialog and decorative return portals as Motion projection
+  roots so they do not inherit the drawer's scroll coordinates through the React tree.
+  Keep the original card mounted and explicitly hidden throughout the modal's
   lifetime, including changes to motion preferences, and restore it on dismissal for the return.
   Facility cards use it for their background, icon and title. Facility
   details put product, efficiency and shift production first, then compact operator rows with

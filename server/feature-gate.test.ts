@@ -21,6 +21,17 @@ describe('feature gate', () => {
     await expect(enforceFeatureGate(new Request('http://localhost/api/optimization/jobs/job-1/cancel', { method: 'POST' }))).resolves.toBeNull()
   })
 
+  it('blocks new AI calls while keeping saved explanations and administrator configuration readable', async () => {
+    const post = () => enforceFeatureGate(new Request('http://localhost/api/user/schedule-explanation', { method: 'POST' }))
+    await expect((await post())?.json()).resolves.toMatchObject({ feature: 'ai_schedule_explanation' })
+    await expect(enforceFeatureGate(new Request('http://localhost/api/user/schedule-explanation'))).resolves.toBeNull()
+    await expect(enforceFeatureGate(new Request('http://localhost/api/admin/ai-settings'))).resolves.toBeNull()
+    getSiteFeatureSettings.mockResolvedValue(settingsWith({ ai_schedule_explanation: true }))
+    await expect(post()).resolves.toBeNull()
+    getSiteFeatureSettings.mockResolvedValue(settingsWith({ ai_schedule_explanation: true, v2: false }))
+    expect((await post())?.status).toBe(503)
+  })
+
   it('rejects retired metered admissions even with a stored enabled switch', async () => {
     getSiteFeatureSettings.mockResolvedValue(settingsWith({ metered_billing: false }))
 

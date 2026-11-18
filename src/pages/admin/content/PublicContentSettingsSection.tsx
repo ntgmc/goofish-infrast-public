@@ -222,16 +222,14 @@ function PurchaseEditor({ settings, edit }: { settings: PublicContentSettingsV1;
 
 function PurchaseMediaFields({ prefix, media, onChange }: {
   prefix: string
-  media: { share_image_url: string; qr_code_url: string }
-  onChange: (field: 'share_image_url' | 'qr_code_url', value: string) => void
+  media: { share_image_url: string }
+  onChange: (field: 'share_image_url', value: string) => void
 }) {
   const { onUploadingChange } = useContext(ValidationContext)
   return <div className="my-4 space-y-3">
-    <div className="grid gap-4 sm:grid-cols-2">
-      {(['share_image_url', 'qr_code_url'] as const).map((field) => <PurchaseImageField key={field} label={field === 'share_image_url' ? copy.publicContent.admin_share_image_url : copy.publicContent.admin_qr_code_url} value={media[field]} onChange={(value) => onChange(field, value)} onUploadingChange={onUploadingChange}>
-        <TextField path={`${prefix}.${field}`} id={`${prefix}-${field}`} label={copy.publicContent.admin_image_url} value={media[field]} maxLength={2048} required={false} onChange={(value) => onChange(field, value)} />
-      </PurchaseImageField>)}
-    </div>
+    <PurchaseImageField label={copy.publicContent.admin_share_image_url} value={media.share_image_url} onChange={(value) => onChange('share_image_url', value)} onUploadingChange={onUploadingChange}>
+      <TextField path={`${prefix}.share_image_url`} id={`${prefix}-share_image_url`} label={copy.publicContent.admin_image_url} value={media.share_image_url} maxLength={2048} required={false} onChange={(value) => onChange('share_image_url', value)} />
+    </PurchaseImageField>
     <p className="text-sm leading-6 text-ink-secondary">{copy.publicContent.admin_purchase_media_help}</p>
     <p className="text-sm leading-6 text-ink-secondary">{copy.publicContent.admin_image_url_help}</p>
   </div>

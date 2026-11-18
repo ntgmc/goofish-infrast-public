@@ -99,6 +99,7 @@ import {
 import { selectAuthPayloadProfiles } from './auth-payload-profiles'
 import { projectExpiredFreePreviewWorkspace } from '../free-preview-workspace'
 import { cancelAccountDeletionOnLogin } from '../account-data-lifecycle'
+import { getUpgradedProfileMetadata } from '../profile-default-metadata'
 
 const SESSION_COOKIE = 'maa_session'
 const SESSION_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/
@@ -614,7 +615,10 @@ export async function upgradePreviewProfileWithCdk(
       key: cdkKey,
       idempotencyKey: normalizeIdempotencyKey(idempotencyKey),
       idempotencyScope: `profile-upgrade:${user.id}:${profile.id}`,
-      requestHash: createRequestHash({ codeHash, profileId: profile.id, displayName, note }),
+      requestHash: createRequestHash({
+        codeHash, profileId: profile.id, displayName, note,
+        ...(noteValue !== undefined && !note ? { clearNote: true } : {}),
+      }),
       complete: async (client, cdkRecord) => {
         if (!isProfileCdkRecord(cdkRecord)) throw new Error(authCopy.api_cdk_type_mismatch)
         const locked = await client.query<{ record_json: UserGameAccountRecord }>(
@@ -624,9 +628,11 @@ export async function upgradePreviewProfileWithCdk(
         if (!current || (!isFreePreviewProfile(current) && current.kind !== 'metered_personal') || current.status !== 'active') throw new Error('档案当前不可用。')
         const cdkOrderHash = cdkRecord.license_order_hash || createAccountOrderHash(codeHash, current.id)
         const profileExpiresAt = resolveProfileCdkExpiresAt(cdkRecord, now)
+        const metadata = getUpgradedProfileMetadata(current)
         const upgraded: UserGameAccountRecord = {
           ...current, kind: 'cdk', cdk_key: cdkKey, cdk_code_hash: codeHash, cdk_order_hash: cdkOrderHash,
-          permission: normalizePermissionMode(cdkRecord.permission), display_name: displayName || current.display_name || '免费个人排班', note: note || current.note,
+          permission: normalizePermissionMode(cdkRecord.permission), display_name: displayName || metadata.display_name,
+          note: noteValue === undefined ? metadata.note : note,
           expires_at: profileExpiresAt, updated_at: now,
         }
         await saveProfileInTransaction(client, upgraded)

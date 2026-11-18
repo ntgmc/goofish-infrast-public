@@ -447,6 +447,7 @@ export const appUserStatusLabels: Record<AppUserStatus, string> = {
 export const sectionLabels: Record<AdminSection, string> = {
   overview: '总览',
   features: copy.features.admin_nav,
+  ai: 'AI 服务',
   content: copy.publicContent.admin_nav,
   queue: '异步队列',
   items: '道具与礼包',

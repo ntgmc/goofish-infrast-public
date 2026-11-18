@@ -19,6 +19,85 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
+it('creates task feedback only after one click, opens its details, and reopens without another submission', async () => {
+  const jobId = '764b3769-09e4-4261-83b8-d23896419a8f'
+  let created = false
+  let complete!: () => void
+  mocks.api.mockImplementation(async (url, options) => {
+    if (options?.method === 'POST') { await new Promise<void>((resolve) => { complete = resolve }); created = true; return { id: jobId } }
+    if (url.includes('job_id=')) return { id: created ? jobId : null, can_submit: true }
+    return { feedback: { id: jobId, category: 'schedule', message: '任务失败，已预填错误信息', status: 'open', result: null, revision: 0, created_at: '2026-11-16T00:00:00Z' }, entries: [], next_before_revision: null }
+  })
+  const user = userEvent.setup()
+  const view = render(<FeedbackButton failureJobId={jobId} />)
+  const button = await screen.findByRole('button', { name: copy.feedback.reportFailure })
+  await waitFor(() => expect(button).toBeEnabled())
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(mocks.api.mock.calls.filter(([, options]) => options?.method === 'POST')).toHaveLength(0)
+  await user.click(button)
+  expect(button).toBeDisabled()
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  await user.click(button)
+  complete()
+  expect(await screen.findByText('任务失败，已预填错误信息')).toBeVisible()
+  expect(screen.getByRole('tab', { name: copy.feedback.myFeedback })).toHaveAttribute('aria-selected', 'true')
+  expect(mocks.api.mock.calls.filter(([, options]) => options?.method === 'POST')).toHaveLength(1)
+  expect(mocks.api).toHaveBeenCalledWith('/api/user/feedback', expect.objectContaining({ json: { failed_job_id: jobId } }))
+  await user.click(screen.getByRole('button', { name: copy.feedback.close }))
+  const existing = screen.getByRole('button', { name: copy.feedback.viewFailure })
+  await waitFor(() => expect(existing).toHaveFocus())
+  await user.click(existing)
+  expect(await screen.findByText('任务失败，已预填错误信息')).toBeVisible()
+  expect(mocks.api.mock.calls.filter(([, options]) => options?.method === 'POST')).toHaveLength(1)
+  view.unmount()
+  render(<FeedbackButton failureJobId={jobId} />)
+  expect(await screen.findByRole('button', { name: copy.feedback.viewFailure })).toBeVisible()
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+})
+
+it('keeps failed task-feedback submission on the error view and allows retrying the same task', async () => {
+  const jobId = '764b3769-09e4-4261-83b8-d23896419a8f'
+  let attempts = 0
+  mocks.api.mockImplementation(async (url, options) => {
+    if (options?.method === 'POST') { if (++attempts === 1) throw new Error('网络中断，请重试'); return { id: jobId } }
+    if (url.includes('job_id=')) return { id: attempts > 1 ? jobId : null, can_submit: true }
+    return { feedback: { id: jobId, category: 'schedule', message: '预填反馈', status: 'open', revision: 0, result: null, created_at: '2026-11-16T00:00:00Z' }, entries: [], next_before_revision: null }
+  })
+  const user = userEvent.setup()
+  render(<FeedbackButton failureJobId={jobId} />)
+  const button = await screen.findByRole('button', { name: copy.feedback.reportFailure })
+  await waitFor(() => expect(button).toBeEnabled())
+  await user.click(button)
+  expect(await screen.findByRole('alert')).toHaveTextContent('网络中断，请重试')
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  await user.click(button)
+  expect(await screen.findByText('预填反馈')).toBeVisible()
+  expect(attempts).toBe(2)
+})
+
+it('hides task-failure feedback for expected errors without submitting anything', async () => {
+  mocks.api.mockResolvedValue({ id: null, can_submit: false })
+  render(<FeedbackButton failureJobId="764b3769-09e4-4261-83b8-d23896419a8f" />)
+  await waitFor(() => expect(screen.queryByRole('button', { name: copy.feedback.reportFailure })).not.toBeInTheDocument())
+  expect(mocks.api).toHaveBeenCalledTimes(1)
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+})
+
+it('cancels a pending task-feedback submission when its owner view unmounts', async () => {
+  let pendingSignal: AbortSignal | undefined
+  mocks.api.mockImplementation(async (_url, options) => {
+    if (options?.method === 'POST') { pendingSignal = options.signal; return new Promise(() => {}) }
+    return { id: null, can_submit: true }
+  })
+  const view = render(<FeedbackButton failureJobId="764b3769-09e4-4261-83b8-d23896419a8f" />)
+  const button = await screen.findByRole('button', { name: copy.feedback.reportFailure })
+  await waitFor(() => expect(button).toBeEnabled())
+  await userEvent.click(button)
+  expect(pendingSignal?.aborted).toBe(false)
+  view.unmount()
+  expect(pendingSignal?.aborted).toBe(true)
+})
+
 it('preserves the draft after failure, submits the chosen category, and clears it only after success', async () => {
   const user = userEvent.setup()
   mocks.api.mockRejectedValueOnce(new Error('稍后重试')).mockResolvedValueOnce({ id: 'feedback' })

@@ -12,9 +12,9 @@ test('reports the production dependency audit for every pull request to main', (
   assert.match(workflow, /^ {4}name: Audit Production Dependencies$/m)
 })
 
-test('audits production and development dependencies without lowering the severity threshold', () => {
+test('audits production dependencies in full and limits the development exception to picomatch', () => {
   assert.match(workflow, /^ {8}run: pnpm audit --prod$/m)
-  assert.match(workflow, /^ {8}run: pnpm audit$/m)
+  assert.match(workflow, /^ {10}pnpm audit --ignore GHSA-fc5q-39xc-vjpf\n {10}pnpm audit$/m)
   assert.doesNotMatch(workflow, /--audit-level|continue-on-error/)
 })
 

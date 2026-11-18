@@ -7,8 +7,9 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } fr
 
 afterEach(cleanup)
 
-function Example({ customFocus = false, children, onPointerDownOutside, preventOutsideDismiss }: {
+function Example({ customFocus = false, modal = true, children, onPointerDownOutside, preventOutsideDismiss }: {
   customFocus?: boolean
+  modal?: boolean
   children?: ReactNode
   onPointerDownOutside?: ComponentProps<typeof DialogContent>['onPointerDownOutside']
   preventOutsideDismiss?: boolean
@@ -19,7 +20,7 @@ function Example({ customFocus = false, children, onPointerDownOutside, preventO
   return <>
     <button onClick={() => setOpen(true)}>打开弹窗</button>
     <button ref={alternative}>下一步</button>
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog modal={modal} open={open} onOpenChange={setOpen}>
       <DialogContent
         preventOutsideDismiss={preventOutsideDismiss}
         onPointerDownOutside={onPointerDownOutside}
@@ -32,6 +33,19 @@ function Example({ customFocus = false, children, onPointerDownOutside, preventO
     </Dialog>
   </>
 }
+
+it('keeps the page available for a non-modal dialog and restores its opener on Escape', async () => {
+  const user = userEvent.setup()
+  render(<Example modal={false} />)
+  const opener = screen.getByRole('button', { name: '打开弹窗' })
+  await user.click(opener)
+  expect(screen.getByRole('dialog', { name: '编辑' })).not.toHaveAttribute('aria-modal')
+  expect(document.querySelector('[data-slot="dialog-overlay"]')).toBeNull()
+  expect(screen.getByRole('button', { name: '下一步' })).toBeVisible()
+  await user.keyboard('{Escape}')
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  expect(opener).toHaveFocus()
+})
 
 it.each(['Escape', 'button'])('restores focus to a controlled dialog opener after closing with %s', async (method) => {
   const user = userEvent.setup()

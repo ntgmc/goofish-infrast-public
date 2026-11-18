@@ -1227,6 +1227,8 @@ export interface PersonalDataExportV4 {
   skland_snapshots?: PersonalDataExportRecord[];
   workspaces: Array<UserWorkspace | null>;
   optimization_results: WorkspaceResultHistoryExportItem[];
+  ai_schedule_explanations?: PersonalDataExportRecord[];
+  ai_schedule_usage?: PersonalDataExportRecord[];
   legacy_workspace: PersonalDataExportRecord | null;
   usage_events: unknown[];
   optimize_jobs: PersonalDataExportRecord[];

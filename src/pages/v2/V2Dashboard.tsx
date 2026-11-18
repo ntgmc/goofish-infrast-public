@@ -6,6 +6,7 @@ import './auth.css'
 import { NextIcon as ArrowRight, ExpandIcon as ChevronDown, BreadcrumbIcon, ExportIcon as Download, MenuIcon as Menu, GenerateIcon, LoadingIcon, ConfigIcon as Settings2, DataSourceIcon as ShieldCheck, InfoIcon as Sparkles, CloseIcon as X, PreviewIcon, SampleIcon } from '../../components/icons'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import Link from '../../components/InternalLink'
+import FeedbackButton from '../../components/FeedbackDialog'
 import { copy } from '../../copy'
 import { Loading } from './components/WorkspaceUI'
 import { MotionNavIndicator, motionTokens } from '../../components/MotionPrimitives'
@@ -30,6 +31,7 @@ import ScheduleBoard from './ScheduleBoard'
 import ScheduleContext from './ScheduleContext'
 import IncomeAnalysis from './IncomeAnalysis'
 import ProductionSummary from './ProductionSummary'
+import ScheduleExplanation from './ScheduleExplanation'
 import ResultExportDrawer from './ResultExportDrawer'
 import ManualResultExport from './ManualResultExport'
 import OptionsDrawer, { type OptionPanel, type V2Session } from './OptionsDrawer'
@@ -338,6 +340,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
             {error && (workflow?.inlineError?.retry === 'save'
               ? <button type="button" disabled={busy || session.configSyncStatus === 'pending' || session.configSyncStatus === 'saving'} onClick={session.retryConfigSave}>{session.configSyncStatus === 'pending' || session.configSyncStatus === 'saving' ? copy.optimize.generation.saving : copy.optimize.generation.retry_save}</button>
               : onRetryResult && <button type="button" onClick={onRetryResult}>{text.retry}</button>)}
+            {error === workflow?.inlineError?.message && workflow?.inlineError?.jobId && <FeedbackButton key={workflow.inlineError.jobId} failureJobId={workflow.inlineError.jobId} className="v2-button v2-button-secondary" />}
           </div></FeedbackRegion>}
           </AnimatePresence>
           {generationProgress}
@@ -371,6 +374,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
             )}
           </V2Transition>
           </div>
+          {view !== 'manual' && <ScheduleExplanation userId={session.user?.id} profileId={session.activeProfile?.id} resultId={exportResultId} sample={sample} result={result} />}
           {view === 'schedule' && <ScheduleContext result={result} prepared={prepared} config={config} operators={owned} sampleOperators={sampleOperators}
             onConfigure={() => openPanel('config')} onOperators={() => openPanel('operators')} />}
           </div>

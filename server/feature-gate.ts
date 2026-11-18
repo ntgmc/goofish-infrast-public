@@ -54,6 +54,7 @@ function requiredFeatures(pathname: string, method: string): SiteFeatureKey[] {
   if (pathname === '/api/user/profiles/metered-personal' || pathname === '/api/user/commercial/profiles'
     || pathname === '/api/user/billing/quote') return ['profiles', 'schedule_generation', 'metered_billing']
   if (pathname === '/api/user/profiles' || pathname === '/api/user/status') return ['profiles']
+  if (pathname === '/api/user/schedule-explanation') return method === 'POST' ? ['profiles', 'ai_schedule_explanation'] : ['profiles']
   if (pathname === '/api/user/workspace') return ['profiles']
   if (pathname === '/api/user/maa-export'
     || (pathname.startsWith('/api/user/results/') && pathname.endsWith('/maa-export'))) return ['inventory', 'maa_export']

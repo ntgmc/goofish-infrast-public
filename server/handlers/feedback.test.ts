@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { FEEDBACK_IMAGE_MAX_BYTES } from '../../src/lib/feedback-contracts'
 
-const mocks = vi.hoisted(() => ({ session: vi.fn(), admin: vi.fn(), create: vi.fn(), list: vi.fn(), userList: vi.fn(), detail: vi.fn(), update: vi.fn(), image: vi.fn(), rate: vi.fn() }))
+const mocks = vi.hoisted(() => ({ session: vi.fn(), admin: vi.fn(), create: vi.fn(), createFailure: vi.fn(), failure: vi.fn(), list: vi.fn(), userList: vi.fn(), detail: vi.fn(), update: vi.fn(), image: vi.fn(), rate: vi.fn() }))
 vi.mock('./user-auth', () => ({ requireUserSession: mocks.session, jsonResponse: (body: unknown, status = 200, headers = {}) => new Response(JSON.stringify(body), { status, headers }) }))
 vi.mock('./admin-auth', () => ({ authenticateAdminRequest: mocks.admin }))
-vi.mock('../storage/feedback-store', async (importOriginal) => ({ ...await importOriginal<typeof import('../storage/feedback-store')>(), createFeedback: mocks.create, listAdminFeedback: mocks.list, listUserFeedback: mocks.userList, getFeedbackDetail: mocks.detail, updateFeedback: mocks.update, getFeedbackImage: mocks.image }))
+vi.mock('../storage/feedback-store', async (importOriginal) => ({ ...await importOriginal<typeof import('../storage/feedback-store')>(), createFeedback: mocks.create, createOptimizationFailureFeedback: mocks.createFailure, getOptimizationFailureFeedback: mocks.failure, listAdminFeedback: mocks.list, listUserFeedback: mocks.userList, getFeedbackDetail: mocks.detail, updateFeedback: mocks.update, getFeedbackImage: mocks.image }))
 vi.mock('../security/persistent-rate-limit', () => ({ reservePersistentRateLimit: mocks.rate }))
 import userFeedbackHandler from './user-feedback'
 import adminFeedbackHandler from './admin-feedback'
@@ -18,6 +18,8 @@ beforeEach(() => {
   mocks.session.mockResolvedValue({ user: { id: 'logged-in-user' } })
   mocks.admin.mockResolvedValue({ ok: true, username: 'operator' })
   mocks.create.mockResolvedValue(id)
+  mocks.createFailure.mockResolvedValue({ id, created: true })
+  mocks.failure.mockResolvedValue({ id: null, can_submit: true })
   mocks.rate.mockResolvedValue({ allowed: true, attempt: { retain: vi.fn() } })
   mocks.list.mockResolvedValue({ items: [], pagination: { page: 1, page_size: 25, total: 0, total_pages: 0 } })
   mocks.image.mockResolvedValue({ image_type: 'image/png', image_data: png })
@@ -36,6 +38,40 @@ describe('feedback authorization and upload boundary', () => {
     expect(mocks.image).toHaveBeenCalledWith(id, 'logged-in-user')
     mocks.session.mockResolvedValue(null)
     expect((await userFeedbackHandler(new Request(`http://localhost/api/user/feedback?feedback_id=${id}`))).status).toBe(401)
+  })
+  it('reads task feedback status and creates a prefilled report only on an authenticated POST', async () => {
+    const state = await userFeedbackHandler(new Request(`http://localhost/api/user/feedback?job_id=${id}`))
+    expect(await state.json()).toEqual({ id: null, can_submit: true })
+    expect(mocks.failure).toHaveBeenCalledWith('logged-in-user', id)
+    expect(mocks.createFailure).not.toHaveBeenCalled()
+    const created = await userFeedbackHandler(request({ failed_job_id: id }))
+    expect(created.status).toBe(201)
+    expect(await created.json()).toEqual({ id })
+    expect(mocks.createFailure).toHaveBeenCalledWith('logged-in-user', id)
+    expect(mocks.create).not.toHaveBeenCalled()
+    mocks.createFailure.mockResolvedValue({ id, created: false })
+    expect((await userFeedbackHandler(request({ failed_job_id: id }))).status).toBe(200)
+    mocks.session.mockResolvedValue(null)
+    expect((await userFeedbackHandler(request({ failed_job_id: id }))).status).toBe(401)
+    expect((await userFeedbackHandler(new Request(`http://localhost/api/user/feedback?job_id=${id}`))).status).toBe(401)
+  })
+  it.each([`job_id=${id}&feedback_id=${id}`, `job_id=${id}&page=1`, 'job_id=invalid'])('rejects ambiguous task-feedback queries %s', async (params) => {
+    expect((await userFeedbackHandler(new Request(`http://localhost/api/user/feedback?${params}`))).status).toBe(400)
+    expect(mocks.failure).not.toHaveBeenCalled()
+  })
+  it('rejects task-feedback lookups by administrators and forged creation content', async () => {
+    expect((await adminFeedbackHandler(new Request(`http://localhost/api/admin/feedback?job_id=${id}`))).status).toBe(400)
+    for (const body of [{ failed_job_id: 'invalid' }, { failed_job_id: id, user_id: 'other' }, { failed_job_id: id, message: '伪造错误' }]) {
+      expect((await userFeedbackHandler(request(body))).status).toBe(400)
+    }
+    expect(mocks.createFailure).not.toHaveBeenCalled()
+  })
+  it('returns task-feedback ownership and eligibility errors without creating a manual report', async () => {
+    mocks.createFailure.mockRejectedValueOnce(new FeedbackError('feedback_context_invalid', '任务不存在', 404))
+      .mockRejectedValueOnce(new FeedbackError('optimization_failure_not_reportable', '当前任务无需反馈', 400))
+    expect((await userFeedbackHandler(request({ failed_job_id: id }))).status).toBe(404)
+    expect((await userFeedbackHandler(request({ failed_job_id: id }))).status).toBe(400)
+    expect(mocks.create).not.toHaveBeenCalled()
   })
   it('requires mutation permission and persists the authenticated administrator with an audit reason', async () => {
     const body = { feedback_id: id, expected_revision: 1, request_key: id, status: 'resolved', assignment: 'mine', message: '已修复', internal_note: '工单 42', reason: '排查完成' }

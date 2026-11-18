@@ -184,7 +184,7 @@ function ConnectedDashboard({ session }: { session: V2Session }) {
     taskCenterButton.current?.focus()
   }
   const taskCenterAction = <OptimizationTaskCenterButton controller={tasks} open={taskCenterOpen} onOpen={() => setTaskCenterOpen(true)} buttonRef={taskCenterButton} iconOnly />
-  const taskCenterDialog = <OptimizationTaskCenterDialog open={taskCenterOpen} controller={tasks} onClose={closeTaskCenter} retryEnabled={features.features.schedule_generation}
+  const taskCenterDialog = <OptimizationTaskCenterDialog open={taskCenterOpen} controller={tasks} onClose={closeTaskCenter} retryEnabled={features.features.schedule_generation} feedbackEnabled
     onRetrySchedule={() => { closeTaskCenter(); void generate() }} onOpenScenario={() => { closeTaskCenter(); void navigate(v2Path('lab', profile.id)) }}
     onOpenResult={(job) => { void (async () => {
       if (!confirmResultChange()) return

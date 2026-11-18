@@ -100,6 +100,8 @@ async function exportData(userId: string): Promise<Response> {
     notifications,
     feedback,
     sklandSnapshots,
+    aiExplanations,
+    aiUsage,
   ] = await Promise.all([
     getUserById(userId),
     listProfileWorkspaces(profileIds),
@@ -257,6 +259,8 @@ async function exportData(userId: string): Promise<Response> {
                     and (entry.message is not null or entry.status <> entry.previous_status)), '[]'::jsonb) as follow_up
              from user_feedback where user_id = $1 order by created_at asc, id asc`, [userId]),
     query('select uid, version::text, record_json, updated_at from skland_snapshots where user_id = $1 order by uid', [userId]),
+    query('select profile_id, result_id, explanation, created_at from ai_schedule_explanations where user_id = $1 order by created_at', [userId]),
+    query('select id, quota_period, status, created_at from ai_schedule_usage where user_id = $1 order by created_at', [userId]),
   ])
 
   const safeProfiles = profiles.map((profile) => {
@@ -296,6 +300,8 @@ async function exportData(userId: string): Promise<Response> {
       } : null
     }),
     optimization_results: profileIds.flatMap((profileId) => optimizationResultsByProfile.get(profileId) ?? []),
+    ai_schedule_explanations: aiExplanations.rows,
+    ai_schedule_usage: aiUsage.rows,
     legacy_workspace: legacyWorkspace.rows[0]?.record_json ?? null,
     usage_events: usage.rows.map((row) => row.record_json),
     optimize_jobs: jobs.rows,

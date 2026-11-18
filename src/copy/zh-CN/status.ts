@@ -47,7 +47,7 @@ export const statusCopy = {
   pages_StatusPage_073: "进行中的事件",
   pages_StatusPage_074: "最近已解决",
   pages_StatusPage_075: "森空岛导入",
-  pages_StatusPage_076: "提供森空岛账号绑定以及干员、仓库数据导入服务。",
+  pages_StatusPage_076: "支持扫码登录、账号绑定及干员、仓库数据导入。可用时服务连接正常，个人授权失效需重新登录。",
   pages_StatusPage_048: "记录数",
   pages_StatusPage_049: "可用率",
   pages_StatusPage_050: "无数据",

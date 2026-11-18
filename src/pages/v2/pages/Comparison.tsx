@@ -7,6 +7,7 @@ import { formatWorkspaceDate } from '../../../lib/workspace-history'
 import { LAYOUTS, SCHEDULES, DRONES, buildPlan, planLabel, planKey } from '../../tool/optimize/scenario-lab/ScenarioFactors'
 import ComparisonResults from './ComparisonResults'
 import ScheduleProgress from '../../../components/ScheduleProgress'
+import FeedbackButton from '../../../components/FeedbackDialog'
 import ProductIcon from '../../../components/ProductIcon'
 import { PRODUCT_LABELS } from '../../../components/result-panel/labels'
 import type { V2Workflow } from '../WorkspaceSections'
@@ -49,7 +50,7 @@ function ComparisonWorkspace({ workflow: w, onConfig }: { workflow: V2Workflow; 
     </div>
     {skippedCount > 0 && <details className="v2-comparison-skips"><summary>{ui.skippedCount(skippedCount)}</summary><ul>{expansion.value?.skipped.map((item) => <li key={`${item.code}:${item.droneStrategy}`}>{ui.skippedItem(item.message, item.count)}</li>)}</ul></details>}
     {w.scenarioQuoteRequired && <Notice>{w.scenarioBillingQuoteLoading ? text.pages_tool_optimize_ScenarioLabSection_055 : w.scenarioBillingQuoteError ?? (w.scenarioBillingQuote?.sufficient === false ? text.pages_tool_optimize_ScenarioLabSection_056 : text.pages_tool_optimize_ScenarioLabSection_057)}{w.scenarioBillingQuoteError && <button className="v2-text-button" onClick={() => void w.refreshScenarioBillingQuote()}>{text.pages_tool_optimize_ScenarioLabSection_058}</button>}</Notice>}
-    <Notice error>{model.error}</Notice>
+    <Notice error>{model.error}{model.error && (model.job?.status === 'failed' || model.job?.status === 'dead_lettered') && <div className="v2-actions"><FeedbackButton key={model.job.id} failureJobId={model.job.id} className="v2-button v2-button-secondary" /></div>}</Notice>
   </section>
   {model.progress && <div className="v2-experiment-progress"><ScheduleProgress progress={model.progress} variant="focus" />{model.canCancel && <button className="v2-button v2-button-secondary" disabled={model.cancelling} onClick={() => { if (window.confirm(text.pages_tool_optimize_ScenarioLabSection_052)) void model.cancel() }}>{model.cancelling ? text.pages_tool_optimize_ScenarioLabSection_053 : text.pages_tool_optimize_ScenarioLabSection_051}</button>}</div>}
   {!model.result && !model.progress && <EmptyState title={copy.v2.comparison.emptyTitle}>{copy.v2.comparison.emptyDescription}</EmptyState>}

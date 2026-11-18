@@ -9,6 +9,7 @@ import {
   OptimizeJobAdmissionError,
 } from './optimize-job-store'
 import { emptyWorkspace, getWorkspace, saveWorkspace, updateProfileWorkspaceAtomically, updateProfileWorkspaceInTransaction } from './user-store'
+import { createOptimizationFailureFeedback, getOptimizationFailureFeedback, getFeedbackDetail, listUserFeedback } from './feedback-store'
 import {
   activateInvitationForUser,
   ensureInvitationCode,
@@ -142,6 +143,107 @@ describe('PostgreSQL optimization job read projections', () => {
       vi.unstubAllEnvs()
       await query('delete from optimize_jobs where id = any($1::text[])', [[first.id, blocker.id]])
     }
+  })
+})
+
+describe('user-initiated optimization failure feedback', () => {
+  it.each(['terminal', 'invalid_job_payload', 'retry_exhausted', 'lease_expired', 'timed_out'] as const)('creates one prefilled report for %s', async (failure) => {
+    const profileId = await seedProfile()
+    const userId = (await query('select user_id from user_game_accounts where id = $1', [profileId])).rows[0].user_id
+    const store = createPostgresOptimizeJobStore()
+    const job = await store.createJob(input({ owner_key: `profile:${profileId}`, profile_id: failure === 'terminal' ? null : profileId, priority: 2_130_000_000 }))
+    const firstLock = randomUUID()
+    const secondLock = randomUUID()
+    const claim = (lock: string) => store.claimNextJob('feedback-worker', lock, new Date(Date.now() + 60_000).toISOString(), 2, 100)
+    await query('update optimize_dispatch_state set prioritized_streak = 0 where id = true')
+    const first = await claim(firstLock)
+    expect(first?.id).toBe(job.id)
+
+    if (failure === 'terminal' || failure === 'invalid_job_payload') {
+      const error = { code: failure === 'terminal' ? 'optimizer_error' : failure, failureKind: failure === 'terminal' ? 'application_error' as const : 'validation_error' as const, publicMessage: '优化计算失败。', internalMessage: 'private diagnostic details' }
+      await expect(store.failAttempt(job.id, 1, 'feedback-worker', firstLock, error)).resolves.toBe(true)
+      await expect(store.failAttempt(job.id, 1, 'feedback-worker', firstLock, error)).resolves.toBe(false)
+    } else if (failure === 'retry_exhausted') {
+      await expect(store.retryFailedAttempt(job.id, 1, 'feedback-worker', firstLock, 'worker_crash', 'private diagnostic details', 2)).resolves.toBe('queued')
+      expect((await listUserFeedback(userId, 1, 25)).items).toHaveLength(0)
+      await query("update optimize_jobs set next_attempt_at = now() - interval '1 second' where id = $1", [job.id])
+      const second = await claim(secondLock)
+      expect(second?.id).toBe(job.id)
+      await expect(store.retryFailedAttempt(job.id, 2, 'feedback-worker', secondLock, 'worker_crash', 'private diagnostic details', 2)).resolves.toBe('dead_lettered')
+    } else {
+      await query(failure === 'timed_out'
+        ? "update optimize_jobs set started_at = now() - interval '31 minutes' where id = $1"
+        : "update optimize_jobs set lock_expires_at = now() - interval '1 minute' where id = $1", [job.id])
+      await store.recoverExpiredAttempts(new Date().toISOString(), 1)
+      await store.recoverExpiredAttempts(new Date().toISOString(), 1)
+      expect((await store.getJob(job.id))?.status).toBe('dead_lettered')
+    }
+
+    expect((await listUserFeedback(userId, 1, 25)).items).toHaveLength(0)
+    expect(await getOptimizationFailureFeedback(userId, job.id)).toEqual({ id: null, can_submit: true })
+    await expect(getOptimizationFailureFeedback(randomUUID(), job.id)).rejects.toMatchObject({ status: 404 })
+    await expect(createOptimizationFailureFeedback(randomUUID(), job.id)).rejects.toMatchObject({ status: 404 })
+    const created = await Promise.all([createOptimizationFailureFeedback(userId, job.id), createOptimizationFailureFeedback(userId, job.id)])
+    expect(created.filter((item) => item.created)).toHaveLength(1)
+    expect(created.map((item) => item.id)).toEqual([job.id, job.id])
+    expect(await getOptimizationFailureFeedback(userId, job.id)).toEqual({ id: job.id, can_submit: true })
+    expect(await createOptimizationFailureFeedback(userId, job.id)).toEqual({ id: job.id, created: false })
+    const page = await listUserFeedback(userId, 1, 25)
+    expect(page.items).toHaveLength(1)
+    expect(page.items[0]).toMatchObject({ id: job.id, category: 'schedule', status: 'open', context: { profile_id: profileId, job_id: job.id } })
+    expect(page.items[0].message).toContain('希望协助排查此问题')
+    expect(page.items[0].message).toContain(job.id)
+    expect(page.items[0].message).toContain((await store.getJob(job.id))!.error_message)
+    expect(JSON.stringify(await getFeedbackDetail(job.id, userId))).not.toContain('private diagnostic details')
+    expect((await getFeedbackDetail(job.id, null)).feedback).toMatchObject({ user_id: userId, assignee: null })
+    await expect(getFeedbackDetail(job.id, randomUUID())).rejects.toMatchObject({ status: 404 })
+  })
+
+  it.each(['permission_denied', 'profile_expired', 'license_revoked', 'capability_not_available', 'feature_disabled', 'insufficient_balance', 'pricing_changed', 'validation_failed', 'risk_frozen'])('does not report the expected error %s', async (code) => {
+    const profileId = await seedProfile()
+    const store = createPostgresOptimizeJobStore()
+    const job = await store.createJob(input({ owner_key: `profile:${profileId}`, profile_id: profileId, priority: 2_130_000_000 }))
+    await query('update optimize_dispatch_state set prioritized_streak = 0 where id = true')
+    const lock = randomUUID()
+    const claimed = await store.claimNextJob('expected-worker', lock, new Date(Date.now() + 60_000).toISOString(), 2, 100)
+    expect(claimed?.id).toBe(job.id)
+    await store.failAttempt(job.id, 1, 'expected-worker', lock, { code, failureKind: 'application_error', publicMessage: '请检查账号或输入。', internalMessage: code })
+    const userId = (await query('select user_id from user_game_accounts where id = $1', [profileId])).rows[0].user_id
+    expect(await getOptimizationFailureFeedback(userId, job.id)).toEqual({ id: null, can_submit: false })
+    await expect(createOptimizationFailureFeedback(userId, job.id)).rejects.toMatchObject({ code: 'optimization_failure_not_reportable' })
+    expect((await query('select id from user_feedback where id = $1', [job.id])).rows).toEqual([])
+  })
+
+  it.each(['queued', 'running', 'succeeded', 'cancelled'])('rejects task-failure feedback while the task is %s', async (status) => {
+    const profileId = await seedProfile()
+    const userId = (await query('select user_id from user_game_accounts where id = $1', [profileId])).rows[0].user_id
+    const store = createPostgresOptimizeJobStore()
+    const job = await store.createJob(input({ owner_key: `profile:${profileId}`, profile_id: profileId }))
+    await query('update optimize_jobs set status = $2 where id = $1', [job.id, status])
+    expect(await getOptimizationFailureFeedback(userId, job.id)).toEqual({ id: null, can_submit: false })
+    await expect(createOptimizationFailureFeedback(userId, job.id)).rejects.toMatchObject({ status: 400 })
+    await query('delete from optimize_jobs where id = $1', [job.id])
+  })
+
+  it('settles the failed task independently and allows retrying an unsuccessful feedback submission', async () => {
+    const profileId = await seedProfile()
+    const store = createPostgresOptimizeJobStore()
+    const job = await store.createJob(input({ owner_key: `profile:${profileId}`, profile_id: profileId, priority: 2_130_000_000 }))
+    await query('update optimize_dispatch_state set prioritized_streak = 0 where id = true')
+    const claimed = await store.claimNextJob('rollback-worker', 'rollback-lock', new Date(Date.now() + 60_000).toISOString(), 2, 100)
+    expect(claimed?.id).toBe(job.id)
+    const userId = (await query('select user_id from user_game_accounts where id = $1', [profileId])).rows[0].user_id
+    await query(`alter table user_feedback add constraint test_failure_feedback check (id <> '${job.id}') not valid`)
+    try {
+      await expect(store.failAttempt(job.id, 1, 'rollback-worker', 'rollback-lock', 'system failure')).resolves.toBe(true)
+      await expect(createOptimizationFailureFeedback(userId, job.id)).rejects.toThrow()
+      expect(await store.getJob(job.id)).toMatchObject({ status: 'failed', failure_count: 1 })
+      expect(await getOptimizationFailureFeedback(userId, job.id)).toEqual({ id: null, can_submit: true })
+    } finally {
+      await query('alter table user_feedback drop constraint test_failure_feedback')
+    }
+    await expect(createOptimizationFailureFeedback(userId, job.id)).resolves.toEqual({ id: job.id, created: true })
+    expect((await query('select id from user_feedback where id = $1', [job.id])).rows).toHaveLength(1)
   })
 })
 
@@ -1562,6 +1664,9 @@ describe('PostgreSQL optimization job admission', () => {
       public_error_code: 'invalid_optimizer_result',
       billing_json: { status: 'released' },
     })
+    expect(await getOptimizationFailureFeedback(userId, admitted.job.id)).toEqual({ id: null, can_submit: true })
+    await createOptimizationFailureFeedback(userId, admitted.job.id)
+    expect((await getFeedbackDetail(admitted.job.id, userId)).feedback).toMatchObject({ category: 'schedule', context: { profile_id: profileId, job_id: admitted.job.id } })
     expect(await getBalanceSummary(userId)).toMatchObject({ available: '1200.00', reserved: '0.00' })
     expect((await query<{ count: string }>(
       "select count(*)::text as count from user_balance_transactions where user_id = $1 and kind = 'schedule_debit'",

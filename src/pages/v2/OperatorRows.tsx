@@ -152,7 +152,7 @@ function OperatorReturn({ returning: { operator, from, to, scrollTop }, onComple
     window.addEventListener('resize', onComplete)
     return () => { document.removeEventListener('scroll', interrupt, true); window.removeEventListener('resize', onComplete) }
   }, [onComplete])
-  return createPortal(<motion.div className="v2-dialog shared-card-dialog v2-operator-return" aria-hidden inert
+  return createPortal(<motion.div className="v2-dialog shared-card-dialog v2-operator-return" aria-hidden inert data-framer-portal-id={`card-${operator.id}`}
     initial={from} animate={to} style={{ borderRadius: 6 }}
     transition={motionTokens.morph} onAnimationComplete={onComplete}>
     <motion.div className="v2-operator-return-surface" layoutId={`card-${operator.id}`} transition={{ duration: 0 }}>

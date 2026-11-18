@@ -1499,6 +1499,53 @@ ALTER TABLE optimization_result_history DROP CONSTRAINT IF EXISTS optimization_r
 ALTER TABLE optimization_result_history ADD CONSTRAINT optimization_result_history_source_check
   CHECK (source IN ('generated', 'applied_suggestions', 'legacy', 'manual'));
 
+CREATE TABLE IF NOT EXISTS ai_settings (
+  key TEXT PRIMARY KEY CHECK (key = 'global'),
+  settings JSONB NOT NULL,
+  encrypted_api_key TEXT,
+  revision INTEGER NOT NULL CHECK (revision > 0),
+  updated_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS ai_schedule_usage (
+  id TEXT PRIMARY KEY,
+  user_id TEXT REFERENCES user_accounts(id) ON DELETE SET NULL,
+  cache_key TEXT NOT NULL,
+  quota_period TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('pending', 'succeeded', 'failed')),
+  cost_micro_cny BIGINT NOT NULL CHECK (cost_micro_cny >= 0),
+  created_at TIMESTAMPTZ NOT NULL
+);
+ALTER TABLE ai_schedule_usage ADD COLUMN IF NOT EXISTS profile_id TEXT;
+ALTER TABLE ai_schedule_usage ADD COLUMN IF NOT EXISTS result_id TEXT;
+ALTER TABLE ai_schedule_usage ADD COLUMN IF NOT EXISTS pricing JSONB;
+ALTER TABLE ai_schedule_usage ADD COLUMN IF NOT EXISTS usage JSONB;
+ALTER TABLE ai_schedule_usage ADD COLUMN IF NOT EXISTS cost_breakdown JSONB;
+ALTER TABLE ai_schedule_usage ADD COLUMN IF NOT EXISTS cost_basis TEXT NOT NULL DEFAULT 'legacy';
+ALTER TABLE ai_schedule_usage ADD COLUMN IF NOT EXISTS reserved_micro_cny BIGINT CHECK (reserved_micro_cny >= 0);
+ALTER TABLE ai_schedule_usage ADD COLUMN IF NOT EXISTS settled_at TIMESTAMPTZ;
+ALTER TABLE ai_schedule_usage ADD COLUMN IF NOT EXISTS duration_ms INTEGER CHECK (duration_ms >= 0);
+ALTER TABLE ai_schedule_usage ADD COLUMN IF NOT EXISTS provider_request_id TEXT;
+ALTER TABLE ai_schedule_usage ADD COLUMN IF NOT EXISTS error_code TEXT;
+ALTER TABLE ai_schedule_usage DROP CONSTRAINT IF EXISTS ai_schedule_usage_cost_basis_check;
+ALTER TABLE ai_schedule_usage ADD CONSTRAINT ai_schedule_usage_cost_basis_check CHECK (cost_basis IN ('usage', 'estimated', 'reserved', 'legacy'));
+ALTER TABLE ai_schedule_usage DROP CONSTRAINT IF EXISTS ai_schedule_usage_result_fkey;
+ALTER TABLE ai_schedule_usage ADD CONSTRAINT ai_schedule_usage_result_fkey
+  FOREIGN KEY (profile_id, result_id) REFERENCES optimization_result_history(profile_id, id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_ai_schedule_usage_user ON ai_schedule_usage(user_id, quota_period, created_at);
+CREATE INDEX IF NOT EXISTS idx_ai_schedule_usage_created ON ai_schedule_usage(created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_ai_schedule_usage_pending ON ai_schedule_usage(cache_key) WHERE status = 'pending';
+
+CREATE TABLE IF NOT EXISTS ai_schedule_explanations (
+  cache_key TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
+  profile_id TEXT NOT NULL,
+  result_id TEXT NOT NULL,
+  explanation TEXT NOT NULL CHECK (char_length(explanation) BETWEEN 1 AND 4000),
+  created_at TIMESTAMPTZ NOT NULL,
+  FOREIGN KEY (profile_id, result_id) REFERENCES optimization_result_history(profile_id, id) ON DELETE CASCADE
+);
+
 -- Backfill every structurally valid legacy result before removing the embedded
 -- copies.  Arrays are stored newest-first, so reverse ordinality preserves the
 -- same ordering when the sequence-backed cursor positions are assigned.
@@ -2718,6 +2765,9 @@ const API_ONLY_RUNTIME_TABLES = new Set([
   'feature_settings',
   'public_content_settings',
   'public_content_images',
+  'ai_settings',
+  'ai_schedule_usage',
+  'ai_schedule_explanations',
   'website_notification_events',
   'qqbot_registration_qualifications',
   'personal_use_declaration_versions',

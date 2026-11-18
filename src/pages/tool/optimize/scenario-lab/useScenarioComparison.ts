@@ -175,6 +175,7 @@ export function useScenarioComparison({
     setError(null)
     setLoading(true)
     setResult(null)
+    setJob(null)
     const request: CreateOptimizationJobRequest = {
       kind: 'scenario_comparison',
       identity: { type: 'profile', profileId },

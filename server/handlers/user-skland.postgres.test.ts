@@ -10,6 +10,7 @@ import { getProfileById, getProfileWorkspace, insertUserAccountForRegistration, 
 let container: StartedPostgreSqlContainer
 let userId: string
 let uid: string
+let nickname: string
 let tokenResponse: unknown
 let pause: (() => Promise<void>) | undefined
 const session = 'm'.repeat(43)
@@ -31,6 +32,7 @@ beforeEach(async () => {
   await query('truncate table user_accounts, cdk_records cascade')
   userId = randomUUID()
   uid = randomUUID()
+  nickname = 'Fixture'
   pause = undefined
   tokenResponse = { code: 0, message: 'OK', data: { token: 'fixture-token' } }
   const now = new Date().toISOString()
@@ -42,7 +44,7 @@ beforeEach(async () => {
     const path = new URL(String(url)).pathname
     let data: unknown
     if (path.endsWith('/auth/refresh')) return Response.json(tokenResponse)
-    if (path.endsWith('/player/binding')) data = { list: [{ appCode: 'arknights', defaultUid: uid, bindingList: [{ uid, nickName: 'Fixture', channelName: '官服' }] }] }
+    if (path.endsWith('/player/binding')) data = { list: [{ appCode: 'arknights', defaultUid: uid, bindingList: [{ uid, nickName: nickname, channelName: '官服' }] }] }
     else if (path.endsWith('/player/info')) {
       const gate = pause
       pause = undefined
@@ -124,6 +126,37 @@ it('preserves a concurrent freeze and refuses to upgrade the frozen UID with a v
   expect((await request('/lifetime-voucher/login/confirm', { confirmation_id: next.body.confirmation_id, idempotency_key: randomUUID() })).status).toBe(200)
   expect(await getProfileById(target.id)).toMatchObject({ id: target.id, kind: 'cdk', status: 'active' })
   expect(await getItemBalance(userId, 'lifetime_profile_voucher')).toBe(0)
+})
+
+it('keeps the game nickname when a voucher creates a new lifetime profile', async () => {
+  nickname = '免费个人排班'
+  await grantItem({ userId, itemCode: 'lifetime_profile_voucher', quantity: 1, expiry: { mode: 'never' }, sourceType: 'test', sourceId: randomUUID(), recipientRole: 'test' })
+  const pending = await preview('/lifetime-voucher')
+  const confirmed = await request('/lifetime-voucher/login/confirm', { confirmation_id: pending.body.confirmation_id, idempotency_key: randomUUID() })
+  expect(confirmed.status).toBe(200)
+  expect(confirmed.body.active_profile).toMatchObject({ kind: 'cdk', display_name: nickname, note: '使用终身版兑换 CDK 绑定。' })
+})
+
+it.each([
+  { name: '免费个人排班', note: '已绑定森空岛的免费个人排班档案。', expectedName: '个人排班', expectedNote: '' },
+  { name: '主账号', note: '已绑定森空岛的免费个人排班档案。', expectedName: '主账号', expectedNote: '' },
+  { name: '免费个人排班', note: '官服', expectedName: '个人排班', expectedNote: '官服' },
+  { name: '免费个人排班－小号', note: '自定义备注', expectedName: '免费个人排班－小号', expectedNote: '自定义备注' },
+])('cleans legacy defaults and keeps custom metadata on lifetime voucher upgrade: $name', async ({ name, note, expectedName, expectedNote }) => {
+  const target = await profile('free_preview')
+  await saveUserProfile({ ...target, display_name: name, note })
+  const binding = await preview('', target.id)
+  expect((await request('/login/confirm', { profile_id: target.id, confirmation_id: binding.body.confirmation_id, idempotency_key: randomUUID() })).status).toBe(200)
+  await grantItem({ userId, itemCode: 'lifetime_profile_voucher', quantity: 1, expiry: { mode: 'never' }, sourceType: 'test', sourceId: randomUUID(), recipientRole: 'test' })
+  const pending = await preview('/lifetime-voucher')
+  const body = { confirmation_id: pending.body.confirmation_id, idempotency_key: randomUUID() }
+  const confirmed = await request('/lifetime-voucher/login/confirm', body)
+  expect(confirmed.status).toBe(200)
+  expect(confirmed.body.active_profile).toMatchObject({ id: target.id, kind: 'cdk', display_name: expectedName, note: expectedNote })
+  expect(await getProfileById(target.id)).toMatchObject({ display_name: expectedName, note: expectedNote })
+  expect((await getProfileWorkspace(target.id))?.operators).toHaveLength(1)
+  expect(await getItemBalance(userId, 'lifetime_profile_voucher')).toBe(0)
+  expect((await request('/lifetime-voucher/login/confirm', body)).body).toMatchObject({ replayed: true, active_profile: { display_name: expectedName, note: expectedNote } })
 })
 
 it.each([{ code: 500, message: 'Service temporarily unavailable' }, { code: 0, message: 'OK', data: {} }, null])('preserves bound credentials on token response %j', async (failure) => {

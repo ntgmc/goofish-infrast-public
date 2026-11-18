@@ -11,10 +11,10 @@ const groups: Array<{ label: string; sections: AdminSection[] }> = [
   { label: '运营', sections: ['overview', 'users', 'feedback'] },
   { label: '权益与发放', sections: ['cdk', 'items', 'invitation'] },
   { label: '服务与安全', sections: ['queue', 'risk', 'audit'] },
-  { label: '站点管理', sections: ['features', 'registration', 'announcement', 'content'] },
+  { label: '站点管理', sections: ['features', 'ai', 'registration', 'announcement', 'content'] },
 ]
 const icons = { overview: AdminOverviewIcon, users: AdminUsersIcon, cdk: RedemptionIcon, items: ItemManagementIcon, invitation: InvitationIcon, queue: QueueIcon,
-  audit: ResultHistoryIcon, risk: RiskIcon, features: SiteFeaturesIcon, registration: RegistrationIcon, announcement: AnnouncementIcon, content: ContentManagementIcon, feedback: FeedbackIcon }
+  audit: ResultHistoryIcon, risk: RiskIcon, features: SiteFeaturesIcon, ai: ContentManagementIcon, registration: RegistrationIcon, announcement: AnnouncementIcon, content: ContentManagementIcon, feedback: FeedbackIcon }
 
 export function canAccessAdminSection(section: AdminSection, capabilities: AdminCapability[]): boolean {
   if (section === 'overview') return capabilities.includes('usage_view')

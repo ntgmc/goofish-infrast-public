@@ -1,12 +1,12 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { ScrollArea } from './ui/scroll-area'
 import { SuccessIcon as Check, AddImageIcon as ImagePlus, FeedbackIcon as MessageSquare, RemoveIcon as X } from './icons'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { usePrivateQueryScope } from '../lib/private-query-scope'
 import { useTaskDraft } from '../lib/task-drafts'
 import { copy } from '../copy'
 import { apiJson, getApiErrorMessage } from '../lib/api-client'
-import { FEEDBACK_CATEGORIES, FEEDBACK_IMAGE_TYPES, FEEDBACK_MESSAGE_MAX_LENGTH, type FeedbackCategory } from '../lib/feedback-contracts'
+import { FEEDBACK_CATEGORIES, FEEDBACK_IMAGE_TYPES, FEEDBACK_MESSAGE_MAX_LENGTH, type FeedbackCategory, type OptimizationFailureFeedbackState } from '../lib/feedback-contracts'
 import { prepareFeedbackImage } from '../lib/feedback-image'
 import { Dialog, DialogContent, DialogTitle } from './ui/dialog'
 import { Tabs } from './ui/tabs'
@@ -14,10 +14,15 @@ import FeedbackHistory from './FeedbackHistory'
 import FeedbackImage from './FeedbackImage'
 import './FeedbackDialog.css'
 
-export default function FeedbackButton({ iconOnly = false, className = 'tool-secondary-action', profileId }: { iconOnly?: boolean; className?: string; profileId?: string }) {
+export default function FeedbackButton({ iconOnly = false, className = 'tool-secondary-action', profileId, failureJobId }: { iconOnly?: boolean; className?: string; profileId?: string; failureJobId?: string }) {
   const text = copy.feedback
   const client = useQueryClient()
   const owner = usePrivateQueryScope('user')
+  const failureKey = [...owner.key, 'feedback', 'optimization-job', failureJobId]
+  const failureQuery = useQuery({ queryKey: failureKey, enabled: owner.enabled && Boolean(failureJobId),
+    queryFn: ({ signal }) => apiJson<OptimizationFailureFeedbackState>(`/api/user/feedback?job_id=${encodeURIComponent(failureJobId!)}`, { signal, fallbackMessage: text.loadFailed }) })
+  const failureRequest = useRef<AbortController | null>(null)
+  useEffect(() => () => { failureRequest.current?.abort() }, [])
   const id = useId()
   const trigger = useRef<HTMLButtonElement>(null)
   const categoryInput = useRef<HTMLSelectElement>(null)
@@ -48,6 +53,7 @@ export default function FeedbackButton({ iconOnly = false, className = 'tool-sec
   const hasDraft = Boolean(message.trim() || attachment || attachProfile || resultId.trim() || jobId.trim())
 
   useEffect(() => {
+    if (failureJobId) return
     const button = trigger.current
     function openHistory(event?: Event) {
       const requestedId = event instanceof CustomEvent ? event.detail as string : new URLSearchParams(window.location.search).get('feedback')
@@ -59,7 +65,7 @@ export default function FeedbackButton({ iconOnly = false, className = 'tool-sec
     button?.addEventListener('goofish:open-feedback', openHistory)
     if (document.querySelector('.feedback-trigger') === button) openHistory()
     return () => button?.removeEventListener('goofish:open-feedback', openHistory)
-  }, [])
+  }, [failureJobId])
 
   useEffect(() => {
     if (!open) return
@@ -99,12 +105,43 @@ export default function FeedbackButton({ iconOnly = false, className = 'tool-sec
     finally { setSubmitting(false) }
   }
 
+  async function openFailureFeedback() {
+    if (busy || !failureJobId) return
+    setError(null)
+    const status = failureQuery.data ?? (await failureQuery.refetch()).data
+    if (!status || !status.id && !status.can_submit) return
+    let targetId = status.id
+    if (!targetId) {
+      const request = new AbortController()
+      failureRequest.current = request
+      setSubmitting(true)
+      try {
+        const created = await apiJson<{ id: string }>('/api/user/feedback', { method: 'POST', json: { failed_job_id: failureJobId }, signal: request.signal, fallbackMessage: text.submitFailed })
+        if (request.signal.aborted) return
+        targetId = created.id
+        client.setQueryData(failureKey, { id: targetId, can_submit: true } satisfies OptimizationFailureFeedbackState)
+        void client.invalidateQueries({ queryKey: [...owner.key, 'feedback'] })
+      } catch (caught) {
+        if (!request.signal.aborted) setError(getApiErrorMessage(caught, text.submitFailed))
+        return
+      } finally { if (!request.signal.aborted) setSubmitting(false) }
+    }
+    setFeedbackId(targetId)
+    setSuccess(false)
+    setView('history')
+    setOpen(true)
+  }
+
+  if (failureJobId && (!owner.enabled || failureQuery.isPending || failureQuery.data && !failureQuery.data.can_submit && !failureQuery.data.id)) return null
+  const triggerLabel = failureJobId ? submitting ? text.submitting : failureQuery.data?.id ? text.viewFailure : text.reportFailure : text.title
   return <>
-    <button ref={trigger} type="button" className={`${className} feedback-trigger${iconOnly ? ' feedback-trigger-icon' : ''}`} aria-label={text.title}
-      aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? `${id}-dialog` : undefined} title={iconOnly ? text.title : undefined}
-      onClick={() => { setSuccess(false); setError(null); setView('new'); setOpen(true) }}>
-      <MessageSquare size={18} aria-hidden="true" />{!iconOnly && <span>{text.title}</span>}
+    <button ref={trigger} type="button" className={`${className}${failureJobId ? '' : ' feedback-trigger'}${iconOnly ? ' feedback-trigger-icon' : ''}`} aria-label={triggerLabel}
+      aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? `${id}-dialog` : undefined} title={iconOnly ? triggerLabel : undefined}
+      disabled={Boolean(failureJobId && (busy || failureQuery.isFetching))} aria-busy={failureJobId ? submitting || failureQuery.isFetching : undefined}
+      onClick={() => { if (failureJobId) { void openFailureFeedback(); return } setSuccess(false); setError(null); setView('new'); setOpen(true) }}>
+      <MessageSquare size={18} aria-hidden="true" />{!iconOnly && <span>{triggerLabel}</span>}
     </button>
+    {failureJobId && !open && (error || failureQuery.isError) && <p role="alert" className="w-full text-sm text-error">{error ?? text.loadFailed}</p>}
     <Dialog open={open} onOpenChange={(next) => { if (!busy) setOpen(next) }}>
       <DialogContent id={`${id}-dialog`} className="feedback-dialog v2-modal" aria-describedby={undefined}
         preventOutsideDismiss={busy || view === 'new' && !success && hasDraft || historyHasDraft}

@@ -10,6 +10,7 @@ import InvitationSettingsSection from './invitations/InvitationSettingsSection'
 import RegistrationSettingsSection from './registration/RegistrationSettingsSection'
 import QueueMonitorPanel from './optimization/QueueMonitorPanel'
 import FeatureSettingsSection from './features/FeatureSettingsSection'
+import AiServiceSection from './ai/AiServiceSection'
 import PublicContentSettingsSection from './content/PublicContentSettingsSection'
 import AnnouncementSettingsSection from './announcements/AnnouncementSettingsSection'
 import InventoryAdminSection from './inventory/InventoryAdminSection'
@@ -77,6 +78,7 @@ export default function AdminDashboardView() {
           {section === 'risk' && <RiskSection model={c} search={activeSection === 'risk' ? location.search : ''} active={displayedSection === 'risk'} />}
           {section === 'queue' && <QueueMonitorPanel adminUsername={c.adminUsername} capabilities={c.adminCapabilities} search={activeSection === 'queue' ? location.search : ''} active={displayedSection === 'queue'} />}
           {section === 'features' && <FeatureSettingsSection />}
+          {section === 'ai' && <AiServiceSection />}
           {section === 'content' && <PublicContentSettingsSection />}
           {section === 'items' && <InventoryAdminSection />}
           {section === 'audit' && <OperationAuditSection />}

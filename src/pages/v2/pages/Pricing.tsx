@@ -1,28 +1,41 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
-import { SelectedIcon as Check, CloseIcon as X, ServiceCongestedIcon as Hourglass, NextIcon as ArrowRight, ExpandIcon as ChevronDown } from '../../../components/icons'
+import { SelectedIcon as Check, CloseIcon as X, ServiceCongestedIcon as Hourglass, NextIcon as ArrowRight, ExpandIcon as ChevronDown, AccountIcon } from '../../../components/icons'
 import { copy, CURRENT_LOCALE } from '../../../copy'
 import { PUBLIC_PRICING_PLAN_IDS } from '../../../lib/public-content'
 import { usePublicContent } from '../../../lib/public-content-context'
 import { useSiteFeatures } from '../../../lib/site-feature-context'
 import { METERED_BILLING_AVAILABLE } from '../../../lib/site-features'
 import { getMeteredBillingPolicy, getMeteredScheduleQuote } from '../../../lib/metered-billing'
-import { getSku } from '../../../lib/product-catalog'
+import { getSku, productPolicies } from '../../../lib/product-catalog'
+import { formatShanghaiDateTime, getProfileAccessLabel, isFreePreviewProfile } from '../../tool/tool-utils'
+import type { V2Session } from '../OptionsDrawer'
+import type { UserGameAccount } from '../../../lib/types'
 import Link from '../../../components/InternalLink'
 import { FeedbackLink } from '../../../components/PublicFooter'
 import { Facts, Notice, SectionTitle } from '../components/WorkspaceUI'
 import { RollingValue } from '../../../components/NumberMotion'
 import { v2Path } from '../navigation'
 import PricingBenefits from './PricingBenefits'
+import { PurchaseDialog } from './Purchase'
 
 const text = copy.public
 const planIds = PUBLIC_PRICING_PLAN_IDS.filter((id) => id !== 'free_preview')
+const quotas = productPolicies.metered_billing.scenario_quotas
+const comparisonQuotas = { single_account_monthly: quotas.month, single_account_half_year: quotas.half_year, single_account_annual: quotas.year, single_account_lifetime: quotas.lifetime }
+const archiveQuotas = { single_account_monthly: 1, single_account_half_year: 1, single_account_annual: 1, single_account_lifetime: 3 }
+const comparisonLabels = [text.pricing_choice.free_title, ...planIds.map((id) => text.pricing_choice.term_labels[id])]
+const comparisonOrder = new Map<string, number>(text.pricing_choice.comparison_order.map((feature, index) => [feature, index]))
 
-export default function Pricing() {
+export default function Pricing({ session }: { session: V2Session }) {
   const { content } = usePublicContent()
   const { features } = useSiteFeatures()
   const [params] = useSearchParams()
-  const purchasePath = v2Path('purchase', params.get('profile_id'))
+  const profile = session.authStatus === 'authenticated' ? session.activeProfile : null
+  const profileId = profile?.id ?? params.get('profile_id')
+  const canUpgrade = Boolean(profile && isFreePreviewProfile(profile) && profile.status === 'active' && !profile.archived_at)
+  const redemptionPath = `${v2Path('add-account', profileId)}&mode=${canUpgrade ? 'upgrade' : 'cdk'}`
+  const [purchaseOffer, setPurchaseOffer] = useState<string | null>(null)
   const [selectedPlan, setSelectedPlan] = useState<(typeof planIds)[number]>('single_account_monthly')
   const [mobile, setMobile] = useState(() => Boolean(window.matchMedia?.('(max-width: 40rem)').matches))
   useEffect(() => {
@@ -33,6 +46,14 @@ export default function Pricing() {
     return () => query.removeEventListener('change', update)
   }, [])
   const pricing = content.pricing
+  const comparisonRows = [...pricing.comparison_rows, {
+    id: 'archive-quota', feature: text.pricing_cards.archive_comparison,
+    free_preview: `❌ ${text.pricing_cards.archive_not_included}`,
+    single_account_monthly: `✅ ${text.pricing_cards.archive_gift(archiveQuotas.single_account_monthly)}`,
+    single_account_half_year: `✅ ${text.pricing_cards.archive_gift(archiveQuotas.single_account_half_year)}`,
+    single_account_annual: `✅ ${text.pricing_cards.archive_gift(archiveQuotas.single_account_annual)}`,
+    single_account_lifetime: `✅ ${text.pricing_cards.archive_gift(archiveQuotas.single_account_lifetime)}`,
+  }].sort((left, right) => (comparisonOrder.get(left.feature) ?? comparisonOrder.size) - (comparisonOrder.get(right.feature) ?? comparisonOrder.size))
   const free = pricing.plans.free_preview
   const choice = text.pricing_choice
   const freeAvailable = features.free_preview && features.skland && features.schedule_generation
@@ -40,16 +61,22 @@ export default function Pricing() {
   const term = (label: string) => label.replace(/^单账号\s*/u, '').replace(/\s*CDK$/u, '')
   return <div className="v2-pricing-workspace">
     <div className="v2-pricing-intro">
-      {mobile ? <div><h2>{choice.free_title} · {free.display_price}</h2><p>{choice.free_features} {free.summary}</p><p>{free.account_scope}</p></div> : <p className="v2-lead">{choice.intro}</p>}
-      {freeAvailable ? <Link to="/tool/optimize/overview" className="v2-button v2-button-secondary">{choice.free_action}</Link> : <button disabled className="v2-button v2-button-secondary">{choice.free_unavailable}</button>}
+      <div><h2>{choice.intro}</h2><p>{choice.description}</p></div>
+      {profile && !isFreePreviewProfile(profile) ? <PricingAccount profile={profile} /> : <div className="v2-pricing-intro-actions">
+        {profile ? !canUpgrade && features.site && features.profiles && <Link to={v2Path('profiles', profileId)} className="v2-button v2-button-secondary">{choice.manage_action}</Link>
+          : freeAvailable ? <Link to="/tool/optimize/overview" className="v2-button v2-button-secondary">{choice.free_action}</Link> : <button disabled className="v2-button v2-button-secondary">{choice.free_unavailable}</button>}
+        {redemptionAvailable ? <Link to={redemptionPath} className="v2-text-button">{canUpgrade ? text.purchase.upgrade_redeem : text.purchase.redeem_action}<ArrowRight size={14} aria-hidden="true" /></Link> : <span className="v2-muted">{text.pricing_redemption.unavailable}</span>}
+      </div>}
     </div>
+    <div className="v2-pricing-value"><p><strong>{choice.free_title} · {free.display_price}</strong>{choice.free_comparison}</p>{!mobile && <p><strong>{choice.shared_benefits}</strong>{choice.paid_comparison}</p>}</div>
+    {!profile && <p className="v2-pricing-free-quota">{free.summary} {free.account_scope}</p>}
     {!features.maa_export && <Notice>{choice.export_unavailable}</Notice>}
     {mobile && <>
       <section className="v2-pricing-shared" aria-labelledby="pricing-shared-title">
         <h2 id="pricing-shared-title">{choice.shared_benefits}</h2>
         <ul className="v2-pricing-benefits">{text.pricing_cards.features.map((feature) => <li key={feature}><Check size={16} aria-hidden="true" /><span>{feature}</span></li>)}</ul>
       </section>
-      <fieldset className="v2-pricing-terms">
+      <fieldset id="pricing-plans" tabIndex={-1} className="v2-pricing-terms">
         <legend>{choice.choose_term}</legend>
         <div>{planIds.map((id) => <label key={id} data-selected={selectedPlan === id}>
           <input type="radio" name="pricing-term" value={id} checked={selectedPlan === id} onChange={() => setSelectedPlan(id)} />
@@ -57,66 +84,87 @@ export default function Pricing() {
         </label>)}</div>
       </fieldset>
     </>}
-    <section className="v2-pricing-plans" aria-label={copy.v2.planChoice}>
+    <section id={mobile ? undefined : 'pricing-plans'} tabIndex={-1} className="v2-pricing-plans" aria-label={copy.v2.planChoice}>
       {(mobile ? [selectedPlan] : planIds).map((id) => {
         const plan = pricing.plans[id]
         const [amount, period] = plan.display_price.split('/')
-        const archiveCount = id === 'single_account_lifetime' ? 3 : 1
+        const archiveCount = archiveQuotas[id]
         return <article key={mobile ? 'selected-plan' : id} className={`v2-pricing-plan${id === 'single_account_lifetime' ? ' v2-pricing-plan-featured' : ''}`} aria-labelledby={`${id}-title`}>
+          {(id === 'single_account_monthly' || id === 'single_account_lifetime') && <span className="v2-pricing-recommendation">{text.pricing_cards.recommendations[id]}</span>}
           <header>
-            {!mobile && <span className="v2-pricing-badge">{plan.badge}</span>}
+            <span className="v2-pricing-badge">{plan.badge}</span>
             <h2 id={`${id}-title`}>{term(plan.label)}</h2>
             <p className="v2-pricing-price">{mobile && <span>{choice.total_price}</span>}<strong><RollingValue value={amount.trim()} /></strong>{period && <span>／{period.trim()}</span>}</p>
             {plan.discount_fold < 10 && <small>{text.pages_PricingPage_017(plan.original_price, plan.discount_fold)}</small>}
             <p className="v2-pricing-audience">{getSku(id).audience}</p>
           </header>
-          {mobile ? <p className="v2-pricing-gift">{text.pricing_archive_gift(archiveCount)}</p> : <ul className="v2-pricing-benefits">
-            {[...text.pricing_cards.features, text.pricing_cards.archive_gift(archiveCount)].map((feature) => <li key={feature}><Check size={16} aria-hidden="true" /><span>{feature}</span></li>)}
-          </ul>}
+          <ul className="v2-pricing-benefits">
+            {[...(mobile ? [] : text.pricing_cards.features), features.scenario_comparison ? text.pricing_cards.comparisons(comparisonQuotas[id]) : copy.optimize.paid_preview.lab_unavailable].map((feature) => <li key={feature}><Check size={16} aria-hidden="true" /><span>{feature}</span></li>)}
+            <li className="v2-pricing-archive-benefit"><Check size={16} aria-hidden="true" /><details className="v2-pricing-archive"><summary><span>{text.pricing_cards.archive_gift(archiveCount)}</span><ChevronDown size={14} aria-hidden="true" /></summary><h3>{text.pricing_cards.archive_title}</h3><p>{text.pricing_cards.archive_description}</p></details></li>
+          </ul>
           <div className="v2-pricing-plan-footer">
             {mobile ? <div className="v2-pricing-account-scope"><p id={`${id}-purchase-terms`}>{plan.account_scope}</p><p id={`${id}-activation`}>{text.pricing_redemption.activation}</p></div> : <details className="v2-pricing-plan-details">
               <summary>{text.pricing_cards.plan_details}<ChevronDown size={16} aria-hidden="true" /></summary>
-              <p>{plan.summary}</p><p id={`${id}-purchase-terms`}>{plan.account_scope}</p><p>{text.pricing_archive_gift(archiveCount)}</p>
+              <p>{plan.summary}</p><p id={`${id}-purchase-terms`}>{plan.account_scope}</p>
             </details>}
-            {plan.purchase_url || plan.share_image_url || plan.qr_code_url ? <Link to={`${purchasePath}&offer=${id}`} aria-describedby={`${id}-purchase-terms ${mobile ? `${id}-activation` : 'pricing-purchase-terms'} pricing-purchase-flow`} className={`v2-button ${id === 'single_account_lifetime' ? 'v2-button-primary' : 'v2-button-secondary'}`}>{text.pricing_purchase_labels[id]}<ArrowRight size={16} aria-hidden="true" /></Link> : <button disabled className="v2-button v2-button-secondary">{text.pricing_purchase_unavailable}</button>}
+            {plan.purchase_url || plan.share_image_url ? <button type="button" onClick={() => setPurchaseOffer(id)} aria-haspopup="dialog" aria-describedby={`${id}-purchase-terms ${mobile ? `${id}-activation` : 'pricing-purchase-terms'} pricing-purchase-flow`} className={`v2-button ${id === 'single_account_lifetime' ? 'v2-button-primary' : 'v2-button-secondary'}`}>{text.pricing_purchase_labels[id]}<ArrowRight size={16} aria-hidden="true" /></button> : <button disabled className="v2-button v2-button-secondary">{text.pricing_purchase_unavailable}</button>}
           </div>
         </article>
       })}
     </section>
     <div className="v2-pricing-checkout">
-      <div>{!mobile && <p id="pricing-purchase-terms">{text.pages_PricingPage_016} {text.pricing_redemption.activation}</p>}<p id="pricing-purchase-flow">{text.pricing_redemption.flow}</p></div>
-      <div className="v2-actions">
-        {(content.cdk_purchase.xianyu_url || content.cdk_purchase.share_image_url || content.cdk_purchase.qr_code_url) && <Link to={purchasePath} className="v2-button v2-button-secondary">{text.purchase.general_action}</Link>}
-        {redemptionAvailable ? <Link to="/tool/redeem?mode=cdk" className="v2-button v2-button-secondary">{text.pricing_redemption.action}</Link> : <span className="v2-muted">{text.pricing_redemption.unavailable}</span>}
-      </div>
+      <div className="v2-pricing-buying"><p id="pricing-purchase-flow">{text.pricing_cards.purchase_flow}</p>{(content.cdk_purchase.xianyu_url || content.cdk_purchase.share_image_url) && <button type="button" onClick={() => setPurchaseOffer('')} aria-haspopup="dialog" className="v2-text-button">{text.purchase.general_action}<ArrowRight size={14} aria-hidden="true" /></button>}</div>
+      <p id="pricing-purchase-terms">{text.pricing_cards.purchase_terms}</p>
+      {features.scenario_comparison && <p className="v2-pricing-comparison-help">{text.pricing_cards.comparisons_help}</p>}
     </div>
-    <PricingBenefits />
     <section className="v2-pricing-evidence" aria-label={text.pricing_evidence.title}>
       <div><h2>{text.pricing_evidence.title}</h2><p>{text.pricing_evidence.description}</p><Link to="/v2/benchmarks" className="v2-button v2-button-secondary">{text.pricing_evidence.action}</Link></div>
       <Facts items={[[text.pricing_evidence.execution_label, text.pricing_evidence.execution_value], [text.pricing_evidence.yield_label, text.pricing_evidence.yield_value]]} />
     </section>
-    {!mobile && <section className="v2-pricing-free-start" aria-labelledby="pricing-free-title">
-      <div><h2 id="pricing-free-title">{choice.free_title} · {free.display_price}</h2><p>{choice.free_features}</p></div>
-      <div><p>{free.summary}</p><p className="v2-muted">{free.account_scope}</p></div>
-    </section>}
+    <PricingBenefits />
+    <div className="v2-pricing-return"><p>{choice.after_story}</p><a href="#pricing-plans" className="v2-button v2-button-primary">{choice.choose_plan}<ArrowRight size={16} aria-hidden="true" /></a></div>
     <details className="v2-pricing-details">
       <summary><h2>{choice.full_comparison}</h2><ChevronDown size={20} aria-hidden="true" /></summary>
       <table className="v2-pricing-comparison" aria-label={pricing.comparison_heading}>
         <thead><tr><th scope="col">{text.pages_PricingPage_008}</th><th scope="col">{choice.free_title}</th>{planIds.map((id) => <th scope="col" key={id}>{choice.term_labels[id]}</th>)}</tr></thead>
-        <tbody>{pricing.comparison_rows.map((row) => <tr key={row.id}>
-          <th scope="row">{row.feature}</th><td data-label={choice.free_title}><ComparisonValue value={row.free_preview} /></td>{planIds.map((id) => <td key={id} data-label={choice.term_labels[id]}><ComparisonValue value={row[id] ?? '—'} /></td>)}
-        </tr>)}</tbody>
+        <tbody>{comparisonRows.map((row) => <ComparisonRow key={row.id} feature={row.feature} values={PUBLIC_PRICING_PLAN_IDS.map((id) => row[id] ?? '—')} />)}</tbody>
       </table>
       <p className="v2-muted">{choice.export_note}</p>
     </details>
     <details className="v2-pricing-details">
       <summary><h2>{text.pricing_cards.rules}</h2><ChevronDown size={20} aria-hidden="true" /></summary>
       <section className="v2-pricing-policy"><SectionTitle title={pricing.policy_heading} description={text.pricing_redemption.instructions} /><ul>{pricing.disclosures.map((disclosure, index) => <li key={index}>{disclosure}</li>)}</ul></section>
-      <section className="v2-pricing-upgrade"><SectionTitle title={text.pricing_upgrade_title} description={text.pricing_upgrade_description(pricing.lifetime_upgrade.service_fee)} /><p>{text.pricing_upgrade_process}</p><div className="v2-actions">{features.support && <Link to="/support" className="v2-button v2-button-secondary">{text.pricing_upgrade_contact}</Link>}{pricing.lifetime_upgrade.purchase_url || pricing.lifetime_upgrade.share_image_url || pricing.lifetime_upgrade.qr_code_url ? <Link to={`${purchasePath}&offer=lifetime_upgrade`} className="v2-button v2-button-primary">{text.pricing_upgrade_purchase}</Link> : <button disabled className="v2-button v2-button-primary">{text.pricing_upgrade_unavailable}</button>}</div></section>
+      <section className="v2-pricing-upgrade"><SectionTitle title={text.pricing_upgrade_title} description={text.pricing_upgrade_description(pricing.lifetime_upgrade.service_fee)} /><p>{text.pricing_upgrade_process}</p><div className="v2-actions">{features.support && <Link to="/support" className="v2-button v2-button-secondary">{text.pricing_upgrade_contact}</Link>}{pricing.lifetime_upgrade.purchase_url || pricing.lifetime_upgrade.share_image_url ? <button type="button" onClick={() => setPurchaseOffer('lifetime_upgrade')} aria-haspopup="dialog" className="v2-button v2-button-primary">{text.pricing_upgrade_purchase}</button> : <button disabled className="v2-button v2-button-primary">{text.pricing_upgrade_unavailable}</button>}</div></section>
     </details>
     {METERED_BILLING_AVAILABLE && <MeteredPricing />}
     <section className="v2-pricing-support"><SectionTitle title={pricing.support_heading} description={pricing.support_body} /><FeedbackLink className="v2-button v2-button-secondary">{text.pages_PricingPage_010}</FeedbackLink></section>
+    <PurchaseDialog offer={purchaseOffer} profileId={profileId} profile={profile} onClose={() => setPurchaseOffer(null)} />
   </div>
+}
+
+function PricingAccount({ profile }: { profile: UserGameAccount }) {
+  const { features } = useSiteFeatures()
+  const choice = text.pricing_choice
+  const expiresAt = profile.expires_at
+  return <section className="v2-pricing-account" aria-label={choice.current_profile}>
+    <div className="v2-pricing-account-heading"><AccountIcon size={20} aria-hidden="true" /><div><span>{choice.current_profile}</span><strong>{profile.display_name || copy.v2.account}</strong></div><span className="v2-pricing-account-type">{getProfileAccessLabel(profile)}</span></div>
+    <p className="v2-pricing-account-validity">{profile.archived_at ? choice.archived : profile.status !== 'active' ? choice.profile_states[profile.status] : expiresAt ? new Date(expiresAt).getTime() <= Date.now() ? choice.expired(formatShanghaiDateTime(expiresAt)) : choice.until(formatShanghaiDateTime(expiresAt)) : profile.kind === 'cdk' ? choice.lifetime_card : null}</p>
+    <div className="v2-pricing-account-actions">
+      {features.site && features.profiles && <Link to={v2Path('profiles', profile.id)} className="v2-text-button">{choice.manage_action}<ArrowRight size={14} aria-hidden="true" /></Link>}
+      {profile.kind === 'cdk' && expiresAt && features.support && <FeedbackLink className="v2-text-button">{choice.renew_action}</FeedbackLink>}
+      {features.site && features.profiles && features.cdk_redemption && <Link to={`${v2Path('add-account', profile.id)}&mode=cdk`} className="v2-text-button">{text.purchase.redeem_action}</Link>}
+    </div>
+  </section>
+}
+
+function ComparisonRow({ feature, values }: { feature: string; values: string[] }) {
+  const groups: { value: string; labels: string[] }[] = []
+  values.forEach((value, index) => {
+    const previous = groups[groups.length - 1]
+    if (previous?.value === value) previous.labels.push(comparisonLabels[index]!)
+    else groups.push({ value, labels: [comparisonLabels[index]!] })
+  })
+  return <tr><th scope="row">{feature}</th>{groups.map((group) => <td key={group.labels[0]} colSpan={group.labels.length} data-label={group.labels.join('、')}><ComparisonValue value={group.value} /></td>)}</tr>
 }
 
 function ComparisonValue({ value }: { value: string }) {

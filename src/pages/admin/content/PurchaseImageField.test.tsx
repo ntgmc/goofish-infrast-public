@@ -11,7 +11,7 @@ vi.mock('../../../lib/admin-api-client', () => ({ adminApiJson: api }))
 const busy = vi.fn()
 function Field() {
   const [value, setValue] = useState('https://example.com/original.png')
-  return <PurchaseImageField label="购买二维码" value={value} onChange={setValue} onUploadingChange={busy}><input aria-label="地址" value={value} onChange={(event) => setValue(event.target.value)} /></PurchaseImageField>
+  return <PurchaseImageField label="闲鱼分享图" value={value} onChange={setValue} onUploadingChange={busy}><input aria-label="地址" value={value} onChange={(event) => setValue(event.target.value)} /></PurchaseImageField>
 }
 beforeEach(() => { api.mockReset(); busy.mockClear() })
 afterEach(cleanup)
@@ -19,13 +19,13 @@ it('keeps the previous image when upload fails, then supports retry and removal'
   const user = userEvent.setup()
   api.mockRejectedValueOnce(new Error('暂时无法上传'))
   render(<Field />)
-  const file = new File(['image'], 'qr.png', { type: 'image/png' })
-  await user.upload(screen.getByLabelText('购买二维码 · 上传图片'), file)
+  const file = new File(['image'], 'share.png', { type: 'image/png' })
+  await user.upload(screen.getByLabelText('闲鱼分享图 · 上传图片'), file)
   expect(await screen.findByRole('alert')).toHaveTextContent('暂时无法上传')
   expect(screen.getByLabelText('地址')).toHaveValue('https://example.com/original.png')
   const url = `/api/site/public-content-image?id=${'a'.repeat(64)}`
   api.mockResolvedValueOnce({ url })
-  await user.upload(screen.getByLabelText('购买二维码 · 上传图片'), file)
+  await user.upload(screen.getByLabelText('闲鱼分享图 · 上传图片'), file)
   expect(await screen.findByRole('status')).toHaveTextContent('图片已上传')
   expect(screen.getByLabelText('地址')).toHaveValue(url)
   expect(busy.mock.calls).toEqual([[true], [false], [true], [false]])
@@ -34,13 +34,13 @@ it('keeps the previous image when upload fails, then supports retry and removal'
   expect(screen.queryByRole('img')).not.toBeInTheDocument()
 })
 it.each([
-  new File(['<svg/>'], 'qr.svg', { type: 'image/svg+xml' }),
+  new File(['<svg/>'], 'share.svg', { type: 'image/svg+xml' }),
   new File([new Uint8Array(IMAGE_UPLOAD_MAX_BYTES + 1)], 'large.png', { type: 'image/png' }),
   new File([], 'empty.png', { type: 'image/png' }),
 ])('rejects unsupported, empty and oversized files before upload', async (file) => {
   const user = userEvent.setup({ applyAccept: false })
   render(<Field />)
-  await user.upload(screen.getByLabelText('购买二维码 · 上传图片'), file)
+  await user.upload(screen.getByLabelText('闲鱼分享图 · 上传图片'), file)
   expect(await screen.findByRole('alert')).toBeVisible()
   expect(api).not.toHaveBeenCalled()
   expect(screen.getByLabelText('地址')).toHaveValue('https://example.com/original.png')

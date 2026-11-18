@@ -19,6 +19,7 @@ interface UseOptimizationJobOptions {
 
 class OptimizationJobTerminalError extends Error {
   readonly code?: string
+  readonly jobId: string
   readonly retryable: boolean
   readonly recoveryAction?: OptimizeJobStatusResponse['recovery_action']
   readonly supportReference?: string
@@ -29,11 +30,16 @@ class OptimizationJobTerminalError extends Error {
     super(`${job.error || fallbackMessage}${supportSuffix}`)
     this.name = 'OptimizationJobTerminalError'
     this.code = job.error_code
+    this.jobId = job.job_id
     this.retryable = job.error_retryable ?? false
     this.recoveryAction = job.recovery_action
     this.supportReference = job.support_reference
     this.status = job.status as OptimizationJobTerminalError['status']
   }
+}
+
+export function getOptimizationFailureJobId(error: unknown): string | undefined {
+  return error instanceof OptimizationJobTerminalError && error.status !== 'cancelled' ? error.jobId : undefined
 }
 
 export function isOptimizationJobCancelledError(error: unknown): boolean {

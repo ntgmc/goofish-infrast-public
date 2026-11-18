@@ -1,11 +1,11 @@
 import { createHash, randomUUID } from 'node:crypto'
-import type { FeedbackRequest, Feedback, FeedbackPage, AdminFeedback, AdminFeedbackPage, FeedbackDetail, FeedbackEntry, FeedbackReply, AdminFeedbackUpdate, FeedbackStatus, AdminFeedbackFilters, FeedbackOperation } from '../../src/lib/feedback-contracts'
+import type { FeedbackRequest, Feedback, FeedbackPage, AdminFeedback, AdminFeedbackPage, FeedbackDetail, FeedbackEntry, FeedbackReply, AdminFeedbackUpdate, FeedbackStatus, AdminFeedbackFilters, FeedbackOperation, OptimizationFailureFeedbackState } from '../../src/lib/feedback-contracts'
 import { feedbackCopy as text } from '../../src/copy/zh-CN/feedback'
 import { buildAdminPagination } from '../handlers/admin-pagination'
 import { recordAdminOperationAuditInTransaction, type AdminOperationAuditInput } from './admin-operation-audit-store'
 import { upsertFeedbackNotificationInTransaction } from './notification-store'
 import { ensureDatabaseSchema } from './schema'
-import { query, withTransaction } from './postgres'
+import { query, withTransaction, type QueryClient } from './postgres'
 import { FEEDBACK_TODO_SQL, FEEDBACK_WAITING_SINCE_SQL } from './feedback-todo-sql'
 
 export class FeedbackError extends Error {
@@ -56,6 +56,53 @@ export async function createFeedback(userId: string, input: FeedbackRequest, ima
     )
   })
   return id
+}
+
+export async function getOptimizationFailureFeedback(userId: string, jobId: string): Promise<OptimizationFailureFeedbackState> {
+  await ensureDatabaseSchema()
+  return withTransaction(async (client) => {
+    const { id, can_submit } = await readOptimizationFailureFeedback(client, userId, jobId)
+    return { id, can_submit }
+  })
+}
+
+export async function createOptimizationFailureFeedback(userId: string, jobId: string): Promise<{ id: string; created: boolean }> {
+  await ensureDatabaseSchema()
+  return withTransaction(async (client) => {
+    const failure = await readOptimizationFailureFeedback(client, userId, jobId)
+    if (failure.id) return { id: failure.id, created: false }
+    if (!failure.can_submit) throw new FeedbackError('optimization_failure_not_reportable', text.failureNotReportable, 400)
+    // Reuse the job ID so retries and concurrent clicks return the same report.
+    const inserted = await client.query(
+      `insert into user_feedback (id, user_id, category, message, context_json)
+       values ($1, $2, 'schedule', $3, $4::jsonb) on conflict (id) do nothing returning id`,
+      [jobId, userId, text.failureMessage(jobId, failure.error_message ?? text.failureFallback),
+        JSON.stringify({ profile_id: failure.profile_id, job_id: jobId })],
+    )
+    return { id: jobId, created: Boolean(inserted.rowCount) }
+  })
+}
+
+async function readOptimizationFailureFeedback(client: QueryClient, userId: string, jobId: string) {
+  const result = await client.query<OptimizationFailureFeedbackState & { profile_id: string; error_message: string | null }>(
+    `select feedback.id, profile.id as profile_id, job.error_message,
+       (job.status in ('failed', 'dead_lettered') and coalesce(job.public_error_code, '') <> all($3::text[])) as can_submit
+     from optimize_jobs job join user_game_accounts profile
+       on profile.id = coalesce(job.profile_id, case when job.owner_key like 'profile:%' then substring(job.owner_key from 9) end)
+     left join user_feedback feedback on feedback.id = job.id and feedback.user_id = profile.user_id
+     where job.id = $1 and profile.user_id = $2 for share of job, profile`,
+    [jobId, userId, [
+      'auth_required', 'permission_denied', 'capability_not_available', 'feature_disabled',
+      'profile_missing', 'profile_not_found', 'profile_expired', 'profile_archived', 'profile_merged',
+      'profile_frozen', 'profile_revoked', 'license_frozen', 'license_revoked', 'license_unavailable', 'permission_invalid',
+      'personal_use_declaration_required', 'risk_soft_blocked', 'risk_frozen',
+      'insufficient_balance', 'pricing_changed', 'debt_outstanding', 'commercial_not_eligible', 'commercial_suspended',
+      'subscription_scenario_quota_exceeded', 'validation_failed', 'baseline_required', 'baseline_not_found',
+      'scenario_cost_exceeded', 'queue_expired', 'cancelled_by_user',
+    ]],
+  )
+  if (!result.rows[0]) throw new FeedbackError('feedback_context_invalid', text.contextInvalid, 404)
+  return result.rows[0]
 }
 
 export async function listAdminFeedback(page: number, pageSize: number, status?: FeedbackStatus, todo?: AdminFeedbackFilters['todo'], filters: AdminFeedbackFilters = {}, username = ''): Promise<AdminFeedbackPage> {

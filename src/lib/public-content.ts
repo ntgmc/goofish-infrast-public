@@ -3,7 +3,7 @@ import { copy } from '../copy/index'
 import { getSku, productPolicies } from './product-catalog'
 
 export const PUBLIC_CONTENT_VERSION = 1 as const
-export const PUBLIC_CONTENT_DEFAULTS_REVISION = 16 as const
+export const PUBLIC_CONTENT_DEFAULTS_REVISION = 18 as const
 export const PUBLIC_PRICING_PLAN_IDS = [
   'free_preview',
   'single_account_monthly',
@@ -54,7 +54,6 @@ const purchaseImageUrl = z.string().trim().max(2048).refine((value) => value ===
   || /^\/api\/site\/public-content-image\?id=[a-f0-9]{64}$/.test(value), { message: copy.publicContent.validation_invalid }).optional().default('')
 const purchaseMediaFields = {
   share_image_url: purchaseImageUrl,
-  qr_code_url: purchaseImageUrl,
 }
 
 const pricingPlanSchema = z.strictObject({
@@ -69,7 +68,7 @@ const pricingPlanSchema = z.strictObject({
   account_scope: text(500),
 })
 
-const pricingPlanInputSchema = z.strictObject({
+const pricingPlanInputSchema = z.preprocess(discardUploadedQr, z.strictObject({
   ...purchaseMediaFields,
   purchase_url: optionalHttpsUrl,
   label: text(80),
@@ -79,7 +78,14 @@ const pricingPlanInputSchema = z.strictObject({
   discount_fold: pricingDiscountFold.optional(),
   summary: text(1000),
   account_scope: text(500),
-})
+}))
+
+// Saved content can still contain the retired upload field.
+function discardUploadedQr(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value
+  const { qr_code_url: _uploadedQr, ...content } = value as Record<string, unknown>
+  return content
+}
 
 type PublicPricingSku = ReturnType<typeof getSku> & {
   display_price: string
@@ -97,7 +103,6 @@ const defaultPricingPlans = {
   free_preview: {
     purchase_url: '',
     share_image_url: '',
-    qr_code_url: '',
     label: freePreview.label,
     badge: copy.public.pages_PricingPage_005,
     display_price: freePreview.display_price!,
@@ -109,7 +114,6 @@ const defaultPricingPlans = {
   single_account_monthly: {
     purchase_url: '',
     share_image_url: '',
-    qr_code_url: '',
     label: singleAccountMonthly.label,
     badge: copy.publicContent.default_pricing_badge_monthly,
     display_price: singleAccountMonthly.display_price!,
@@ -121,7 +125,6 @@ const defaultPricingPlans = {
   single_account_half_year: {
     purchase_url: '',
     share_image_url: '',
-    qr_code_url: '',
     label: singleAccountHalfYear.label,
     badge: copy.publicContent.default_pricing_badge_half_year,
     display_price: singleAccountHalfYear.display_price!,
@@ -133,7 +136,6 @@ const defaultPricingPlans = {
   single_account_annual: {
     purchase_url: '',
     share_image_url: '',
-    qr_code_url: '',
     label: singleAccountAnnual.label,
     badge: copy.publicContent.default_pricing_badge_annual,
     display_price: singleAccountAnnual.display_price!,
@@ -145,7 +147,6 @@ const defaultPricingPlans = {
   single_account_lifetime: {
     purchase_url: '',
     share_image_url: '',
-    qr_code_url: '',
     label: singleAccountLifetime.label,
     badge: copy.publicContent.default_pricing_badge_lifetime,
     display_price: singleAccountLifetime.display_price!,
@@ -198,11 +199,11 @@ const thanksSectionSchema = z.strictObject({
 })
 
 export const publicContentDraftSchema = z.strictObject({
-  cdk_purchase: z.strictObject({
+  cdk_purchase: z.preprocess(discardUploadedQr, z.strictObject({
     ...purchaseMediaFields,
     xianyu_url: httpsUrlOrEmpty,
     instructions: z.string().trim().max(2000).optional().default(''),
-  }),
+  })),
   qq_group: z.strictObject({
     name: text(80),
     number: z.string().trim().regex(/^[1-9]\d{4,11}$/),
@@ -222,11 +223,11 @@ export const publicContentDraftSchema = z.strictObject({
     title: text(80),
     intro: text(1000),
     plans: pricingPlansSchema,
-    lifetime_upgrade: z.strictObject({
+    lifetime_upgrade: z.preprocess(discardUploadedQr, z.strictObject({
       ...purchaseMediaFields,
       purchase_url: optionalHttpsUrl,
       service_fee: pricingPriceLabel.default(copy.publicContent.default_lifetime_upgrade_fee),
-    }).default({ purchase_url: '', share_image_url: '', qr_code_url: '', service_fee: copy.publicContent.default_lifetime_upgrade_fee }),
+    })).default({ purchase_url: '', share_image_url: '', service_fee: copy.publicContent.default_lifetime_upgrade_fee }),
     policy_heading: text(120),
     disclosures: z.array(text(500)).max(PUBLIC_CONTENT_LIMITS.pricingDisclosures),
     comparison_heading: text(120),
@@ -256,7 +257,6 @@ export const DEFAULT_PUBLIC_CONTENT_DRAFT: PublicContentDraftV1 = {
   cdk_purchase: {
     xianyu_url: 'https://m.tb.cn/h.RGCWZHH?tk=X063g9yLZxZ%20MF287',
     share_image_url: '',
-    qr_code_url: '',
     instructions: '',
   },
   qq_group: {
@@ -305,11 +305,9 @@ export const DEFAULT_PUBLIC_CONTENT_DRAFT: PublicContentDraftV1 = {
       single_account_annual: { ...defaultPricingPlans.single_account_annual },
       single_account_lifetime: { ...defaultPricingPlans.single_account_lifetime },
     },
-    lifetime_upgrade: { purchase_url: '', share_image_url: '', qr_code_url: '', service_fee: copy.publicContent.default_lifetime_upgrade_fee },
+    lifetime_upgrade: { purchase_url: '', share_image_url: '', service_fee: copy.publicContent.default_lifetime_upgrade_fee },
     policy_heading: copy.public.pages_PricingPage_006,
-    disclosures: productPolicies.public_disclosures
-      .filter((line) => line !== copy.publicContent.retired_personal_disclosure)
-      .map((line) => line === copy.publicContent.retired_commercial_disclosure ? copy.publicContent.pricing_transfer_disclosure : line),
+    disclosures: [...productPolicies.public_disclosures],
     comparison_heading: copy.public.pages_PricingPage_007,
     comparison_rows: productPolicies.public_feature_comparison.map((row, index) => ({
       id: `comparison-${index + 1}`,
@@ -442,6 +440,31 @@ export function resolvePublicContentSettings(value: unknown): { content: PublicC
       const current = DEFAULT_PUBLIC_CONTENT_DRAFT.faq.items.find((entry) => entry.id === item.id)
       return previous && current && item.question === previous.question && item.answer === previous.answer && item.action === current.action
         ? { ...item, question: current.question, answer: current.answer } : item
+    })
+  }
+  if (storedDefaultsRevision < 17) {
+    const current = DEFAULT_PUBLIC_CONTENT_DRAFT.pricing.comparison_rows.find((row) => row.feature === copy.publicContent.pricing_comparison_skland)!
+    migratedDraft.pricing.comparison_rows = migratedDraft.pricing.comparison_rows.map((row) => row.feature === current.feature && row.free_preview === copy.publicContent.legacy_free_skland_comparison
+      ? { ...row, free_preview: current.free_preview } : row)
+  }
+  if (storedDefaultsRevision < 18) {
+    const [account, lifetime, review, transfer] = productPolicies.public_disclosures
+    const replacements = new Map<string, string | null>([
+      [copy.publicContent.legacy_pricing_account_rule, account!],
+      [copy.publicContent.legacy_pricing_prepaid_rule, lifetime!],
+      [copy.publicContent.lifetime_existing_rights_disclosure, lifetime!],
+      [copy.publicContent.legacy_pricing_anomaly_rule, review!],
+      [copy.publicContent.legacy_pricing_review_rule, review!],
+      [copy.publicContent.pricing_transfer_disclosure, transfer!],
+      [copy.publicContent.legacy_pricing_unlimited_rule, null],
+    ])
+    const replaced = new Set<string>()
+    migratedDraft.pricing.disclosures = migratedDraft.pricing.disclosures.flatMap((line) => {
+      const next = replacements.get(line)
+      if (next === undefined) return [line]
+      if (next === null || replaced.has(next)) return []
+      replaced.add(next)
+      return [next]
     })
   }
   return {

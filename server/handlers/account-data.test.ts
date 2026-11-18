@@ -139,6 +139,22 @@ describe('account data Skland controls', () => {
     expect(mocks.query.mock.calls.some(([statement]) => String(statement).includes('inventory_admin_audit'))).toBe(false)
   })
 
+  it('exports saved AI explanations and account usage without provider expense or cache identifiers', async () => {
+    const explanation = { profile_id: 'profile-1', result_id: 'result-1', explanation: '我的解读', created_at: '2026-11-17' }
+    const usage = { id: 'attempt-1', quota_period: '2026-11', status: 'succeeded', created_at: '2026-11-17' }
+    mocks.query.mockImplementation(async (statement: string) => ({ rows: statement.includes('from ai_schedule_explanations') ? [explanation]
+      : statement.includes('from ai_schedule_usage') ? [usage] : [] }))
+    const response = await accountDataHandler(new Request('http://localhost/api/user/data/export'))
+    const body = await response.json()
+    expect(body.ai_schedule_explanations).toEqual([explanation])
+    expect(body.ai_schedule_usage).toEqual([usage])
+    for (const [statement, params] of mocks.query.mock.calls.filter(([sql]) => String(sql).includes('from ai_schedule_'))) {
+      expect(statement).toContain('where user_id = $1')
+      expect(statement).not.toMatch(/select \*|cost_micro_cny|cache_key/)
+      expect(params).toEqual(['user-1'])
+    }
+  })
+
   it('exports public notifications without internal source or grant identifiers', async () => {
     mocks.exportUserNotifications.mockResolvedValue([{ id: 'notification-1', type: 'item_grant' }])
     const response = await accountDataHandler(new Request('http://localhost/api/user/data/export'))

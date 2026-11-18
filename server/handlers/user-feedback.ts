@@ -4,7 +4,7 @@ import { requestSchemas } from '../security/request-policy'
 import { hasImageSignature } from '../security/image-upload'
 import { getValidatedJson, RequestInputError, validateAndStoreJsonBody } from '../security/request-validation'
 import { reservePersistentRateLimit } from '../security/persistent-rate-limit'
-import { createFeedback, updateFeedback, FeedbackError } from '../storage/feedback-store'
+import { createFeedback, createOptimizationFailureFeedback, updateFeedback, FeedbackError } from '../storage/feedback-store'
 import { readFeedback } from './feedback-read'
 import { AdminPaginationError } from './admin-pagination'
 import { jsonResponse, requireUserSession } from './user-auth'
@@ -26,9 +26,14 @@ export default async function userFeedbackHandler(req: Request): Promise<Respons
     }
     await validateAndStoreJsonBody(req, requestSchemas.userFeedback, 'feedback')
     const body = await getValidatedJson(req, requestSchemas.userFeedback, true)
-    const image = decodeImage(body.image)
+    const image = 'failed_job_id' in body ? null : decodeImage(body.image)
     const decision = await reservePersistentRateLimit('user-feedback', auth.user.id, 10, 60 * 60 * 1000)
     if (!decision.allowed) return jsonResponse({ error: text.tooFrequent }, 429, { 'Cache-Control': 'no-store', 'Retry-After': String(decision.retryAfterSeconds) })
+    if ('failed_job_id' in body) {
+      const result = await createOptimizationFailureFeedback(auth.user.id, body.failed_job_id)
+      if (result.created) decision.attempt.retain()
+      return respond({ id: result.id }, result.created ? 201 : 200)
+    }
     const id = await createFeedback(auth.user.id, body, image)
     decision.attempt.retain()
     return respond({ id }, 201)

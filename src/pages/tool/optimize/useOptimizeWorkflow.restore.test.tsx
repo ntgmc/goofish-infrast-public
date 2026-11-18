@@ -82,7 +82,7 @@ it.each(['cancelled', 'failed'] as const)('locks configuration while restoring p
     expect(result.current.progress).toMatchObject({ jobId: job.job_id, estimatePhase: status })
     expect(result.current.inlineError).toBeNull()
   } else {
-    expect(result.current.inlineError).toMatchObject({ scope: 'generate' })
+    expect(result.current.inlineError).toMatchObject({ scope: 'generate', jobId: job.job_id })
   }
   act(() => result.current.updateConfig((draft) => { draft.schedule_mode = 'rotation' }))
   expect(props.setConfigOverride).toHaveBeenCalledOnce()

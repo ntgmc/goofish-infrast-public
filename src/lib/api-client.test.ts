@@ -4,6 +4,7 @@ import {
   ApiError,
   apiJson,
   apiJsonOrNull,
+  apiStream,
   getApiErrorCode,
   getApiRequestId,
   getApiRetryAfterSeconds,
@@ -90,6 +91,28 @@ describe('API client boundary', () => {
     expect(cancel).toHaveBeenCalledTimes(1)
     await vi.advanceTimersByTimeAsync(0)
     expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('keeps the request deadline active while consuming a streamed body and cleans up on timeout', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('fetch', vi.fn(async (_url, init) => new Response(new ReadableStream({ start(controller) {
+      init.signal.addEventListener('abort', () => controller.error(init.signal.reason), { once: true })
+    } }), { headers: { 'Content-Type': 'text/event-stream' } })))
+    const result = apiStream('/api/user/schedule-explanation', { method: 'POST', timeoutMs: 25 }, (response) => response.text())
+    const checked = expect(result).rejects.toMatchObject({ code: 'request_timeout' })
+    await vi.advanceTimersByTimeAsync(25)
+    await checked
+    expect(vi.getTimerCount()).toBe(0)
+    expect(apiEvents()).toEqual([expect.objectContaining({ outcome: 'timeout' })])
+  })
+
+  it('cancels unread streamed content and preserves safe API errors from the consumer', async () => {
+    const cancel = vi.fn()
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(new ReadableStream({ cancel }), { headers: { 'Content-Type': 'text/event-stream' } })))
+    await expect(apiStream('/api/user/schedule-explanation', { method: 'POST' }, async () => {
+      throw new ApiError('未扣除次数。', 502, { code: 'ai_generation_failed' }, '/api/user/schedule-explanation')
+    })).rejects.toMatchObject({ message: '未扣除次数。', code: 'ai_generation_failed' })
+    expect(cancel).toHaveBeenCalledOnce()
   })
 
   it('cleans up the deadline and caller listener if request serialization fails', async () => {

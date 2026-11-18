@@ -6,15 +6,16 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 const DialogSurfaceContext = React.createContext<string | undefined>(undefined)
+const DialogModalContext = React.createContext(true)
 const DialogSurfaceProvider = DialogSurfaceContext.Provider
 
 function Dialog({
   modal = true,
   ...props
 }: Omit<React.ComponentProps<typeof DialogPrimitive.Root>, 'modal'> & {
-  modal?: true
+  modal?: boolean
 }) {
-  return <DialogPrimitive.Root data-slot="dialog" modal={modal} {...props} />
+  return <DialogModalContext.Provider value={modal}><DialogPrimitive.Root data-slot="dialog" modal={modal} {...props} /></DialogModalContext.Provider>
 }
 
 function DialogPortal({
@@ -46,6 +47,7 @@ function DialogOverlay({
 }
 
 type DialogContentProps = React.ComponentProps<typeof DialogPrimitive.Content> & {
+  portalContainer?: React.ComponentProps<typeof DialogPrimitive.Portal>['container']
   preventOutsideDismiss?: boolean
 } &
   (
@@ -62,16 +64,18 @@ function DialogContent({
   onCloseAutoFocus,
   onPointerDownOutside,
   preventOutsideDismiss = false,
+  portalContainer,
   ...props
 }: DialogContentProps) {
   const surfaceClassName = React.useContext(DialogSurfaceContext)
+  const modal = React.useContext(DialogModalContext)
   const opener = React.useRef<HTMLElement | null>(null)
   return (
-    <DialogPortal>
-      <DialogOverlay />
+    <DialogPortal container={portalContainer}>
+      {modal && <DialogOverlay />}
       <DialogPrimitive.Content
         data-slot="dialog-content"
-        aria-modal="true"
+        aria-modal={modal || undefined}
         onPointerDownOutside={(event) => {
           onPointerDownOutside?.(event)
           if (preventOutsideDismiss) event.preventDefault()

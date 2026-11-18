@@ -31,6 +31,7 @@ import {
   type UserGameAccountRecord,
 } from '../storage/user-store'
 import { isLifetimeVoucherUpgradeableProfile } from './lifetime-voucher-profile-policy'
+import { DEFAULT_PROFILE_DISPLAY_NAME, getUpgradedProfileMetadata } from '../profile-default-metadata'
 import { commitReservedItemsInTransaction, getItemBalance, grantFreePreviewLimitedVoucher, InventoryError, markOnboardingTaskComplete, reserveItemsInTransaction } from '../storage/inventory-store'
 import { hasDatabaseUrl, query, withTransaction } from '../storage/postgres'
 import { createLifetimeVoucherProfileAuthorizationInTransaction, saveProfileInTransaction } from '../storage/cdk-redemption'
@@ -1080,6 +1081,7 @@ async function confirmLifetimeVoucherBinding(
     }
     const nextProfile: UserGameAccountRecord = {
       ...baseProfile,
+      ...(existingProfile ? getUpgradedProfileMetadata(existingProfile) : {}),
       kind: 'cdk', cdk_key: authorization.cdkKey, cdk_code_hash: authorization.codeHash,
       cdk_order_hash: authorization.orderHash, permission: 'advanced', status: 'active', temporary_permission: null,
       skland_binding: {
@@ -1338,8 +1340,8 @@ async function confirmFreePreviewClaim(
     cdk_order_hash: null,
     permission: 'growth',
     status: 'active',
-    display_name: pending.display_name || '免费个人排班',
-    note: pending.note || '已绑定森空岛的免费个人排班档案。',
+    display_name: pending.display_name || DEFAULT_PROFILE_DISPLAY_NAME,
+    note: pending.note,
     skland_binding: null,
     skland_pending_binding: null,
     skland_risk: null,

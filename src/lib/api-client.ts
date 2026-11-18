@@ -83,6 +83,22 @@ export async function apiJson<T>(url: string, init: ApiRequestInit = {}): Promis
   }
 }
 
+export async function apiStream<T>(url: string, init: ApiRequestInit, consume: (response: Response) => Promise<T>): Promise<T> {
+  const pending = await request(url, init)
+  try {
+    const result = await consume(pending.response)
+    pending.completeSuccess()
+    return result
+  } catch (error) {
+    const normalized = pending.normalizeError(error)
+    pending.completeFailure(normalized)
+    throw normalized
+  } finally {
+    await pending.response.body?.cancel().catch(() => undefined)
+    pending.cleanup()
+  }
+}
+
 export async function apiJsonOrNull<T>(url: string, init: ApiRequestInit = {}): Promise<T | null> {
   const pending = await request(url, init)
   try {

@@ -1,18 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { getQueueSnapshot, isServiceReady, getHistory, listIncidents, autoscalingConfig, ensureSklandConfiguration } = vi.hoisted(() => ({
+const { getQueueSnapshot, isServiceReady, getHistory, listIncidents, autoscalingConfig, ensureSklandConfiguration, connectorReady } = vi.hoisted(() => ({
   getQueueSnapshot: vi.fn(),
   isServiceReady: vi.fn(),
   getHistory: vi.fn(),
   listIncidents: vi.fn(),
   autoscalingConfig: vi.fn(),
   ensureSklandConfiguration: vi.fn(),
+  connectorReady: vi.fn(),
 }))
 
 vi.mock('../storage/optimize-job-store', () => ({ getAdminOptimizationQueueSnapshot: getQueueSnapshot }))
 vi.mock('../storage/service-status-store', () => ({ getServiceStatusHistory: getHistory, listPublicServiceStatusIncidents: listIncidents }))
 vi.mock('../lifecycle', () => ({ isServiceReady }))
 vi.mock('../skland-config', () => ({ ensureSklandServiceConfiguration: ensureSklandConfiguration }))
+vi.mock('../skland-transport', () => ({ isSklandConnectorReady: connectorReady }))
 vi.mock('../optimize-job-config', () => ({
   getOptimizeStatusQueuePickupGraceMs: () => 5_000,
   getOptimizeWorkerAutoscalingConfiguration: autoscalingConfig,
@@ -25,6 +27,7 @@ describe('service status handler', () => {
     vi.clearAllMocks()
     isServiceReady.mockReturnValue(true)
     ensureSklandConfiguration.mockReturnValue(undefined)
+    connectorReady.mockResolvedValue(true)
     autoscalingConfig.mockReturnValue({ enabled: false, scaleUpQueueThreshold: 4, scaleDownQueueThreshold: 1, scaleDownIdleMs: 600000, intervalMs: 30000 })
     getQueueSnapshot.mockResolvedValue(snapshot({ queued: 0, running: 1, workerConcurrency: 3, workerInstances: 1 }))
     getHistory.mockResolvedValue({ from: '2026-07-09T09:00:00.000Z', to: '2026-08-08T09:00:00.000Z', buckets: [{ component_id: 'optimization', bucket_start: '2026-08-08T08:00:00.000Z', status: 'available', sample_count: 12, availability_percent: 100 }] })
@@ -126,6 +129,25 @@ describe('service status handler', () => {
       { id: 'optimization', status: 'available' },
       { id: 'skland_import', status: 'unavailable' },
     ] })
+  })
+
+  it('reports an unreachable connector independently of optimization capacity', async () => {
+    connectorReady.mockResolvedValue(false)
+    const response = await serviceStatusHandler(new Request('http://localhost/api/status'))
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({ components: [
+      { id: 'optimization', status: 'available' },
+      { id: 'skland_import', status: 'unavailable' },
+    ] })
+  })
+
+  it('does not probe the connector before configuration and local readiness pass', async () => {
+    ensureSklandConfiguration.mockImplementation(() => { throw new Error('invalid configuration') })
+    await serviceStatusHandler(new Request('http://localhost/api/status'))
+    expect(connectorReady).not.toHaveBeenCalled()
+    isServiceReady.mockReturnValue(false)
+    await serviceStatusHandler(new Request('http://localhost/api/status'))
+    expect(connectorReady).not.toHaveBeenCalled()
   })
 
   it('does not expose storage errors', async () => {
