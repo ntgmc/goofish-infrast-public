@@ -164,7 +164,7 @@ function ExplanationWindow({ children, sample = false, busy = false }: { childre
   }
   return createPortal(<Dialog modal={false} open={open} onOpenChange={setOpen}>
     <div ref={setContainer} className="v2-dialog v2-explanation-float" style={position ?? undefined} data-dragging={dragging || undefined}>
-      <DialogContent ref={panel} portalContainer={container} id={id} className="v2-dialog v2-explanation-window" aria-describedby={undefined}
+      <DialogContent unstyled ref={panel} portalContainer={container} id={id} className="v2-dialog v2-explanation-window" aria-describedby={undefined}
         onOpenAutoFocus={(event) => { event.preventDefault(); panel.current?.focus({ preventScroll: true }) }}
         onInteractOutside={(event) => event.preventDefault()}
         onCloseAutoFocus={(event) => { event.preventDefault(); trigger.current?.focus({ preventScroll: true }) }}>

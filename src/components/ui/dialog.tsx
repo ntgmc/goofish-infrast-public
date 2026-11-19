@@ -49,6 +49,7 @@ function DialogOverlay({
 type DialogContentProps = React.ComponentProps<typeof DialogPrimitive.Content> & {
   portalContainer?: React.ComponentProps<typeof DialogPrimitive.Portal>['container']
   preventOutsideDismiss?: boolean
+  unstyled?: boolean
 } &
   (
     | { showCloseButton?: false; closeLabel?: never }
@@ -64,6 +65,7 @@ function DialogContent({
   onCloseAutoFocus,
   onPointerDownOutside,
   preventOutsideDismiss = false,
+  unstyled = false,
   portalContainer,
   ...props
 }: DialogContentProps) {
@@ -93,7 +95,7 @@ function DialogContent({
           }
         }}
         className={cn(
-          'fixed top-1/2 left-1/2 z-50 grid max-h-[85dvh] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-xl border border-surface-3 bg-surface-1 p-5 text-sm text-ink-primary shadow-2xl outline-none duration-[var(--motion-enter)] ease-[var(--motion-ease-enter)] sm:p-6 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-98 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-98 data-[state=closed]:duration-[var(--motion-exit)] data-[state=closed]:ease-[var(--motion-ease-exit)] motion-reduce:animate-none!',
+          !unstyled && 'fixed top-1/2 left-1/2 z-50 grid max-h-[85dvh] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-xl border border-surface-3 bg-surface-1 p-5 text-sm text-ink-primary shadow-2xl outline-none duration-[var(--motion-enter)] ease-[var(--motion-ease-enter)] sm:p-6 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-98 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-98 data-[state=closed]:duration-[var(--motion-exit)] data-[state=closed]:ease-[var(--motion-ease-exit)] motion-reduce:animate-none!',
           className,
           surfaceClassName,
         )}
