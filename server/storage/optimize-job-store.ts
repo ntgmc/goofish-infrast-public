@@ -823,21 +823,20 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
     heartbeatAttempt: async (id, attemptNo, workerId, lockToken, lockExpiresAt) => {
       await ensureSchema()
       const now = new Date().toISOString()
-      return withTransaction(async (client) => {
-        const owned = await client.query(
-          `update optimize_jobs set heartbeat_at = $6, lock_expires_at = $5, updated_at = $6
+      const owned = await query(
+        `with owned_job as (
+           update optimize_jobs set heartbeat_at = $6, lock_expires_at = $5, updated_at = $6
            where id = $1 and attempt_count = $2 and worker_id = $3 and lock_token = $4 and status = 'running' and cancel_requested_at is null
-           returning id`,
-          [id, attemptNo, workerId, lockToken, lockExpiresAt, now],
-        )
-        if (!owned.rowCount) return false
-        await client.query(
-          `update optimize_job_attempts set heartbeat_at = $5
-           where job_id = $1 and attempt_no = $2 and worker_id = $3 and lock_token = $4 and status = 'running'`,
-          [id, attemptNo, workerId, lockToken, now],
-        )
-        return true
-      })
+           returning id
+         ), attempt_heartbeat as (
+           update optimize_job_attempts set heartbeat_at = $6
+           where job_id in (select id from owned_job)
+             and attempt_no = $2 and worker_id = $3 and lock_token = $4 and status = 'running'
+         )
+         select id from owned_job`,
+        [id, attemptNo, workerId, lockToken, lockExpiresAt, now],
+      )
+      return Boolean(owned.rowCount)
     },
     ownsAttempt: async (id, attemptNo, workerId, lockToken) => {
       await ensureSchema()
