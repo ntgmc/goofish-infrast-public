@@ -1,8 +1,10 @@
 import { useCallback, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { copy } from '../../../copy'
 import { AI_PROTOCOLS, adminAiSettingsUpdateSchema, aiConfigurationIssues, aiSettingsSchema, type AdminAiSettings, type AiSettings } from '../../../lib/ai-settings'
 import { adminApiJson } from '../../../lib/admin-api-client'
 import { useAdminDraftQuery } from '../../../lib/admin-draft-query'
+import { SITE_FEATURE_QUERY_KEY } from '../../../lib/site-feature-context'
 import { ApiError } from '../../../lib/api-client'
 import { SectionLoader } from '../../../components/SessionLoader'
 import { AdminToast } from '../shared/AdminToast'
@@ -29,6 +31,7 @@ export default function AiSettingsSection() {
   const apply = useCallback((value: AdminAiSettings) => {
     setData(value); setApiKey(''); setClearKey(false); setReason(''); setDirty(false); setIssues({}); setError(null)
   }, [])
+  const client = useQueryClient()
   const query = useAdminDraftQuery('ai', '/api/admin/ai-settings', apply)
   const change = (path: string) => {
     setDirty(true); setNotice(null); setIssues((current) => { const next = { ...current }; delete next[path]; return next })
@@ -58,6 +61,7 @@ export default function AiSettingsSection() {
       const saved = await adminApiJson<AdminAiSettings>('/api/admin/ai-settings', { method: 'PUT', json: parsed.data, fallbackMessage: text.save_failed })
       await query.write(saved)
       apply(saved)
+      void client.invalidateQueries({ queryKey: SITE_FEATURE_QUERY_KEY, exact: true })
       setNotice(text.saved)
     } catch (cause) {
       fail(cause instanceof ApiError && cause.status === 409 ? text.conflict : cause instanceof Error ? cause.message : text.save_failed)

@@ -14,6 +14,7 @@ import { formatShanghaiDateTime } from '../../tool/tool-utils'
 import type { V2Session } from '../OptionsDrawer'
 import { EmptyState, Facts, Field, Notice } from '../components/WorkspaceUI'
 import { V2SectionLoading } from '../V2LoadingScreen'
+import PageHelp from './PageHelp'
 
 const text = copy.inventory
 type InventoryModel = ReturnType<typeof useInventory>
@@ -27,7 +28,9 @@ export default function Inventory({ session, onProfiles }: { session: V2Session;
   const reveal = useListReveal(!model.loading && !model.search.trim())
   if (model.loading && !model.inventory) return <V2SectionLoading label={text.loading} />
   return <div ref={reveal} className="v2-inventory-workspace">
-    <div className="v2-inventory-overview"><Package size={32} aria-hidden="true" /><div><h2>{text.title}</h2><p>{text.description}</p></div><strong>{model.inventory?.stacks.length ?? 0}<small>{copy.v2.inventoryItems}</small></strong></div>
+    <div className="v2-inventory-overview"><Package size={24} aria-hidden="true" /><div><p>{text.description}</p></div><strong>{model.inventory?.stacks.length ?? 0}<small>{copy.v2.inventoryItems}</small></strong>
+      <PageHelp key={session.activeProfile?.id ?? session.user?.id} page="inventory" profileId={session.activeProfile?.id} couponBalance={model.inventory?.stacks.reduce((sum, stack) => sum + (stack.item.code === 'maa_export_trial_coupon' ? stack.quantity : 0), 0)} />
+    </div>
     <Notice error>{model.error}{model.error && <button className="v2-text-button" onClick={() => void model.load()}>{copy.v2.retry}</button>}</Notice>
     <Notice>{model.notice?.message}{model.notice?.action === 'profiles' && <button className="v2-text-button" onClick={onProfiles}>{text.view_profiles}<ArrowRight size={16} /></button>}</Notice>
     <nav className="v2-view-switch" aria-label={text.title}><button aria-pressed={view === 'items'} onClick={() => setView('items')}>{copy.v2.inventoryItems}</button>{tasks.length > 0 && <button aria-pressed={view === 'tasks'} onClick={() => setView('tasks')}>{text.tasks}<span>{tasks.filter((task) => task.status === 'claimable').length}</span></button>}{features.qqbot && <button aria-pressed={view === 'qq-groups'} onClick={() => setView('qq-groups')}>{copy.notifications.qqbotActivities.title}</button>}<button aria-pressed={view === 'activity'} onClick={() => setView('activity')}>{copy.v2.inventoryActivity}</button></nav>

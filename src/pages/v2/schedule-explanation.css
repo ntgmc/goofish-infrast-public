@@ -80,12 +80,6 @@
 }
 .v2-explanation-dot { position: absolute; top: 0; right: 0; width: 8px; height: 8px; border: 2px solid var(--explanation-surface); border-radius: 50%; background: var(--v2-accent); }
 .v2-explanation-window {
-  position: relative;
-  inset: auto;
-  translate: none;
-  transform: none;
-  animation: none;
-  transition: none;
   order: -1;
   flex: 0 1 auto;
   min-height: 0;

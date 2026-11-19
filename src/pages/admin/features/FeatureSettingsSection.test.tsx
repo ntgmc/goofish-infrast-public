@@ -31,12 +31,48 @@ describe('FeatureSettingsSection', () => {
     render(<FeatureSettingsSection />)
     await user.click(await screen.findByRole('tab', { name: '公开工具' }))
     const tools = screen.getByRole('checkbox', { name: /公开工具中心/ })
-    const depot = screen.getByRole('checkbox', { name: /基建价值分析/ })
+    const depot = screen.getByRole('combobox', { name: '基建价值分析' })
     expect(tools).toBeChecked()
-    expect(depot).toBeChecked()
+    expect(depot).toHaveValue('open')
     await user.click(tools)
-    expect(depot).toBeChecked()
+    expect(depot).toHaveValue('open')
     expect(screen.getAllByText(/上级功能关闭/).length).toBeGreaterThan(0)
+  })
+
+  it('saves the assistant and paused-avatar switches independently', async () => {
+    const user = userEvent.setup()
+    render(<FeatureSettingsSection />)
+    await user.click(await screen.findByRole('tab', { name: '工作台助手' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: '按目标比较方案' }), 'open')
+    await user.click(screen.getByRole('checkbox', { name: /^暂停生成时保留排班解读头像/ }))
+    await user.click(screen.getByRole('checkbox', { name: /^当前页面使用助手/ }))
+    await user.click(screen.getByRole('button', { name: '保存功能开关' }))
+    await waitFor(() => expect(adminApiJson).toHaveBeenLastCalledWith('/api/admin/feature-settings', expect.objectContaining({
+      json: { expected_revision: 2, features: expect.objectContaining({
+        ai_schedule_explanation: false, schedule_explanation_avatar: false, ai_goal_comparison: true,
+        ai_cultivation_advisor: false, workspace_page_help: false, ai_change_summary: false,
+      }) },
+    })))
+  })
+
+  it('requires a public pause reason and saves pause and hidden states separately', async () => {
+    const user = userEvent.setup()
+    render(<FeatureSettingsSection />)
+    await user.click(await screen.findByRole('tab', { name: '公开工具' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: '养成项目' }), 'paused')
+    await user.selectOptions(screen.getByRole('combobox', { name: '比较已有排班' }), 'hidden')
+    const reason = screen.getByRole('textbox', { name: '养成项目的暂停说明' })
+    const save = screen.getByRole('button', { name: '保存功能开关' })
+    await user.click(save)
+    expect(screen.getByRole('alert')).toHaveTextContent('请填写暂停说明后再保存。')
+    await waitFor(() => expect(reason).toHaveFocus())
+    expect(adminApiJson).toHaveBeenCalledTimes(1)
+    await user.type(reason, '正在更新数据，请稍后再来。')
+    await user.click(save)
+    expect(adminApiJson).toHaveBeenLastCalledWith('/api/admin/feature-settings', expect.objectContaining({
+      json: expect.objectContaining({ features: expect.objectContaining({ cultivation_projects: false, schedule_comparison: false }),
+        pause_notices: { cultivation_projects: '正在更新数据，请稍后再来。' } }),
+    }))
   })
 
   it('disables editing until a pending save settles', async () => {
@@ -95,8 +131,8 @@ describe('FeatureSettingsSection', () => {
     } })
     render(<FeatureSettingsSection />)
     await user.click(await screen.findByRole('tab', { name: '公开工具' }))
-    const manual = screen.getByRole('checkbox', { name: /手动排班与模拟/ })
-    expect(manual).toBeChecked()
+    const manual = screen.getByRole('combobox', { name: '手动排班与模拟' })
+    expect(manual).toHaveValue('open')
     expect(screen.getByRole('checkbox', { name: /公开工具中心/ })).not.toBeChecked()
     await user.click(screen.getByRole('tab', { name: '排班' }))
     expect(screen.getByRole('checkbox', { name: /一天一换/ })).not.toBeChecked()

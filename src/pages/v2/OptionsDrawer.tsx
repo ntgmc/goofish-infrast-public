@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import ConfigCapabilityPreview from '../../components/ConfigCapabilityPreview'
+import GuestAccountLink from '../../components/GuestAccountLink'
 import type { ConfigDiffItem } from '../../lib/workspace-history'
 import { BalanceIcon, BillingIcon, InventoryIcon, LoadingIcon, NextIcon as ArrowRight, SelectedIcon as Check, SettingsIcon, LogoutIcon as LogOut, AccountIcon as UserRound, SuccessIcon } from '../../components/icons'
 import SklandIcon from '../../components/SklandIcon'
@@ -13,7 +14,7 @@ import { useSiteFeatures } from '../../lib/site-feature-context'
 import { METERED_BILLING_AVAILABLE } from '../../lib/site-features'
 import type { LicenseConfig, LicenseOperator, PermissionMode } from '../../lib/types'
 import type { useToolSession } from '../tool/useToolSession'
-import { getProfileAccessLabel, isFreePreviewProfile } from '../tool/tool-utils'
+import { getProfileAccessLabel, hasFreePreviewAccess } from '../tool/tool-utils'
 import ConfigSaveStatus from '../tool/workspace/ConfigSaveStatus'
 import V2Transition from './V2Transition'
 import OperatorManagementPanel from './OperatorManagementPanel'
@@ -74,7 +75,7 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
 
   return (
     <Dialog open={panel !== null} onOpenChange={(open) => { if (!open) onClose() }}>
-      <DialogContent className={`v2-drawer ${isConfig ? 'v2-drawer-wide' : shownPanel === 'operators' ? 'v2-management-drawer v2-operators-drawer' : isAccount ? 'v2-management-drawer v2-account-drawer' : ''}`} showCloseButton closeLabel={text.close}
+      <DialogContent className={`v2-drawer ${isConfig ? 'v2-drawer-wide v2-config-drawer' : shownPanel === 'operators' ? 'v2-management-drawer v2-operators-drawer' : isAccount ? 'v2-management-drawer v2-account-drawer' : ''}`} showCloseButton closeLabel={text.close}
         onOpenAutoFocus={() => { opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null }}
         onCloseAutoFocus={(event) => { event.preventDefault(); setLastPanel(null); if (opener.current?.isConnected) opener.current.focus({ preventScroll: true }) }}>
         <div className="v2-drawer-heading">
@@ -90,9 +91,9 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
         {isConfig && (
           <>
             <ConfigCapabilityPreview config={config} enabled={!canEditConfig}>
-            <ConfigEditor showOrundumPreference profileId={session.activeProfile?.id} config={config} canEdit={canEditConfig} readOnly={configReadOnly} canEditIntermediateInventory={canUseIntermediateConfig}
-              canSelectPreset={canUseIntermediateConfig} canEditFixedShiftHours={canEditConfig || Boolean(session.activeProfile && isFreePreviewProfile(session.activeProfile))} permission={permission}
-              note={session.activeProfile && isFreePreviewProfile(session.activeProfile) && !canEditConfig
+            <ConfigEditor guideSklandImport showOrundumPreference profileId={session.activeProfile?.id} config={config} canEdit={canEditConfig} readOnly={configReadOnly} canEditIntermediateInventory={canUseIntermediateConfig}
+              canSelectPreset={canUseIntermediateConfig} canEditFixedShiftHours={canEditConfig || Boolean(session.activeProfile && hasFreePreviewAccess(session.activeProfile))} permission={permission}
+              note={session.activeProfile && hasFreePreviewAccess(session.activeProfile) && !canEditConfig
                 ? `${copy.common.components_ConfigEditor_024}${getProfileAccessLabel(session.activeProfile)}${copy.common.components_ConfigEditor_025}`
                 : undefined}
               validation={validation} onUpdate={onUpdateConfig} embedded hideHeader hideValidation />
@@ -141,8 +142,7 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
                 </section>}
               </>
             ) : (
-              <div className="v2-empty-state"><UserRound size={30} /><p>{text.signInRequired}</p>
-                <button type="button" className="v2-button v2-button-primary" onClick={onAccount}>{text.login}</button></div>
+              <GuestAccountLink label={text.login} />
             )}
           </div>
         )}

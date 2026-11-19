@@ -3,7 +3,7 @@ import { copy } from '../copy/index'
 import { getSku, productPolicies } from './product-catalog'
 
 export const PUBLIC_CONTENT_VERSION = 1 as const
-export const PUBLIC_CONTENT_DEFAULTS_REVISION = 18 as const
+export const PUBLIC_CONTENT_DEFAULTS_REVISION = 19 as const
 export const PUBLIC_PRICING_PLAN_IDS = [
   'free_preview',
   'single_account_monthly',
@@ -466,6 +466,14 @@ export function resolvePublicContentSettings(value: unknown): { content: PublicC
       replaced.add(next)
       return [next]
     })
+  }
+  if (storedDefaultsRevision < 19) {
+    const rows = migratedDraft.pricing.comparison_rows
+    const archive = DEFAULT_PUBLIC_CONTENT_DRAFT.pricing.comparison_rows.find((row) => row.feature === copy.public.pricing_cards.archive_comparison)!
+    if (rows.length < PUBLIC_CONTENT_LIMITS.pricingComparisonRows
+      && !rows.some((row) => row.feature === archive.feature || row.id === archive.id)) {
+      rows.push({ ...archive })
+    }
   }
   return {
     content: {

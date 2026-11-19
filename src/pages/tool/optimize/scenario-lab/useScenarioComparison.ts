@@ -19,6 +19,7 @@ import { fetchOptimizeJobSnapshotStatus, isOptimizeJobPollCancelled, isRetryable
 import { cancelOptimizationJob, OPTIMIZE_SUBMIT_TIMEOUT_MS } from '../optimization-api'
 import { publishOptimizationJobUpdate, subscribeOptimizationJobUpdates, withOptimizationSubmissionLock } from '../optimization-job-events'
 import { z } from 'zod'
+import { comparisonGoalSchema, type ComparisonGoal } from '../../../../lib/workspace-assistant'
 
 
 const RESTORE_SCENARIO_EVENT = 'maa:scenario-lab:restore'
@@ -40,6 +41,7 @@ interface StoredScenarioSession {
   factors: ScenarioComparisonFactors;
   activeJobId?: string;
   result?: ScenarioComparisonResult;
+  goal?: ComparisonGoal;
   pendingSubmission?: { requestJson: string; idempotencyKey: string };
 }
 
@@ -47,6 +49,7 @@ const storedScenarioSessionSchema: z.ZodType<StoredScenarioSession> = z.strictOb
   factors: scenarioComparisonFactorsSchema,
   activeJobId: z.string().min(1).max(256).optional(),
   result: scenarioComparisonResultSchema.optional(),
+  goal: comparisonGoalSchema.optional(),
   pendingSubmission: z.strictObject({
     requestJson: z.string().min(1).max(512 * 1024),
     idempotencyKey: z.string().min(1).max(200),
@@ -58,15 +61,18 @@ export function useScenarioComparison({
   operators,
   config,
   onSettled,
+  allowDisabledDrones = false,
 }: {
   profileId: string;
   operators: LicenseOperator[];
   config: LicenseConfig;
   onSettled?: () => void | Promise<void>;
+  allowDisabledDrones?: boolean;
 }) {
-  const initial = useMemo(() => readSession(profileId), [profileId])
+  const initial = useMemo(() => readSession(profileId, allowDisabledDrones), [profileId, allowDisabledDrones])
   const [factors, setFactorsState] = useState<ScenarioComparisonFactors>(initial?.factors ?? DEFAULT_FACTORS)
   const [result, setResult] = useState<ScenarioComparisonResult | null>(initial?.result ?? null)
+  const [resultGoal, setResultGoal] = useState(initial?.result ? initial.goal : undefined)
   const [job, setJob] = useState<ScenarioComparisonJobSnapshot | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(Boolean(initial?.activeJobId))
@@ -77,13 +83,14 @@ export function useScenarioComparison({
 
   const setFactors = useCallback((next: ScenarioComparisonFactors) => {
     setFactorsState(next)
-    writeSession(profileId, { factors: next, ...(result ? { result } : {}) })
-  }, [profileId, result])
+    writeSession(profileId, { factors: next, ...(result ? { result, goal: resultGoal } : {}) })
+  }, [profileId, result, resultGoal])
 
   const pollJob = useCallback(async (
     jobId: string,
     runId: number,
     sessionFactors: ScenarioComparisonFactors,
+    goal?: ComparisonGoal,
   ) => {
     let failures = 0
     let terminalRefreshRequested = false
@@ -118,8 +125,9 @@ export function useScenarioComparison({
           setJob(snapshot)
           publishOptimizationJobUpdate(profileId, snapshot)
           if (snapshot.status === 'succeeded') {
+            setResultGoal(goal)
             setResult(snapshot.result)
-            writeSession(profileId, { factors: sessionFactors, result: snapshot.result })
+            writeSession(profileId, { factors: sessionFactors, result: snapshot.result, goal })
             await settleInventory(onSettled, setError)
             if (pollRunRef.current === runId) setLoading(false)
             return
@@ -170,7 +178,7 @@ export function useScenarioComparison({
     pollJobRef.current = pollJob
   }, [pollJob])
 
-  const run = useCallback(async (useCoupon = false, billingQuote: IssuedMeteredScheduleQuote | null = null) => {
+  const run = useCallback(async (useCoupon = false, billingQuote: IssuedMeteredScheduleQuote | null = null, goal?: ComparisonGoal) => {
     const runId = ++pollRunRef.current
     setError(null)
     setLoading(true)
@@ -190,7 +198,7 @@ export function useScenarioComparison({
       }),
     }
     const requestJson = JSON.stringify(request)
-    const previousPending = readSession(profileId)?.pendingSubmission
+    const previousPending = readSession(profileId, allowDisabledDrones)?.pendingSubmission
     const pendingSubmission = previousPending?.requestJson === requestJson
       ? previousPending
       : { requestJson, idempotencyKey: crypto.randomUUID() }
@@ -206,11 +214,11 @@ export function useScenarioComparison({
         })
       ))
       const nextJob = response.job
-      writeSession(profileId, { factors, activeJobId: nextJob.id })
+      writeSession(profileId, { factors, activeJobId: nextJob.id, goal })
       if (pollRunRef.current !== runId) return
       setJob(nextJob)
       publishOptimizationJobUpdate(profileId, nextJob)
-      await pollJob(nextJob.id, runId, factors)
+      await pollJob(nextJob.id, runId, factors, goal)
     } catch (caught) {
       if (isOptimizeJobPollCancelled(caught) || pollRunRef.current !== runId) return
       setError(caught instanceof Error ? caught.message : copy.optimize.pages_tool_optimize_scenario_lab_useScenarioComparison_004)
@@ -218,7 +226,7 @@ export function useScenarioComparison({
       await settleInventory(onSettled, setError)
       if (pollRunRef.current === runId) setLoading(false)
     }
-  }, [config, factors, onSettled, operators, pollJob, profileId])
+  }, [allowDisabledDrones, config, factors, onSettled, operators, pollJob, profileId])
 
   const cancel = useCallback(async () => {
     if (!job?.canCancel || cancelling) return
@@ -237,18 +245,19 @@ export function useScenarioComparison({
 
   useEffect(() => {
     const restore = (jobId?: string) => {
-      const restored = readSession(profileId)
+      const restored = readSession(profileId, allowDisabledDrones)
       const restoredFactors = restored?.factors ?? DEFAULT_FACTORS
       const activeJobId = jobId ?? restored?.activeJobId
       setFactorsState(restoredFactors)
       setResult(restored?.result ?? null)
+      setResultGoal(restored?.result ? restored.goal : undefined)
       setError(null)
       setJob(null)
       setLoading(Boolean(activeJobId))
       setConnectionStatus('connected')
       setConsecutivePollFailures(0)
       const runId = ++pollRunRef.current
-      if (activeJobId) void pollJobRef.current(activeJobId, runId, restoredFactors)
+      if (activeJobId) void pollJobRef.current(activeJobId, runId, restoredFactors, restored?.activeJobId === activeJobId ? restored?.goal : undefined)
     }
     const onRestore = (event: Event) => {
       const detail = (event as CustomEvent<{ profileId: string; jobId: string }>).detail
@@ -260,7 +269,7 @@ export function useScenarioComparison({
       pollRunRef.current += 1
       window.removeEventListener(RESTORE_SCENARIO_EVENT, onRestore)
     }
-  }, [profileId])
+  }, [profileId, allowDisabledDrones])
 
   const progress = useMemo<ScheduleProgressState | null>(() => job && (loading || job.status === 'cancelled') ? {
     mode: 'scenario',
@@ -284,15 +293,15 @@ export function useScenarioComparison({
     cancellationRequested: job.cancellationRequested,
   } : null, [connectionStatus, consecutivePollFailures, job, loading])
 
-  return { factors, setFactors, result, job, error, loading, cancelling, canCancel: Boolean(job?.canCancel), progress, run, cancel }
+  return { factors, setFactors, result, resultGoal, job, error, loading, cancelling, canCancel: Boolean(job?.canCancel), progress, run, cancel }
 }
 
 function sessionKey(profileId: string): string {
   return `maa:scenario-lab:v2:${profileId}`
 }
 
-export function restoreScenarioComparisonJob(profileId: string, jobId: string): void {
-  const current = readSession(profileId)
+export function restoreScenarioComparisonJob(profileId: string, jobId: string, allowDisabledDrones = false): void {
+  const current = readSession(profileId, allowDisabledDrones)
   writeSession(profileId, {
     factors: current?.factors ?? DEFAULT_FACTORS,
     activeJobId: jobId,
@@ -300,14 +309,14 @@ export function restoreScenarioComparisonJob(profileId: string, jobId: string): 
   window.dispatchEvent(new CustomEvent(RESTORE_SCENARIO_EVENT, { detail: { profileId, jobId } }))
 }
 
-function readSession(profileId: string): StoredScenarioSession | null {
+function readSession(profileId: string, allowDisabledDrones: boolean): StoredScenarioSession | null {
   try {
     const raw = window.sessionStorage.getItem(sessionKey(profileId))
     if (!raw) return null
     const value = JSON.parse(raw) as unknown
     if (!value || typeof value !== 'object' || Array.isArray(value)) return clearInvalidSession(profileId)
     const candidate = value as Record<string, unknown>
-    const factors = normalizeStoredFactors(candidate.factors)
+    const factors = normalizeStoredFactors(candidate.factors, allowDisabledDrones)
     if (!factors) return clearInvalidSession(profileId)
     const parsed = storedScenarioSessionSchema.safeParse({ ...candidate, factors })
     return parsed.success ? parsed.data : clearInvalidSession(profileId)
@@ -316,7 +325,7 @@ function readSession(profileId: string): StoredScenarioSession | null {
   }
 }
 
-function normalizeStoredFactors(value: unknown): ScenarioComparisonFactors | null {
+function normalizeStoredFactors(value: unknown, allowDisabledDrones: boolean): ScenarioComparisonFactors | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   const factors = value as Record<string, unknown>
   const maaSchedules = Array.isArray(factors.maaSchedules)
@@ -329,6 +338,7 @@ function normalizeStoredFactors(value: unknown): ScenarioComparisonFactors | nul
       : [...DEFAULT_FACTORS.maaSchedules],
   })
   if (!parsed.success) return null
+  if (allowDisabledDrones) return parsed.data
   const droneStrategies = parsed.data.droneStrategies.filter((strategy) => strategy !== 'off')
   return {
     ...parsed.data,

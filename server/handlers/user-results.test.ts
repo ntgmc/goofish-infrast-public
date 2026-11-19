@@ -111,10 +111,12 @@ vi.mock('./user-auth', () => ({
   requireUserSession: mocks.requireUserSession,
 }))
 vi.mock('./profile-authorization', () => ({
-  resolveProfileAuthorization: vi.fn(async (profile: { permission: string; temporary_permission?: { permission?: string } }) => ({
+  resolveProfileAuthorization: vi.fn(async (profile: { kind?: string; permission: string; expires_at?: string; temporary_permission?: { permission?: string } }) => ({
     ok: true,
     permission: profile.temporary_permission?.permission ?? profile.permission,
     cdkRecord: null,
+    subject: { ...profile, permission: profile.temporary_permission?.permission ?? profile.permission,
+      ...(profile.expires_at && Date.parse(profile.expires_at) <= Date.now() ? { kind: 'free_preview' } : {}) },
   })),
 }))
 
@@ -302,6 +304,22 @@ describe('result history reads', () => {
     expect(item.result).not.toHaveProperty('daily_production')
   })
 
+  it('opens expired paid history with free preview data while retaining stored suggestions', async () => {
+    mocks.getProfileForUser.mockResolvedValue({ ...profile('cdk', 'advanced'), expires_at: '2020-01-01' })
+    const stored = storedHistoryItem()
+    stored.result.upgrade_suggestions = [{ type: 'single', name: 'Operator', current: 1, target: 2, gain: 1 }]
+    mocks.getProfileOptimizationResult.mockResolvedValue(stored)
+    mocks.query.mockResolvedValue({ rows: [{ entitled: true }] })
+    const response = await userResultsHandler(new Request('http://localhost/api/user/results/result-1?profile_id=profile-1'))
+    expect(response.status).toBe(200)
+    const { item } = await response.json()
+    expect(item.result.plans).toEqual(stored.result.plans)
+    expect(item.result.raw_results).toEqual([])
+    expect(item.result).not.toHaveProperty('upgrade_suggestions')
+    expect(item.result.daily_production).not.toHaveProperty('details')
+    expect(stored.result.upgrade_suggestions).toHaveLength(1)
+  })
+
   it('does not query result storage when the profile is not owned by the session user', async () => {
     mocks.getProfileForUser.mockResolvedValue(null)
 
@@ -361,6 +379,28 @@ describe('MAA JSON export entitlement', () => {
       jobId: 'job-1',
       result: expect.not.objectContaining({ raw_results: expect.anything() }),
     }))
+  })
+
+  it.each([false, true])('requires a coupon for expired paid MAA exports (confirmed: %s)', async (confirmed) => {
+    mocks.getProfileForUser.mockResolvedValue({ ...profile('cdk', 'advanced'), expires_at: '2020-01-01' })
+    mocks.getValidatedJson.mockResolvedValue({ ...exportBody, use_coupon: confirmed })
+    const response = await userResultsHandler(exportRequest())
+    expect(response.status).toBe(confirmed ? 200 : 403)
+    if (confirmed) {
+      await expect(response.json()).resolves.toMatchObject({ consumed_coupon: true })
+      expect(mocks.consumeInventoryItemImmediately).toHaveBeenCalledWith(expect.objectContaining({ itemCode: 'maa_export_trial_coupon' }))
+    } else {
+      await expect(response.json()).resolves.toMatchObject({ code: 'maa_export_coupon_required' })
+      expect(mocks.consumeInventoryItemImmediately).not.toHaveBeenCalled()
+    }
+  })
+
+  it('rejects full calculation JSON for expired paid profiles', async () => {
+    mocks.getProfileForUser.mockResolvedValue({ ...profile('cdk', 'advanced'), expires_at: '2020-01-01' })
+    const response = await userResultsHandler(exportRequest('full-result-export'))
+    expect(response.status).toBe(403)
+    await expect(response.json()).resolves.toMatchObject({ code: 'full_result_export_forbidden' })
+    expect(mocks.consumeInventoryItemImmediately).not.toHaveBeenCalled()
   })
 
   it('lets an active advanced free preview export without consuming a trial coupon', async () => {

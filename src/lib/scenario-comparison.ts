@@ -10,6 +10,7 @@ const SCENARIO_PARETO_EPSILON = 0.01
 export const SCENARIO_VARIABLE_SHIFT_CANDIDATE_LIMIT = 13
 
 export type ScenarioLayout = '153' | '243' | '252' | '252-1' | '252-full' | '333'
+type ComparisonLayout = ScenarioLayout | 'current'
 export type ScenarioMaaSchedule = 'variable' | '8x3'
 export type ScenarioDroneStrategy =
   | 'off'
@@ -35,7 +36,7 @@ export interface ScenarioProductionPlan {
 }
 
 interface ScenarioLayoutFactor {
-  layout: ScenarioLayout;
+  layout: ComparisonLayout;
   plans: ScenarioProductionPlan[];
 }
 
@@ -57,7 +58,7 @@ export interface ScenarioDefinition {
   id: string;
   label: string;
   config: LicenseConfig;
-  layout: ScenarioLayout;
+  layout: ComparisonLayout;
   productionPlan: ScenarioProductionPlan;
   scheduleMode: ScenarioScheduleMode;
   scheduleStrategy: ScenarioMaaSchedule | 'rotation';
@@ -127,7 +128,7 @@ export interface ScenarioComparisonResult {
   buildMeta: AppBuildMeta;
 }
 
-const LAYOUT_COUNTS: Record<ScenarioLayout, { trading: number; manufacturing: number }> = {
+export const SCENARIO_LAYOUT_COUNTS: Record<ScenarioLayout, { trading: number; manufacturing: number }> = {
   '153': { trading: 1, manufacturing: 5 },
   '243': { trading: 2, manufacturing: 4 },
   '252': { trading: 2, manufacturing: 5 },
@@ -136,7 +137,8 @@ const LAYOUT_COUNTS: Record<ScenarioLayout, { trading: number; manufacturing: nu
   '333': { trading: 3, manufacturing: 3 },
 }
 
-export const SCENARIO_LAYOUT_LABELS: Record<ScenarioLayout, string> = {
+export const SCENARIO_LAYOUT_LABELS: Record<ComparisonLayout, string> = {
+  current: copy.domain.scenarioCurrentLayout,
   '153': '153',
   '243': '243',
   '252': CONFIG_PRESETS['252']!.desc,
@@ -149,7 +151,7 @@ const SCHEDULES: Record<Exclude<ScenarioMaaSchedule, 'variable'>, number[]> = {
   '8x3': [8, 8, 8],
 }
 
-const DRONE_LABELS: Record<ScenarioDroneStrategy, string> = {
+export const SCENARIO_DRONE_LABELS: Record<ScenarioDroneStrategy, string> = {
   off: copy.domain.lib_scenario_comparison_001,
   auto: copy.common.droneAutoEfficiency,
   inventory_balance: copy.common.droneAutoInventoryBalance,
@@ -176,6 +178,15 @@ export function getFixedScenarioProductionPlan(layout: ScenarioLayout): Scenario
   }
 }
 
+export function getCurrentScenarioProductionPlan(config: LicenseConfig): ScenarioProductionPlan {
+  const trading = config.product_requirements.trading_stations
+  const manufacturing = config.product_requirements.manufacturing_stations
+  return {
+    trading: { lmd: trading.LMD ?? 0, orundum: trading.Orundum ?? 0 },
+    manufacturing: { pureGold: manufacturing['Pure Gold'] ?? 0, battleRecord: manufacturing['Battle Record'] ?? 0, originiumShard: manufacturing['Originium Shard'] ?? 0 },
+  }
+}
+
 export function expandScenarioComparison(
   baseConfig: LicenseConfig,
   factors: ScenarioComparisonFactors,
@@ -189,8 +200,11 @@ export function expandScenarioComparison(
   let variableScenarioCount = 0
 
   for (const layoutFactor of factors.layouts) {
-    const counts = LAYOUT_COUNTS[layoutFactor.layout]
-    for (const plan of layoutFactor.plans) {
+    const current = layoutFactor.layout === 'current'
+    const counts = current ? { trading: baseConfig.trading_stations_count, manufacturing: baseConfig.manufacturing_stations_count }
+      : SCENARIO_LAYOUT_COUNTS[layoutFactor.layout as ScenarioLayout]
+    const plans = current ? [getCurrentScenarioProductionPlan(baseConfig)] : layoutFactor.plans
+    for (const plan of plans) {
       validateProductionPlan(layoutFactor.layout, plan, counts)
       for (const schedule of factors.maaSchedules) {
         for (const droneStrategy of factors.droneStrategies) {
@@ -227,7 +241,7 @@ export function expandScenarioComparison(
       code: 'missing_product' as const,
       count,
       droneStrategy,
-      message: `${DRONE_LABELS[droneStrategy]}${copy.domain.lib_scenario_comparison_012}`,
+      message: `${SCENARIO_DRONE_LABELS[droneStrategy]}${copy.domain.lib_scenario_comparison_012}`,
     }))
   if (duplicateCount > 0) {
     skipped.push({ code: 'duplicate', count: duplicateCount, message: copy.domain.lib_scenario_comparison_013 })
@@ -304,28 +318,27 @@ function validateFactors(factors: ScenarioComparisonFactors): void {
   if (factors.layouts.length === 0) throw new Error(copy.domain.lib_scenario_comparison_018)
   if (factors.maaSchedules.length === 0 && !factors.includeRotation) throw new Error(copy.domain.lib_scenario_comparison_019)
   if (factors.maaSchedules.length > 0 && factors.droneStrategies.length === 0) throw new Error(copy.domain.lib_scenario_comparison_020)
-  const additionalConfigCount = factors.layouts.reduce((sum, layout) => sum + layout.plans.length, 0)
+  const additionalConfigCount = factors.layouts.reduce((sum, layout) => sum + (layout.layout === 'current' ? 1 : layout.plans.length), 0)
   if (additionalConfigCount > SCENARIO_COMPARISON_MAX_ADDITIONAL_CONFIGS) {
     throw new Error(copy.domain.lib_scenario_comparison_040(SCENARIO_COMPARISON_MAX_ADDITIONAL_CONFIGS))
   }
   for (const layoutFactor of factors.layouts) {
     assertExactKeys(layoutFactor, ['layout', 'plans'], copy.domain.lib_scenario_comparison_021)
-    if (!Object.prototype.hasOwnProperty.call(LAYOUT_COUNTS, layoutFactor.layout)
-      || !Array.isArray(layoutFactor.plans)
-      || layoutFactor.plans.length === 0) {
+    if (!Array.isArray(layoutFactor.plans) || (layoutFactor.layout === 'current' ? layoutFactor.plans.length !== 0
+      : !Object.prototype.hasOwnProperty.call(SCENARIO_LAYOUT_COUNTS, layoutFactor.layout) || layoutFactor.plans.length === 0)) {
       throw new Error(copy.domain.lib_scenario_comparison_022)
     }
   }
   if (factors.maaSchedules.some((value) => !['variable', '8x3'].includes(value))) {
     throw new Error(copy.domain.lib_scenario_comparison_023)
   }
-  if (factors.droneStrategies.some((value) => !Object.prototype.hasOwnProperty.call(DRONE_LABELS, value))) {
+  if (factors.droneStrategies.some((value) => !Object.prototype.hasOwnProperty.call(SCENARIO_DRONE_LABELS, value))) {
     throw new Error(copy.domain.lib_scenario_comparison_024)
   }
 }
 
 function validateProductionPlan(
-  layout: ScenarioLayout,
+  layout: ComparisonLayout,
   plan: ScenarioProductionPlan,
   counts: { trading: number; manufacturing: number },
 ): void {
@@ -339,7 +352,7 @@ function validateProductionPlan(
     plan?.manufacturing?.battleRecord,
     plan?.manufacturing?.originiumShard,
   ]
-  if (values.some((value) => !Number.isInteger(value) || value < 0)) {
+  if (values.some((value) => !Number.isInteger(value) || value < 0 || value > 5)) {
     throw new Error(`${layout}${copy.domain.lib_scenario_comparison_028}`)
   }
   if (plan.trading.lmd + plan.trading.orundum !== counts.trading) {
@@ -348,7 +361,7 @@ function validateProductionPlan(
   if (plan.manufacturing.pureGold + plan.manufacturing.battleRecord + plan.manufacturing.originiumShard !== counts.manufacturing) {
     throw new Error(`${layout}${copy.domain.lib_scenario_comparison_030}${counts.manufacturing}。`)
   }
-  const fixedPlan = getFixedScenarioProductionPlan(layout)
+  const fixedPlan = layout === 'current' ? null : getFixedScenarioProductionPlan(layout)
   if (fixedPlan && (
     plan.trading.lmd !== fixedPlan.trading.lmd
     || plan.trading.orundum !== fixedPlan.trading.orundum
@@ -379,12 +392,11 @@ function addScenario(
 
 function buildScenario(
   baseConfig: LicenseConfig,
-  layout: ScenarioLayout,
+  layout: ComparisonLayout,
   plan: ScenarioProductionPlan,
   scheduleStrategy: ScenarioMaaSchedule | 'rotation',
   droneStrategy: ScenarioDroneStrategy,
 ): ScenarioDefinition {
-  const counts = LAYOUT_COUNTS[layout]
   const scheduleMode: ScenarioScheduleMode = scheduleStrategy === 'rotation' ? 'rotation' : 'maa'
   const shifts = scheduleStrategy === 'rotation'
     ? [12, 12]
@@ -392,24 +404,27 @@ function buildScenario(
       ? [8, 8, 8]
       : [...SCHEDULES[scheduleStrategy]]
   const config = JSON.parse(JSON.stringify(baseConfig)) as LicenseConfig
-  const preset = CONFIG_PRESETS[layout]
-  config.layout = preset?.layout ?? `${counts.trading}-${counts.manufacturing}-3`
-  delete config.trading_station_levels
-  delete config.manufacturing_station_levels
-  delete config.facility_layout
-  if (preset?.trading_station_levels) config.trading_station_levels = [...preset.trading_station_levels]
-  if (preset?.manufacturing_station_levels) config.manufacturing_station_levels = [...preset.manufacturing_station_levels]
-  config.desc = scenarioDescription(layout, plan, scheduleStrategy)
-  config.trading_stations_count = counts.trading
-  config.manufacturing_stations_count = counts.manufacturing
-  config.product_requirements = {
-    trading_stations: compactCounts({ LMD: plan.trading.lmd, Orundum: plan.trading.orundum }),
-    manufacturing_stations: compactCounts({
-      'Pure Gold': plan.manufacturing.pureGold,
-      'Battle Record': plan.manufacturing.battleRecord,
-      'Originium Shard': plan.manufacturing.originiumShard,
-    }),
+  if (layout !== 'current') {
+    const counts = SCENARIO_LAYOUT_COUNTS[layout]
+    const preset = CONFIG_PRESETS[layout]
+    config.layout = preset?.layout ?? `${counts.trading}-${counts.manufacturing}-3`
+    delete config.trading_station_levels
+    delete config.manufacturing_station_levels
+    delete config.facility_layout
+    if (preset?.trading_station_levels) config.trading_station_levels = [...preset.trading_station_levels]
+    if (preset?.manufacturing_station_levels) config.manufacturing_station_levels = [...preset.manufacturing_station_levels]
+    config.trading_stations_count = counts.trading
+    config.manufacturing_stations_count = counts.manufacturing
+    config.product_requirements = {
+      trading_stations: compactCounts({ LMD: plan.trading.lmd, Orundum: plan.trading.orundum }),
+      manufacturing_stations: compactCounts({
+        'Pure Gold': plan.manufacturing.pureGold,
+        'Battle Record': plan.manufacturing.battleRecord,
+        'Originium Shard': plan.manufacturing.originiumShard,
+      }),
+    }
   }
+  config.desc = `${productionPlanLabel(layout, plan)} · ${scenarioScheduleLabel(scheduleStrategy)}`
   config.schedule_mode = scheduleStrategy === 'variable' ? 'variable' : scheduleMode
   config.shift_hours = shifts
   delete config.auto_balance_source
@@ -438,7 +453,7 @@ function buildScenario(
   const id = `${layout}-${planId}-${scheduleStrategy}-${droneStrategy}`
   return {
     id,
-    label: `${productionPlanLabel(layout, plan)} · ${scheduleLabel(scheduleStrategy)} · ${DRONE_LABELS[droneStrategy]}`,
+    label: `${productionPlanLabel(layout, plan)} · ${scenarioScheduleLabel(scheduleStrategy)} · ${SCENARIO_DRONE_LABELS[droneStrategy]}`,
     config,
     layout,
     productionPlan: JSON.parse(JSON.stringify(plan)) as ScenarioProductionPlan,
@@ -481,19 +496,11 @@ function compactCounts(counts: Record<string, number>): Record<string, number> {
   return Object.fromEntries(Object.entries(counts).filter(([, value]) => value > 0))
 }
 
-function productionPlanLabel(layout: ScenarioLayout, plan: ScenarioProductionPlan): string {
+function productionPlanLabel(layout: ComparisonLayout, plan: ScenarioProductionPlan): string {
   return `${SCENARIO_LAYOUT_LABELS[layout]}${copy.domain.lib_scenario_comparison_033}${plan.trading.lmd}${copy.domain.lib_scenario_comparison_034}${plan.trading.orundum}${copy.domain.lib_scenario_comparison_035}${plan.manufacturing.pureGold}${copy.domain.lib_scenario_comparison_036}${plan.manufacturing.battleRecord}${copy.domain.lib_scenario_comparison_037}${plan.manufacturing.originiumShard}`
 }
 
-function scenarioDescription(
-  layout: ScenarioLayout,
-  plan: ScenarioProductionPlan,
-  strategy: ScenarioMaaSchedule | 'rotation',
-): string {
-  return `${productionPlanLabel(layout, plan)} · ${scheduleLabel(strategy)}`
-}
-
-function scheduleLabel(strategy: ScenarioMaaSchedule | 'rotation'): string {
+export function scenarioScheduleLabel(strategy: ScenarioMaaSchedule | 'rotation'): string {
   if (strategy === 'variable') return copy.domain.lib_scenario_comparison_038
   if (strategy === '8x3') return copy.optimize.pages_tool_optimize_scenario_lab_ScenarioFactors_002
   return copy.domain.lib_scenario_comparison_039

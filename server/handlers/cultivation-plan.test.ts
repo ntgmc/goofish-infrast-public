@@ -3,10 +3,9 @@ import handler from './cultivation-plan'
 import { CultivationReadError } from '../cultivation/worker-client'
 import { DEFAULT_SITE_FEATURE_SETTINGS } from '../../src/lib/site-features'
 
-const mocks = vi.hoisted(() => ({ session: vi.fn(), read: vi.fn(), gate: vi.fn(), snapshot: vi.fn(), features: vi.fn(), usage: vi.fn() }))
+const mocks = vi.hoisted(() => ({ session: vi.fn(), read: vi.fn(), snapshot: vi.fn(), features: vi.fn(), usage: vi.fn() }))
 vi.mock('../storage/tool-usage-store', () => ({ recordToolRun: mocks.usage }))
 vi.mock('./user-auth', () => ({ requireUserSession: mocks.session, jsonResponse: (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }) }))
-vi.mock('../feature-gate', () => ({ requireSiteFeatures: mocks.gate }))
 vi.mock('../cultivation/worker-client', async (original) => ({ ...await original<typeof import('../cultivation/worker-client')>(), readCultivationPlan: mocks.read }))
 vi.mock('../skland-snapshot', async (original) => ({ ...await original<typeof import('../skland-snapshot')>(), getSklandSnapshot: mocks.snapshot }))
 vi.mock('../storage/feature-settings-store', () => ({ getSiteFeatureSettings: mocks.features }))
@@ -15,7 +14,6 @@ const request = (body: unknown = { profile_id: 'mine' }) => new Request('http://
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mocks.gate.mockResolvedValue(null)
   mocks.features.mockResolvedValue(DEFAULT_SITE_FEATURE_SETTINGS)
   mocks.session.mockResolvedValue({ user: { id: 'user-1' }, profiles: [{ id: 'mine', status: 'active', skland_binding: { uid: 'player-uid', encrypted_cred: 'encrypted' } }] })
   mocks.snapshot.mockResolvedValue({ game: { data: { chars: [] }, fetchedAt: '2026-10-17T00:00:00Z' },
@@ -89,6 +87,21 @@ describe('cultivation planning authorization and data boundary', () => {
     expect(response.status).toBe(200)
     expect(response.headers.get('Cache-Control')).toBe('no-store')
     expect(mocks.read).toHaveBeenCalledWith(expect.objectContaining({ training: true, snapshotVersion: '1' }), expect.any(AbortSignal))
+  })
+
+  it.each([
+    ['cultivation_plan', { profile_id: 'mine' }],
+    ['cultivation_projects', { profile_id: 'mine', projects: [] }],
+    ['training_ratio', { profile_id: 'mine', training: true }],
+  ] as const)('blocks %s before reading game data and keeps other tools open', async (feature, body) => {
+    mocks.features.mockResolvedValue({ ...DEFAULT_SITE_FEATURE_SETTINGS, features: { ...DEFAULT_SITE_FEATURE_SETTINGS.features, [feature]: false } })
+    const response = await handler(request(body))
+    expect(response.status).toBe(503)
+    await expect(response.json()).resolves.toMatchObject({ code: 'feature_disabled', feature })
+    expect(mocks.snapshot).not.toHaveBeenCalled()
+    expect(mocks.read).not.toHaveBeenCalled()
+    const other = feature === 'cultivation_projects' ? { training: true } : { projects: [] }
+    expect((await handler(request({ profile_id: 'mine', ...other }))).status).toBe(200)
   })
 
   it('passes the backend-controlled activity switch to the isolated reader', async () => {

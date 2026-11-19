@@ -1,5 +1,6 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { NextIcon as ArrowRight, RefreshIcon, SearchIcon, UploadIcon } from '../../components/icons'
+import GuestAccountLink from '../../components/GuestAccountLink'
 import SklandBindingDialog, { type SklandPayload } from '../../components/SklandBindingDialog'
 import SklandIcon from '../../components/SklandIcon'
 import { copy, CURRENT_LOCALE } from '../../copy'
@@ -8,7 +9,7 @@ import { filterSearch } from '../../lib/search'
 import { useSiteFeatures } from '../../lib/site-feature-context'
 import type { LicenseConfig, LicenseOperator } from '../../lib/types'
 import { extensibleLicenseOperatorsSchema } from '../../lib/workspace-validation'
-import { countOwnedOperators, isFreePreviewProfile, parseOperatorsText, sortOperatorsForPreview } from '../tool/tool-utils'
+import { countOwnedOperators, hasFreePreviewAccess, parseOperatorsText, sortOperatorsForPreview } from '../tool/tool-utils'
 import OperatorRows from './OperatorRows'
 import type { V2Session } from './OptionsDrawer'
 
@@ -39,7 +40,7 @@ export default function OperatorManagementPanel({ session, config, operators, bu
   const profile = session.activeProfile
   const binding = profile?.skland_binding
   const invalid = binding?.credential_status === 'invalid' || credentialInvalid
-  const canUpload = !profile || !isFreePreviewProfile(profile)
+  const canUpload = !profile || !hasFreePreviewAccess(profile)
   const disabled = busy || action !== null || sklandOpen
   const sortedOperators = useMemo(() => sortOperatorsForPreview(operators)
     .sort((left, right) => Number(right.own !== false) - Number(left.own !== false)), [operators])
@@ -120,9 +121,9 @@ export default function OperatorManagementPanel({ session, config, operators, bu
         {binding ? <div className="v2-operator-source">
           <div className="v2-operator-identity"><SklandIcon /><h3>{binding.nickname}</h3><span className={`v2-neutral-tag${invalid ? ' v2-error' : ''}`}>{invalid ? text.authorizationExpired : text.bound}</span></div>
           <div className="v2-operator-uid"><span>UID <span className="v2-selectable-uid">{binding.uid}</span></span><span>{binding.channel_name}</span></div>
-        </div> : <div className="v2-operator-unbound"><h3><SklandIcon />{text.unbound}</h3><p>{text.unboundDescription}</p></div>}
+        </div> : session.user && <div className="v2-operator-unbound"><h3><SklandIcon />{text.unbound}</h3><p>{text.unboundDescription}</p></div>}
         <div className="v2-operator-import-actions">
-          {features.skland && <button type="button" className="v2-button v2-button-primary" disabled={disabled} aria-busy={action === 'refresh'}
+          {features.skland && session.user && <button type="button" className="v2-button v2-button-primary" disabled={disabled} aria-busy={action === 'refresh'}
             onClick={() => { if (!binding || invalid) openBinding(); else void refreshSkland() }}>
             {binding && !invalid ? <RefreshIcon size={16} aria-hidden="true" /> : <SklandIcon />}{action === 'refresh' ? text.refreshing : !binding ? text.bind : invalid ? text.reauthorize : text.refresh}
           </button>}
@@ -132,6 +133,7 @@ export default function OperatorManagementPanel({ session, config, operators, bu
             <input className="sr-only" ref={fileInput} tabIndex={-1} type="file" accept=".json,application/json" disabled={!canUpload || disabled} aria-label={copy.v2.uploadMaa}
               onChange={(event) => { const file = event.target.files?.[0]; if (file) void importFile(file) }} />
           </div>
+          {features.skland && session.authStatus === 'anonymous' && <GuestAccountLink label={copy.v2.guestAccount.bindSkland} />}
         </div>
         {!features.skland && <p className="v2-muted">{text.syncUnavailable}</p>}
         {!canUpload && <p className="v2-muted">{text.previewImport}</p>}

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useLocation } from 'react-router'
-import { authPath } from '../lib/auth-navigation'
+import { Link } from 'react-router'
+import GuestAccountLink from '../components/GuestAccountLink'
 import BrandLogo from '../components/BrandLogo'
 import ThemeSwitcher from '../components/ThemeSwitcher'
 import ManualBlankScheduleSetup from '../components/ManualBlankScheduleSetup'
@@ -117,7 +117,6 @@ export function useManualTool({ session, embedded = false, onDirtyChange }: Page
 }
 
 function ManualScheduleContent({ session, embedded = false, onDirtyChange, onOpenProfile }: PageProps & { session: ReturnType<typeof useToolSession> }) {
-  const location = useLocation()
   const label = copy.tools.manualSchedule
   const ContentRoot = embedded ? 'div' : 'main'
   const operatorsPath = (profileId: string) => embedded ? `${v2Path('overview', profileId)}&panel=operators` : profileScopedPath(workspaceSetupPath('operators'), profileId)
@@ -137,7 +136,7 @@ function ManualScheduleContent({ session, embedded = false, onDirtyChange, onOpe
           <div className="workspace-manual-intro">
             {!embedded && <h1 className="text-2xl font-semibold text-ink-primary">{label.title}</h1>}
             <p className="mt-2 text-sm leading-6 text-ink-secondary">{label.description}</p>
-            <p className="mt-2 text-sm leading-6 text-ink-muted">{label.access}</p>
+            {session.authStatus !== 'anonymous' && <p className="mt-2 text-sm leading-6 text-ink-muted">{label.access}</p>}
           </div>
           <div className="workspace-manual-inputs space-y-4">
           {session.authLoading ? <p role="status">{label.loading}</p> : session.authStatus === 'error' ? (
@@ -145,7 +144,8 @@ function ManualScheduleContent({ session, embedded = false, onDirtyChange, onOpe
               <p>{session.authError?.message}</p>
               <button type="button" className="tool-secondary-action mt-2" onClick={session.retryAuth}>{copy.tools.pages_DepotValuePage_086}</button>
             </div>
-          ) : !profile ? <div className="tool-alert tool-alert--warning p-3 text-sm" role="status">{label.unavailable}{!session.user && <Link className="tool-primary-action mt-3 inline-flex" to={authPath('login', `${location.pathname}${location.search}${location.hash}`)}>{copy.v2.login}</Link>}</div> : (
+          ) : session.authStatus === 'anonymous' ? <GuestAccountLink inset label={copy.v2.guestAccount.selectProfile} description={copy.v2.guestAccount.manualHelp} />
+            : !profile ? <div className="tool-alert tool-alert--warning p-3 text-sm" role="status">{label.unavailable}</div> : (
             <>
               <label className="block space-y-2 text-sm">
                 <span>{label.profile}</span>

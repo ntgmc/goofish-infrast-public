@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { queryMock } = vi.hoisted(() => ({ queryMock: vi.fn() }))
+const { queryMock, transactionMock } = vi.hoisted(() => ({ queryMock: vi.fn(), transactionMock: vi.fn() }))
 vi.mock('./schema', () => ({ ensureDatabaseSchema: vi.fn().mockResolvedValue(undefined) }))
-vi.mock('./postgres', () => ({ query: queryMock, withTransaction: vi.fn() }))
+vi.mock('./postgres', () => ({ query: queryMock, withTransaction: transactionMock }))
 
 beforeEach(() => {
   vi.resetModules()
   vi.clearAllMocks()
+  queryMock.mockReset()
   vi.useFakeTimers()
   vi.setSystemTime('2026-10-27T00:00:00.000Z')
   vi.stubEnv('OPTIMIZE_GLOBAL_WORKER_CONCURRENCY', '1')
@@ -27,6 +28,32 @@ function deferred<T>() {
   const promise = new Promise<T>((accept, fail) => { resolve = accept; reject = fail })
   return { promise, resolve, reject }
 }
+
+describe('PostgreSQL attempt heartbeats', () => {
+  it.each([true, false])('returns ownership %s with one database request', async (owned) => {
+    const { createPostgresOptimizeJobStore } = await import('./optimize-job-store')
+    queryMock.mockResolvedValueOnce({ rows: owned ? [{ id: 'job' }] : [], rowCount: owned ? 1 : 0 })
+
+    await expect(createPostgresOptimizeJobStore().heartbeatAttempt(
+      'job', 2, 'worker', 'lock', '2026-10-27T00:01:00.000Z',
+    )).resolves.toBe(owned)
+
+    expect(queryMock).toHaveBeenCalledExactlyOnceWith(expect.any(String), [
+      'job', 2, 'worker', 'lock', '2026-10-27T00:01:00.000Z', '2026-10-27T00:00:00.000Z',
+    ])
+    expect(transactionMock).not.toHaveBeenCalled()
+  })
+
+  it('propagates a failed heartbeat without reporting ownership', async () => {
+    const { createPostgresOptimizeJobStore } = await import('./optimize-job-store')
+    queryMock.mockRejectedValueOnce(new Error('database unavailable'))
+
+    await expect(createPostgresOptimizeJobStore().heartbeatAttempt(
+      'job', 2, 'worker', 'lock', '2026-10-27T00:01:00.000Z',
+    )).rejects.toThrow('database unavailable')
+    expect(queryMock).toHaveBeenCalledTimes(1)
+  })
+})
 
 describe('PostgreSQL queue display estimates', () => {
   it('shares an in-flight query and one-second snapshot across store instances and job IDs', async () => {

@@ -45,13 +45,30 @@ describe('authoritative profile authorization', () => {
     })
   })
 
-  it('rejects an expired subscription profile even when the linked CDK is still used', async () => {
-    mocks.getCdk.mockResolvedValue(cdkRecord({ profile_expires_at: '2020-01-01T00:00:00.000Z' }))
+  it.each(['profile', 'cdk'] as const)('downgrades %s expiry without changing the stored profile or CDK', async (source) => {
+    const expiresAt = '2020-01-01T00:00:00.000Z'
+    const stored = profile(source === 'profile' ? { expires_at: expiresAt } : {})
+    const cdk = cdkRecord(source === 'cdk' ? { profile_expires_at: expiresAt } : {})
+    mocks.getCdk.mockResolvedValue(cdk)
+    await expect(resolveProfileAuthorization(stored)).resolves.toMatchObject({
+      ok: true, permission: 'recommended', cdkRecord: null,
+      subject: { kind: 'free_preview', permission: 'recommended', expires_at: expiresAt },
+    })
+    expect(stored.permission).toBe('growth')
+    expect(cdk.status).toBe('used')
+  })
 
-    await expect(resolveProfileAuthorization(profile())).resolves.toMatchObject({
-      ok: false,
-      code: 'profile_expired',
-      status: 403,
+  it.each(['frozen', 'revoked'] as const)('keeps %s licenses blocked after expiry', async (status) => {
+    mocks.getCdk.mockResolvedValue(cdkRecord({ status }))
+    await expect(resolveProfileAuthorization(profile({ expires_at: '2020-01-01' }))).resolves.toMatchObject({
+      ok: false, code: `license_${status}`,
+    })
+  })
+
+  it('restores the linked permission after renewal', async () => {
+    mocks.getCdk.mockResolvedValue(cdkRecord({ permission: 'advanced', profile_expires_at: '2099-01-01' }))
+    await expect(resolveProfileAuthorization(profile({ expires_at: '2099-01-01' }))).resolves.toMatchObject({
+      ok: true, permission: 'advanced', subject: { kind: 'cdk', permission: 'advanced' },
     })
   })
 

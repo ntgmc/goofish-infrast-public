@@ -189,7 +189,7 @@ function ConnectedDashboard({ session }: { session: V2Session }) {
     onOpenResult={(job) => { void (async () => {
       if (!confirmResultChange()) return
       if (job.kind === 'scenario_comparison') {
-        restoreScenarioComparisonJob(profile.id, job.id)
+        restoreScenarioComparisonJob(profile.id, job.id, true)
         closeTaskCenter()
         void navigate(v2Path('lab', profile.id))
         return

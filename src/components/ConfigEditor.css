@@ -17,6 +17,46 @@
   margin-top: var(--space-2xs);
 }
 
+.config-skland-import {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'help import';
+  align-items: center;
+  gap: var(--space-2xs) var(--space-xs);
+  padding: var(--space-2xs) var(--space-xs);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-input);
+  background: var(--theme-surface-2);
+}
+
+.config-skland-import > .config-skland-trigger { grid-area: import; }
+.config-skland-help { grid-area: help; }
+.config-skland-import:has(.config-skland-feedback[data-kind="error"]) { grid-template-areas: 'feedback import'; }
+.config-skland-import[data-imported] {
+  grid-template-columns: max-content minmax(0, 1fr);
+  grid-template-areas: 'message message' 'import review';
+  justify-items: start;
+}
+.config-skland-import[data-imported] > .config-skland-feedback { display: contents; }
+.config-skland-import[data-imported] .config-skland-message { grid-area: message; }
+.config-skland-import[data-imported] .config-skland-feedback > button { grid-area: review; }
+.config-skland-import button[aria-disabled="true"] { opacity: .65; cursor: wait; }
+.config-skland-feedback { grid-area: feedback; min-width: 0; }
+.config-skland-message { display: flex; align-items: start; gap: var(--space-2xs); min-width: 0; }
+.config-skland-message svg { flex: none; margin-top: 2px; color: var(--color-positive); }
+[data-kind="previous"] > .config-skland-message svg { color: var(--color-warning); }
+[data-kind="error"] > .config-skland-message svg { color: var(--color-error); }
+.config-skland-message strong { display: block; color: var(--theme-ink-primary); font-size: var(--text-sm); }
+.config-skland-message p { color: var(--theme-ink-secondary); font-size: var(--text-xs); line-height: 1.6; overflow-wrap: anywhere; }
+.config-skland-feedback button,
+.config-skland-room-review { min-height: 44px; gap: var(--space-2xs); }
+.config-skland-import .config-skland-feedback button { border-color: var(--primary); color: var(--primary); }
+.config-skland-import[data-imported] .config-skland-feedback button,
+.config-skland-import[data-imported] > .config-skland-trigger { padding-inline: var(--space-2xs); }
+.config-skland-room-review { justify-self: start; }
+.config-review-anchor { scroll-margin-block: calc(44px + 4 * var(--space-3xs)) var(--space-2xs); }
+.config-execution-review h4:focus-visible { justify-self: start; outline: 2px solid var(--ring); outline-offset: 3px; }
+
 .config-orundum-preference {
   display: grid;
   min-width: 0;
@@ -233,6 +273,9 @@
   border-radius: var(--radius-input);
   background: var(--theme-surface-2);
 }
+
+.config-execution-review { display: grid; min-width: 0; gap: var(--space-md); }
+.config-execution-review[data-imported] { gap: var(--space-2xs); }
 
 .config-execution-options {
   display: grid;
@@ -505,9 +548,45 @@
 .config-room-settings > summary small { display: block; }
 .config-room-settings > summary strong { color: var(--theme-ink-primary); font-size: var(--text-sm); }
 .config-room-settings > summary small { margin-top: var(--space-3xs); color: var(--theme-ink-secondary); font-size: var(--text-xs); }
-.config-room-settings > summary svg { flex: none; transition: transform var(--dur-fast) var(--ease-out); }
-.config-room-settings[open] > summary svg { transform: rotate(180deg); }
+.config-room-chevron { flex: none; transition: transform var(--dur-fast) var(--ease-out); }
+.config-room-settings[open] > summary .config-room-chevron { transform: rotate(180deg); }
 .config-room-settings-body { display: grid; gap: var(--space-md); padding-top: var(--space-md); }
+
+.config-editor-card,
+.config-rooms-panel > .facility-layout,
+.config-room-options > .config-room-settings {
+  min-width: 0;
+  padding: var(--space-sm);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-input);
+  background: var(--theme-surface-1);
+}
+.config-rooms-panel,
+.config-stock-panel,
+.config-room-options { gap: var(--space-xs); }
+.config-room-options { display: grid; align-content: start; min-width: 0; }
+.config-room-options > .config-room-settings > summary { justify-content: start; }
+.config-room-summary-icon { width: 20px; height: 20px; flex: none; color: var(--primary); }
+.config-room-chevron { margin-inline-start: auto; }
+.config-room-options > .config-room-settings[open] > summary { padding-bottom: var(--space-xs); border-bottom: 1px solid var(--border); }
+.config-252-note { border-top: 1px solid var(--border); }
+.config-252-note summary { display: list-item; align-content: center; }
+.config-252-note p { padding-bottom: var(--space-2xs); }
+.config-room-options .config-products-readonly .config-product-groups { margin-top: 0; gap: var(--space-xs); }
+.config-products-readonly .config-product-group { padding: 0; }
+.config-products-readonly .config-product-row { min-height: 36px; }
+.config-products-readonly .config-product-row:last-child { border-bottom: 0; }
+.config-products-readonly .config-product-row img { width: 24px; height: 24px; }
+.config-room-options > .config-room-settings > summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; border-radius: var(--radius-input); }
+.config-recycling-card { --strategy-color: var(--station-manufacturing); display: grid; gap: var(--space-xs); }
+.config-editor-card .config-strategy-heading { margin: 0; }
+.config-stock-card { --strategy-color: var(--primary); }
+.config-stock-card .config-inventory-grid { margin-top: var(--space-xs); }
+.config-stock-card .config-stock-field { min-height: 44px; border: 0; }
+.config-stock-card .config-stock-field input { width: min(45%, 10rem); font-variant-numeric: tabular-nums; }
+.config-stock-link { margin-top: var(--space-xs); min-height: 44px; gap: var(--space-2xs); }
+.config-rebalance-card .config-switch-row { font-weight: 600; }
+.config-rebalance-card .tool-switch { flex: none; }
 
 @container (min-width: 36rem) {
   .config-task-panel--common,
@@ -517,18 +596,32 @@
     column-gap: var(--space-md);
   }
 
+  .config-rooms-panel { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); align-items: start; }
+  .config-stock-panel { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
   .config-layout-notice { grid-column: 1 / -1; }
   .config-strategy-section--drones { grid-column: 2; grid-row: 1 / 3; }
   .config-strategy-section--dormitory,
   .config-strategy-section--fiammetta { grid-column: 1; }
   .config-product-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .config-room-options .config-product-groups { grid-template-columns: minmax(0, 1fr); }
+  .config-room-options .config-products-readonly .config-product-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .config-skland-import[data-imported] {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas: 'message import review';
+  }
   .config-orundum-preference { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .config-room-settings > summary svg { transition: none; }
+  .config-room-chevron { transition: none; }
 }
-[data-reduced-motion] .config-room-settings > summary svg { transition: none; }
+[data-reduced-motion] .config-room-chevron { transition: none; }
+
+@container (max-width: 29rem) {
+  .config-skland-import:not([data-imported]) { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'import'; justify-items: start; }
+  .config-skland-import:has(.config-skland-feedback[data-kind="error"]) { grid-template-areas: 'feedback' 'import'; }
+  .config-skland-import .config-skland-help { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+}
 
 @media (max-width: 40rem) {
   .config-preset {

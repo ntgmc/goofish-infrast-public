@@ -46,6 +46,33 @@ it.each(['cdk', 'free_preview'] as const)('retains explicit inventory balance se
   }
 })
 
+it('downgrades expired profiles with a cached paid license and restores rights after renewal', async () => {
+  const profile: UserGameAccount = {
+    id: 'expired-config', user_id: 'user', kind: 'cdk', permission: 'advanced', status: 'active',
+    cdk_order_hash: null, display_name: '已到期', note: '', operator_count: 0,
+    updated_at: null, created_at: '2020-01-01', expires_at: '2099-01-01',
+  }
+  const props: Props = {
+    profileId: profile.id, profile, license: createAccountLicense(profile, [], normalizeConfig(CONFIG_PRESETS['243'])),
+    workspace: null, setLicense: vi.fn(), eliteOverrides: {}, configOverride: null, setConfigOverride: vi.fn(),
+    configSyncStatus: 'idle', flushConfigSave: vi.fn(async () => true), retryConfigSave: vi.fn(),
+    onWorkspacePatch: vi.fn(), onWorkspaceUpdated: vi.fn(), section: 'config', onSectionChange: vi.fn(),
+    onReset: vi.fn(), onLogout: vi.fn(), announcement: null, redeemedNotice: null, onProfileUpgraded: vi.fn(),
+  }
+  const { result, rerender } = renderHook((input: Props) => useOptimizeWorkflow(input), { initialProps: props })
+  await waitFor(() => expect(result.current.licenseSyncing).toBe(false))
+  expect(result.current.userCanDownloadFullResult).toBe(true)
+  rerender({ ...props, profile: { ...profile, expires_at: '2020-01-01' } })
+  expect(result.current).toMatchObject({
+    permission: 'recommended', isPreviewProfile: true, isRestrictedPreview: true,
+    userCanEditConfig: false, userCanDownloadFullResult: false, userCanExportMaaWithoutCoupon: false,
+    userCanViewFullData: false, userCanUseUpgradeFeatures: false, userHasScenarioLabCapability: false,
+  })
+  rerender(props)
+  expect(result.current.userCanDownloadFullResult).toBe(true)
+  expect(result.current.userCanUseUpgradeFeatures).toBe(true)
+})
+
 it.each(['243', '333', '252', '252-1', '252-full'])('retains the %s preset and map selected by a free preview profile', async (preset) => {
   const profile: UserGameAccount = {
     id: 'free-config', user_id: 'user', kind: 'free_preview', permission: 'growth',

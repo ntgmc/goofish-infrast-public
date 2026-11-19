@@ -1,0 +1,101 @@
+.v2-page-help-trigger,
+.v2-page-help-close {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 44px;
+  min-block-size: 44px;
+  border-radius: var(--radius-v2-control);
+  color: var(--v2-secondary);
+}
+.v2-page-help-trigger {
+  gap: var(--space-2xs);
+  padding-inline: var(--space-2xs);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+.v2-page-help-trigger svg { flex: none; color: var(--v2-accent); }
+.v2-page-help-trigger:hover, .v2-page-help-close:hover { background: var(--color-v2-hover); color: var(--v2-ink); }
+
+.v2-dialog.v2-page-help {
+  width: min(34rem, calc(100% - 2rem));
+  max-width: none;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  line-height: 1.65;
+}
+.v2-page-help-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2xs);
+  padding: var(--space-xs) var(--space-md);
+  border-bottom: 1px solid var(--v2-line);
+}
+.v2-page-help-header h2 { font-size: var(--text-lg); line-height: 1.25; overflow-wrap: anywhere; }
+.v2-page-help-header h2:focus { outline: none; }
+.v2-page-help-close { cursor: pointer; }
+.v2-page-help-body {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.v2-page-help-topics, .v2-page-help-form { display: grid; gap: var(--space-2xs); }
+.v2-page-help-topics > p, .v2-page-help-form label { color: var(--v2-secondary); font-weight: 500; }
+.v2-page-help-topic-list {
+  overflow: hidden;
+  border: 1px solid var(--v2-line);
+  border-radius: var(--radius-v2-control);
+}
+.v2-page-help-topic-list > div > button {
+  display: flex;
+  width: 100%;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+  padding: var(--space-2xs) var(--space-xs);
+  text-align: start;
+  cursor: pointer;
+}
+.v2-page-help-topic-list > div + div { border-top: 1px solid var(--v2-line); }
+.v2-page-help-topic-list > div > button:focus-visible { outline-offset: -2px; }
+.v2-page-help-topic-list > div > button:hover { background: var(--color-v2-hover); }
+.v2-page-help-topic-list > div > button[aria-expanded="true"] { background: var(--v2-accent-soft); color: var(--v2-accent); }
+.v2-page-help-topic-list > div > button[aria-expanded="true"] svg { transform: rotate(90deg); }
+.v2-page-help-topic-list svg, .v2-page-help-search svg { flex: none; }
+.v2-page-help-search { display: flex; gap: var(--space-2xs); }
+.v2-page-help-search .v2-input { flex: 1; min-width: 0; background: var(--v2-paper); color: var(--v2-ink); font-size: max(1rem, var(--text-sm)); }
+.v2-page-help-search button { flex: none; padding-inline: var(--space-xs); }
+.v2-page-help-search button:disabled { opacity: .55; cursor: not-allowed; }
+.v2-page-help-answer {
+  display: grid;
+  gap: var(--space-xs);
+  padding: var(--space-sm);
+  border-inline-start: 3px solid var(--v2-accent);
+  border-radius: var(--radius-v2-control);
+  background: var(--v2-bg);
+  overflow-wrap: anywhere;
+}
+.v2-page-help-topic-list .v2-page-help-answer { border: 0; border-radius: 0; }
+.v2-page-help-answer p { white-space: pre-wrap; }
+.v2-page-help-answer .v2-actions, .v2-page-help-answer .v2-disclosure { margin: 0; }
+.v2-page-help-answer .v2-text-button { min-height: 44px; }
+
+.v2-generation-status-line { display: flex; align-items: center; justify-content: space-between; gap: var(--space-xs); }
+.v2-generation-status-line:has(> .v2-page-help-trigger) > .v2-generation-state { margin: 0; }
+.v2-generation-status-line:has(> .v2-page-help-trigger) { margin-bottom: var(--space-xs); }
+
+@media (max-width: 40rem) {
+  .v2-result-actions:has(> .v2-page-help-trigger) .v2-current-shift { flex-basis: 0; }
+}
+@media (max-width: 25rem) {
+  .v2-result-actions:has(> .v2-page-help-trigger) .v2-current-shift > span { display: none; }
+}

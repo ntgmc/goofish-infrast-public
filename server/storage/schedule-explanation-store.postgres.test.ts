@@ -65,6 +65,17 @@ it('shares trial allowance across profiles and atomically stops at the account l
   expect((await reserveScheduleExplanation({ ...second, cacheKey: randomUUID() })).attemptId).toBeNull()
 })
 
+it('accounts for a workspace request without creating a saved report or keeping the profile identifier', async () => {
+  const report = await fixture()
+  const input = { ...report, resultId: null, cacheKey: randomUUID() }
+  const [first, duplicate] = await Promise.all([reserveScheduleExplanation(input), reserveScheduleExplanation(input)])
+  const accepted = first.attemptId ? first : duplicate
+  expect([first, duplicate].filter((row) => row.attemptId)).toHaveLength(1)
+  await settleScheduleExplanation(input, accepted.attemptId!, accounted('{"keys":["candidate-1"]}', 600))
+  expect(await getAiUsage(accepted.attemptId!)).toMatchObject({ item: { profile_id: null, result_id: null, status: 'succeeded', cost_micro_cny: 600 }, explanation: null })
+  expect(await readScheduleExplanation(report)).toMatchObject({ explanation: null, quota: { remaining: 2 } })
+})
+
 it('returns unused quota after failure or a crashed request while keeping uncertain expenses in the budget', async () => {
   const input = await fixture()
   const first = await reserveScheduleExplanation(input)

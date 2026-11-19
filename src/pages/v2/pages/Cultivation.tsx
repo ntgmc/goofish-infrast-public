@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
-import { useLocation } from 'react-router'
-import { authPath } from '../../../lib/auth-navigation'
+import GuestAccountLink from '../../../components/GuestAccountLink'
 import { useTaskDraft } from '../../../lib/task-drafts'
+import { useSiteFeatures } from '../../../lib/site-feature-context'
+import { allocateCultivationMaterials } from '../../../lib/cultivation-planner'
 import { matchesSearch } from '../../../lib/search'
 import { RefreshIcon, UndoIcon, ExcludeIcon, NextIcon, ExternalLinkIcon } from '../../../components/icons'
 import { copy } from '../../../copy'
@@ -10,25 +11,27 @@ import { DataRefresh, DataSkeleton } from '../components/DataActivity'
 import { defaultCultivationQuery, type CultivationCandidate, type CultivationData, type CultivationOptions } from '../../../lib/cultivation-contract'
 import { useCultivation } from '../../CultivationPlanPage'
 import CultivationProjectImport from '../../../components/CultivationProjectImport'
-import { projectFromCultivationCandidate } from '../../../lib/cultivation-project-import'
+import { projectFromCultivationCandidate, type CultivationProjectScope } from '../../../lib/cultivation-project-import'
 import { number, CultivationTraining, CultivationEvidence } from '../../cultivation/CultivationResults'
 import CultivationFilters from '../../cultivation/CultivationFilters'
 import { SpecialItemRates, useSpecialItems } from '../../cultivation/CultivationSpecialItems'
 import type { V2Session } from '../OptionsDrawer'
+import type { UpgradeSuggestion } from '../../../lib/types'
 import { v2Path } from '../navigation'
 import Link from '../../../components/InternalLink'
 import { EmptyState, Facts, Field, Loading, Notice, SectionTitle } from '../components/WorkspaceUI'
 import './cultivation.css'
+import CultivationAdvisor, { cultivationMaterialFacts } from '../CultivationAdvisor'
 
 type Model = ReturnType<typeof useCultivation>
 const text = copy.tools.cultivation
 
-export default function Cultivation({ session }: { session: V2Session }) {
-  const location = useLocation()
+export default function Cultivation({ session, upgradeSuggestions }: { session: V2Session; upgradeSuggestions?: UpgradeSuggestion[] }) {
+  const { features } = useSiteFeatures()
   const m = useCultivation(session)
   const [view, setView] = useTaskDraft('cultivation:view', 'priorities')
   const appliedQuery = m.appliedOptions.recommendation ?? defaultCultivationQuery
-  const projectScope = session.user && m.profileId ? { userId: session.user.id, profileId: m.profileId } : null
+  const projectScope = features.cultivation_projects && session.user && m.profileId ? { userId: session.user.id, profileId: m.profileId } : null
   const importProjects = m.recommendations?.flatMap((candidate) => { const project = projectFromCultivationCandidate(candidate); return project ? [project] : [] }) ?? []
   return <div className="v2-cultivation-workspace">
     <div className="v2-cultivation-source">
@@ -37,7 +40,9 @@ export default function Cultivation({ session }: { session: V2Session }) {
         {session.authStatus === 'authenticated' && m.profiles.length ? <>
           <label className="v2-field"><span>{text.profile}</span><select className="v2-input" value={m.profileId} onChange={(event) => m.setChosenProfile(event.target.value)}>{m.profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.display_name}</option>)}</select></label>
           <button type="button" className="v2-button v2-button-primary" disabled={m.busy} aria-busy={m.busy} onClick={() => void m.load()}><RefreshIcon size={16} aria-hidden="true" />{copy.skland.refresh}</button>
-        </> : session.authLoading ? <Loading label={text.loading} /> : <div className="v2-cultivation-access"><p>{session.authStatus === 'authenticated' ? text.noProfile : text.login}</p><Link className="v2-button v2-button-secondary" to={!session.user ? authPath('login', `${location.pathname}${location.search}${location.hash}`) : v2Path('profiles', session.activeProfile?.id)}>{text.loginAction}</Link></div>}
+        </> : session.authLoading ? <Loading label={text.loading} /> : session.authStatus === 'error' ? null
+          : !session.user ? <GuestAccountLink label={copy.v2.guestAccount.cultivation} description={copy.v2.guestAccount.cultivationHelp} />
+            : <div className="v2-cultivation-access"><p>{text.noProfile}</p><Link className="v2-button v2-button-secondary" to={v2Path('profiles', session.activeProfile?.id)}>{copy.v2.manageProfiles}</Link></div>}
         {projectScope && <Link className="v2-text-button v2-cultivation-project-link" to={v2Path('cultivation-projects', m.profileId)}>{copy.cultivationProjects.title}<NextIcon size={14} aria-hidden="true" /></Link>}
       </div>
       <div className="v2-data-feedback"><DataRefresh key={m.profileId} pending={m.busy} revision={m.data} error={Boolean(m.error)}
@@ -61,7 +66,9 @@ export default function Cultivation({ session }: { session: V2Session }) {
           <div className="v2-cultivation-apply"><button type="button" className="v2-button v2-button-primary" disabled={m.busy} onClick={m.apply}>{text.apply}</button>{m.changed && <p role="status">{text.settingsChanged}</p>}</div>
         </div>
       </details>
-      <div className="v2-cultivation-outcome v2-data-arrival" aria-busy={m.busy}>
+      {projectScope && view !== 'special' && <CandidateAdvisor scope={projectScope} data={m.data} candidates={view === 'comparison' ? m.data.candidates : m.recommendations}
+        upgradeSuggestions={m.profileId === session.activeProfile?.id ? upgradeSuggestions : undefined} />}
+      <div className="v2-cultivation-outcome v2-data-arrival">
         <nav className="v2-view-switch v2-cultivation-views" aria-label={text.title}>{[['priorities', text.suggestions], ['comparison', text.comparison], ['special', text.specialItems]].map(([id, title]) => <button type="button" key={id} title={title} aria-pressed={view === id} onClick={() => setView(id)}>{text.views[id as keyof typeof text.views]}</button>)}</nav>
         <section hidden={view !== 'priorities'}>
           <SectionTitle title={text.suggestions} description={text.adviceHint} action={projectScope && <CultivationProjectImport key={`${projectScope.profileId}:${JSON.stringify(importProjects)}`} scope={projectScope} projects={importProjects} batch v2 partial={m.recommendations.some((candidate) => Boolean(candidate.target.moduleId) || candidate.target.potential > candidate.current.potential)} />} />
@@ -85,11 +92,32 @@ export default function Cultivation({ session }: { session: V2Session }) {
           })}</ol>}
         </section>
         <section hidden={view !== 'comparison'}><CandidateComparison model={m} data={m.data} /></section>
-        <section hidden={view !== 'special'}><SpecialItems key={m.profileId} data={m.data} preference={m.appliedOptions.preference} /></section>
+        <section hidden={view !== 'special'}><SpecialItems key={m.profileId} data={m.data} preference={m.appliedOptions.preference} scope={projectScope} active={view === 'special'} /></section>
       </div>
       <div className="v2-cultivation-dates"><p>{text.dataDate}<time dateTime={m.data.updatedAt}>{new Date(m.data.updatedAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}</time></p><p>{text.importDate}<time dateTime={m.data.importedAt}>{new Date(m.data.importedAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}</time></p></div>
-    </> : !m.busy && !session.authLoading && <EmptyState title={text.load}>{text.description}</EmptyState>}
+    </> : !m.busy && session.authStatus === 'authenticated' && m.profiles.length > 0 && <EmptyState title={text.load}>{text.description}</EmptyState>}
   </div>
+}
+
+function CandidateAdvisor({ scope, data, candidates, upgradeSuggestions }: { scope: CultivationProjectScope; data: CultivationData; candidates: CultivationCandidate[]; upgradeSuggestions?: UpgradeSuggestion[] }) {
+  const rows = useMemo(() => {
+    const gains = new Map<string, number>()
+    for (const suggestion of upgradeSuggestions ?? []) {
+      const gain = suggestion.roi?.daily_sanity_gain
+      if (suggestion.type === 'single' && suggestion.id && gain != null) gains.set(`${suggestion.id}:${suggestion.current}:${suggestion.target}`, gain)
+    }
+    return candidates.filter((row) => !row.satisfied).map((row) => {
+      const project = projectFromCultivationCandidate(row)
+      const target = `${copy.cultivationProjects.elites[row.target.elite]} Lv.${row.target.level}${row.target.skill ? ` · ${copy.cultivationProjects.skillName(row.target.skill)} ${copy.cultivationProjects.skillRank(row.target.skillLevel)}` : ''}`
+      const gain = gains.get(`${row.operatorId}:${row.current.elite}:${row.target.elite}`)
+      return { id: row.key, title: `${row.name} · ${target}`,
+        facts: [...cultivationMaterialFacts(row.items, data, row.warnings), `${text.weightedDemand} ${number(row.weightedFrequency ?? row.frequency)} · ${text.stageCount} ${row.stageCount}`,
+          ...(gain == null ? [] : [copy.v2.workspaceAssistant.matchedGain(number(gain))])],
+        projects: project ? [project] : [], partial: Boolean(row.target.moduleId) || row.target.potential > row.current.potential }
+    })
+  }, [data, candidates, upgradeSuggestions])
+  const assistant = copy.v2.workspaceAssistant
+  return <CultivationAdvisor scope={scope} rows={rows} description={`${assistant.cultivationHelp}${assistant.cultivationScope}`} />
 }
 
 function Operator({ row, data, rank }: { row: CultivationCandidate; data: CultivationData; rank?: number }) {
@@ -127,7 +155,7 @@ function CandidateComparison({ model: m, data }: { model: Model; data: Cultivati
   </>
 }
 
-function SpecialItems({ data, preference }: Parameters<typeof useSpecialItems>[0]) {
+function SpecialItems({ data, preference, scope, active }: Parameters<typeof useSpecialItems>[0] & { scope: CultivationProjectScope | null; active: boolean }) {
   const m = useSpecialItems({ data, preference })
   const [search, setSearch] = useState('')
   const items = m.items.filter((item) => matchesSearch(`${item.name} ${item.scope}`, search))
@@ -143,6 +171,7 @@ function SpecialItems({ data, preference }: Parameters<typeof useSpecialItems>[0
         <p>{m.selected.scope}</p><p className="v2-special-condition">{text.specialConditions[m.selected.kind]}</p>
         {m.selected.expiresAt && <p>{text.expiry} {new Date(m.selected.expiresAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}</p>}
         {!m.selected.available ? <Notice>{text.itemExpired}</Notice> : !m.recommendations.length ? <EmptyState title={text.noItemUses} /> : <>
+          {scope && active && m.selected.count !== 0 && <SpecialItemAdvisor key={m.selected.id} item={m.selected} recommendations={m.recommendations} scope={scope} data={data} />}
           <h3 className="v2-special-recommendation-title">{text.specialRecommendations}</h3>
           <ol className="v2-special-recommendations">{m.recommendations.slice(0, m.visible).map((row, index) => <li key={row.key}>
             <span className="v2-cultivation-rank">{String(index + 1).padStart(2, '0')}</span>
@@ -156,4 +185,14 @@ function SpecialItems({ data, preference }: Parameters<typeof useSpecialItems>[0
     </div>}
     {data.specialItemsUpdatedAt && <p className="v2-data-date">{text.specialDate} · {new Date(data.specialItemsUpdatedAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}</p>}
   </>
+}
+
+function SpecialItemAdvisor({ item, recommendations, scope, data }: { item: NonNullable<ReturnType<typeof useSpecialItems>['selected']>; recommendations: ReturnType<typeof useSpecialItems>['recommendations']; scope: CultivationProjectScope; data: CultivationData }) {
+  const assistant = copy.v2.workspaceAssistant
+  return <CultivationAdvisor scope={scope} title={assistant.specialItem} description={`${item.name} · ${assistant.specialHint}`} rows={recommendations.map((row) => {
+    const saved = allocateCultivationMaterials(row.items, {}, data).sanity
+    return { id: row.key, title: `${row.name}${row.skill ? ` · ${text.skillName(row.skill)}` : ''}`,
+      facts: [text.specialConditions[item.kind], `${text.weightedDemand} ${number(row.demand)}`,
+        ...(item.kind === 'selector' ? [row.owned ? text.ownedOperator : text.newOperator] : [row.warnings.length || saved === null ? assistant.unknownCost : assistant.itemSaving(number(saved))])] }
+  })} />
 }

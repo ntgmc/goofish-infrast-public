@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { DormitoryIcon as BedDouble, ManufactureIcon as Factory, FiammettaIcon as Flame, TradingStationIcon as Store, PowerPlantIcon as Zap, DroneIcon, SelectedIcon as Check, ConfigIcon, NextIcon as ArrowRight, ExpandIcon as ChevronDown } from './icons'
+import { DormitoryIcon as BedDouble, ManufactureIcon as Factory, FiammettaIcon as Flame, TradingStationIcon as Store, PowerPlantIcon as Zap, DroneIcon, SelectedIcon as Check, ConfigIcon, NextIcon as ArrowRight, ExpandIcon as ChevronDown, ErrorIcon, ServiceOverloadedIcon, SuccessIcon, FacilitiesIcon, InventoryIcon, RecyclingStationIcon } from './icons'
 import { Tabs } from './ui/tabs'
 import {
   CONFIG_PRESETS,
@@ -135,25 +135,30 @@ interface ConfigEditorProps {
   hideHeader?: boolean
   hidePresetActions?: boolean
   hideValidation?: boolean
+  guideSklandImport?: boolean
 }
 
 export default function ConfigEditor({
   profileId, config, canEdit, readOnly = false, readOnlyMessage = copy.common.configGenerationReadOnly, canEditIntermediateInventory,
   canSelectPreset = false, canEditFixedShiftHours = false, showOrundumPreference = false, changed = false, permission,
   validation, onUpdate, note, embedded = false, hideHeader = false,
-  hidePresetActions = false, hideValidation = false,
+  hidePresetActions = false, hideValidation = false, guideSklandImport = false,
 }: ConfigEditorProps) {
   const [section, setSection] = useState('common')
   const [reviewedOrundumKey, setReviewedOrundumKey] = useState('')
   const [importing, setImporting] = useState(false)
-  const [importNotice, setImportNotice] = useState('')
+  const [importFeedback, setImportFeedback] = useState<{ kind: 'imported'; previousDataTime?: string } | { kind: 'error'; message: string } | null>(null)
   const importRequest = useRef<AbortController | null>(null)
   useEffect(() => {
     setImporting(false)
-    setImportNotice('')
+    setImportFeedback(null)
     return () => importRequest.current?.abort()
   }, [profileId, readOnly])
   const roomsTabRef = useRef<HTMLButtonElement>(null)
+  const roomsPanelRef = useRef<HTMLDivElement>(null)
+  const orundumTabRef = useRef<HTMLButtonElement>(null)
+  const executionHeadingRef = useRef<HTMLHeadingElement>(null)
+  const executionReviewRef = useRef<HTMLDivElement>(null)
   const canUseIntermediateInventory = canEdit || Boolean(canEditIntermediateInventory)
   const supported252 = getRightFull252Variant(config) !== null || isFullBlood252Config(config)
   const needsLayout = !hasConfirmedFacilityLayout(config)
@@ -173,6 +178,7 @@ export default function ConfigEditor({
   const presetId = config.desc === copy.v2.configCustomPreset ? '' : Object.keys(CONFIG_PRESETS).find((id) => presetMatches(config, CONFIG_PRESETS[id])) ?? ''
   const activeSection = section === 'orundum' && !showOrundum ? 'common' : section
   const orundumKey = JSON.stringify([profileId, config.product_requirements])
+  const rebalanceInventory = allowsInventoryProductRebalance(config, canEdit)
 
   const update = (mutate: (next: LicenseConfig) => void) => {
     if (!readOnly) onUpdate(mutate)
@@ -181,7 +187,27 @@ export default function ConfigEditor({
     setSection('rooms')
     requestAnimationFrame(() => {
       const tab = roomsTabRef.current
-      if (tab?.getAttribute('aria-selected') === 'true') tab.focus({ preventScroll: true })
+      if (tab?.getAttribute('aria-selected') !== 'true') return
+      tab.focus({ preventScroll: true })
+      const panel = roomsPanelRef.current
+      if (guideSklandImport && panel?.getClientRects().length) panel.scrollIntoView({ block: 'start', behavior: 'instant' })
+    })
+  }
+  const showOrundumInventory = () => {
+    setSection('orundum')
+    setReviewedOrundumKey(orundumKey)
+    requestAnimationFrame(() => {
+      const tab = orundumTabRef.current
+      if (tab?.getAttribute('aria-selected') === 'true') tab.focus()
+    })
+  }
+  const showExecution = () => {
+    setSection('common')
+    requestAnimationFrame(() => {
+      const heading = executionHeadingRef.current
+      if (!heading?.getClientRects().length) return
+      heading.focus({ preventScroll: true })
+      executionReviewRef.current?.scrollIntoView({ block: 'nearest', behavior: 'instant' })
     })
   }
   const importSklandConfig = async () => {
@@ -189,7 +215,7 @@ export default function ConfigEditor({
     const controller = new AbortController()
     importRequest.current = controller
     setImporting(true)
-    setImportNotice('')
+    setImportFeedback(null)
     try {
       const response = await apiJson<{ configuration: unknown; configuration_error?: string; fetched_at: string; refresh_warning?: string }>('/api/user/skland/facilities', {
         method: 'POST', json: { profile_id: profileId }, signal: controller.signal, timeoutMs: 90_000, fallbackMessage: copy.common.facilityLayoutReadFailed,
@@ -209,10 +235,10 @@ export default function ConfigEditor({
         delete next.facility_layout
         Object.assign(next, imported)
       })
-      setImportNotice(response.refresh_warning ? copy.skland.configWarning(new Date(response.fetched_at).toLocaleString('zh-CN')) : copy.skland.importConfigSuccess)
-      showRooms()
+      setImportFeedback({ kind: 'imported', previousDataTime: response.refresh_warning ? new Date(response.fetched_at).toLocaleString('zh-CN') : undefined })
+      if (!guideSklandImport) showRooms()
     } catch (error) {
-      if (!controller.signal.aborted) setImportNotice(error instanceof Error ? error.message : copy.common.facilityLayoutReadFailed)
+      if (!controller.signal.aborted) setImportFeedback({ kind: 'error', message: error instanceof Error ? error.message : copy.common.facilityLayoutReadFailed })
     } finally {
       if (importRequest.current === controller) importRequest.current = null
       if (!controller.signal.aborted) setImporting(false)
@@ -221,6 +247,7 @@ export default function ConfigEditor({
   const applyPreset = (id: string) => {
     const preset = CONFIG_PRESETS[id]
     if (!preset) return
+    if (guideSklandImport) setImportFeedback(null)
     setReviewedOrundumKey('')
     update((next) => {
       const stock = normalizeIntermediateInventory(next.intermediate_inventory)
@@ -267,6 +294,14 @@ export default function ConfigEditor({
     applyCounts(next)
   })
 
+  const imported = importFeedback?.kind === 'imported' ? importFeedback : null
+  const importError = importFeedback?.kind === 'error' ? importFeedback.message : null
+  const previousDataTime = imported?.previousDataTime
+  const ImportIcon = previousDataTime ? ServiceOverloadedIcon : imported ? SuccessIcon : ErrorIcon
+  const importTitle = importError ? copy.skland.configReview.failed : previousDataTime ? copy.skland.configReview.previousTitle : copy.skland.configReview.success
+  const importDetail = importError ?? (previousDataTime ? copy.skland.configReview.previousData(previousDataTime) : null)
+  const importMessageId = useId()
+
   return (
     <Tabs.Root value={activeSection} onValueChange={(value) => {
       setSection(value)
@@ -288,14 +323,25 @@ export default function ConfigEditor({
         <Tabs.Trigger value="common">{text.common}</Tabs.Trigger>
         <Tabs.Trigger ref={roomsTabRef} value="rooms">{text.rooms}{needsLayout && <span className="config-task-pending" aria-label={text.needsLayout} />}</Tabs.Trigger>
         <Tabs.Trigger value="inventory">{text.inventory}</Tabs.Trigger>
-        {showOrundum && <Tabs.Trigger value="orundum">{text.orundum}{reviewedOrundumKey !== orundumKey && <span className="config-task-pending config-task-pending--orundum" aria-label={text.needsOrundumReview} />}</Tabs.Trigger>}
+        {showOrundum && <Tabs.Trigger ref={orundumTabRef} value="orundum">{text.orundum}{reviewedOrundumKey !== orundumKey && <span className="config-task-pending config-task-pending--orundum" aria-label={text.needsOrundumReview} />}</Tabs.Trigger>}
         <Tabs.Trigger value="strategy">{text.strategy}</Tabs.Trigger>
       </Tabs.List>
-      {profileId && <div className="config-field mt-4">
-        <button type="button" className="tool-secondary-action min-h-11 px-4" disabled={readOnly || importing} aria-busy={importing} onClick={() => void importSklandConfig()}><SklandIcon />{importing ? copy.skland.importingConfig : copy.skland.importConfig}</button>
-        <p className="config-help">{copy.skland.importConfigHelp}</p>
+      {profileId && <div className={guideSklandImport ? 'config-skland-import' : 'config-field mt-4'} data-imported={guideSklandImport && imported ? true : undefined}>
+        <button type="button" className="tool-secondary-action min-h-11 px-4 config-skland-trigger" disabled={readOnly || (!guideSklandImport && importing)}
+          aria-busy={importing} aria-disabled={guideSklandImport && importing ? true : undefined} aria-describedby={guideSklandImport ? importMessageId : undefined}
+          onClick={() => void importSklandConfig()}><SklandIcon />{importing ? copy.skland.importingConfig : guideSklandImport && imported ? text.reimportConfig : copy.skland.importConfig}</button>
+        <p id={importMessageId} className={guideSklandImport && importFeedback ? 'sr-only' : 'config-help config-skland-help'}>{guideSklandImport ? copy.skland.configReview.importHelp : copy.skland.importConfigHelp}</p>
+        {guideSklandImport && <div className={importFeedback ? 'config-skland-feedback' : 'sr-only'} data-kind={importError ? 'error' : imported?.previousDataTime ? 'previous' : imported ? 'success' : undefined}>
+          <div role="status" aria-atomic="true" className="config-skland-message">
+            {(imported || importError) && <><ImportIcon size={18} aria-hidden="true" /><div>
+              <strong>{importTitle}</strong>
+              {importDetail && <p>{importDetail}</p>}
+            </div></>}
+          </div>
+          {imported && <button type="button" className="tool-secondary-action" onClick={showExecution}>{copy.skland.configReview.reviewExecution}<ArrowRight size={16} aria-hidden="true" /></button>}
+        </div>}
       </div>}
-      {importNotice && <p role="status" className="tool-alert mt-3">{importNotice}</p>}
+      {!guideSklandImport && (importError || imported) && <p role="status" className="tool-alert mt-3">{importError ?? (imported?.previousDataTime ? copy.skland.configWarning(imported.previousDataTime) : copy.skland.importConfigSuccess)}</p>}
       <fieldset disabled={readOnly || importing} aria-busy={importing} className="config-editor-fields" aria-label={copy.common.components_ConfigEditor_021}>
         <Tabs.Content value="common" forceMount hidden={activeSection !== 'common'} className="config-task-panel config-task-panel--common">
           <h3 className="sr-only">{text.commonTitle}</h3>
@@ -338,44 +384,54 @@ export default function ConfigEditor({
               </div>
               <p id="config-calculation-help" className="config-help">{copy.common.quickCalculationHelp}</p>
             </section>
-            <section aria-labelledby="config-schedule-heading" className="config-field">
-              <h4 id="config-schedule-heading">{copy.v2.configExecution}</h4>
-              <div className="config-execution-options" role="group" aria-label={copy.common.components_ConfigEditor_061}>
-                {(['maa', 'rotation'] as const).map((mode) => <button key={mode} type="button"
-                  aria-pressed={mode === 'rotation' ? rotationMode : !rotationMode}
-                  className={`tool-secondary-action ${rotationMode === (mode === 'rotation') ? 'tool-option-selected' : ''}`}
-                  onClick={() => update((next) => { next.schedule_mode = mode; applyCounts(next) })}>
-                  {SCHEDULE_MODE_LABELS[mode]}
-                </button>)}
-              </div>
-              <p className="config-help">{rotationMode ? copy.common.components_ConfigEditor_062 : text.maaHelp}</p>
-            </section>
-            {!rotationMode && <ShiftHoursEditor value={config.shift_hours} variableMode={variableShiftMode} canEdit={canEdit}
-              canEditFixedShiftHours={canEditFixedShiftHours} onChange={changeHours}
-              onSelectVariable={() => update((next) => {
-                next.schedule_mode = 'variable'
-                next.shift_hours = [8, 8, 8]
-                next.Fiammetta = { ...next.Fiammetta, enable: false }
-                next.variable_shift_schedule = {
-                  ...next.variable_shift_schedule, enable: true, enabled: true, max_shifts: 4,
-                  shift_step_minutes: 60, min_low_hours: 3, beam_width: 4,
-                  trace_variable_shifts: false, trace_mood_cycle: false,
-                }
-                applyCounts(next)
-              })} />}
+            <div ref={executionReviewRef} className="config-execution-review config-review-anchor" data-imported={guideSklandImport && imported ? true : undefined}>
+              <section aria-labelledby="config-schedule-heading" className="config-field">
+                <h4 id="config-schedule-heading" ref={executionHeadingRef} tabIndex={guideSklandImport ? -1 : undefined}>{copy.v2.configExecution}</h4>
+                <div className="config-execution-options" role="group" aria-label={copy.common.components_ConfigEditor_061}>
+                  {(['maa', 'rotation'] as const).map((mode) => <button key={mode} type="button"
+                    aria-pressed={mode === 'rotation' ? rotationMode : !rotationMode}
+                    className={`tool-secondary-action ${rotationMode === (mode === 'rotation') ? 'tool-option-selected' : ''}`}
+                    onClick={() => update((next) => { next.schedule_mode = mode; applyCounts(next) })}>
+                    {SCHEDULE_MODE_LABELS[mode]}
+                  </button>)}
+                </div>
+                <p className="config-help">{rotationMode ? copy.common.components_ConfigEditor_062 : text.maaHelp}</p>
+              </section>
+              {!rotationMode && <ShiftHoursEditor value={config.shift_hours} variableMode={variableShiftMode} canEdit={canEdit}
+                canEditFixedShiftHours={canEditFixedShiftHours} onChange={changeHours}
+                onSelectVariable={() => update((next) => {
+                  next.schedule_mode = 'variable'
+                  next.shift_hours = [8, 8, 8]
+                  next.Fiammetta = { ...next.Fiammetta, enable: false }
+                  next.variable_shift_schedule = {
+                    ...next.variable_shift_schedule, enable: true, enabled: true, max_shifts: 4,
+                    shift_step_minutes: 60, min_low_hours: 3, beam_width: 4,
+                    trace_variable_shifts: false, trace_mood_cycle: false,
+                  }
+                  applyCounts(next)
+                })} />}
+              {guideSklandImport && imported && <button type="button" className="tool-secondary-action config-skland-room-review" onClick={showRooms}>
+                {copy.skland.configReview.reviewRooms}<ArrowRight size={16} aria-hidden="true" />
+              </button>}
+            </div>
           </div>
-          {needsLayout && <button key={presetId || 'custom'} type="button" className="tool-secondary-action config-layout-notice" onClick={showRooms}>
+          {needsLayout && !(guideSklandImport && imported) && <button key={presetId || 'custom'} type="button" className="tool-secondary-action config-layout-notice" onClick={showRooms}>
             <span>{text.confirmLayout}</span>
             <span className="config-layout-arrows" aria-hidden="true">{[0, 1, 2].map((index) => <ArrowRight key={index} size={16} />)}</span>
           </button>}
         </Tabs.Content>
-        <Tabs.Content value="rooms" forceMount hidden={activeSection !== 'rooms'} className="config-task-panel">
-          <FacilityLayoutEditor key={JSON.stringify([profileId, config.trading_stations_count, config.manufacturing_stations_count, config.trading_station_levels, config.manufacturing_station_levels])}
+        <Tabs.Content ref={roomsPanelRef} value="rooms" forceMount hidden={activeSection !== 'rooms'} className={`config-task-panel config-review-anchor${guideSklandImport ? ' config-rooms-panel' : ''}`}>
+          <FacilityLayoutEditor showLayoutPreview={guideSklandImport} key={JSON.stringify([profileId, config.trading_stations_count, config.manufacturing_stations_count, config.trading_station_levels, config.manufacturing_station_levels])}
             config={config} readOnly={readOnly} onUpdate={update} />
+          <div className={guideSklandImport ? 'config-room-options' : 'contents'}>
           <details className="config-room-settings">
-            <summary><span><strong>{text.roomSettings}</strong><small>{text.roomSummary(config.trading_stations_count, config.manufacturing_stations_count, config.layout.split('-')[2])}</small></span><ChevronDown size={18} aria-hidden="true" /></summary>
+            <summary>
+              {guideSklandImport && <FacilitiesIcon className="config-room-summary-icon" aria-hidden="true" />}
+              <span><strong>{text.roomSettings}</strong><small>{text.roomSummary(config.trading_stations_count, config.manufacturing_stations_count, config.layout.split('-')[2])}</small></span>
+              <ChevronDown className="config-room-chevron" size={18} aria-hidden="true" />
+            </summary>
             <div className="config-room-settings-body">
-              {supported252 && <p className="tool-alert tool-alert--warning text-xs leading-5" role="note">{copy.common.components_ConfigEditor_109}</p>}
+              {supported252 && !guideSklandImport && <p className="tool-alert tool-alert--warning text-xs leading-5" role="note">{copy.common.components_ConfigEditor_109}</p>}
               {!supported252 && <section aria-labelledby="config-room-layout-heading">
                 <h3 id="config-room-layout-heading" className="config-section-title">{copy.common.components_ConfigEditor_042}</h3>
                 <div className="config-room-counts">
@@ -389,8 +445,8 @@ export default function ConfigEditor({
                   </div>
                 </div>
               </section>}
-              <section aria-labelledby="config-product-counts-heading">
-                <h3 id="config-product-counts-heading" className="config-section-title">{copy.common.components_ConfigEditor_048}</h3>
+              <section aria-labelledby="config-product-counts-heading" className={guideSklandImport && supported252 ? 'config-products-readonly' : undefined}>
+                <h3 id="config-product-counts-heading" className={guideSklandImport && supported252 ? 'sr-only' : 'config-section-title'}>{copy.common.components_ConfigEditor_048}</h3>
                 <div className="config-product-groups">
                   <ProductGroupEditor station="trading" label={copy.common.components_ConfigEditor_049} products={tradingProducts}
                     counts={config.product_requirements.trading_stations} canEdit={canEdit && !supported252}
@@ -400,28 +456,42 @@ export default function ConfigEditor({
                     onChange={(product, value) => update((next) => { next.product_requirements.manufacturing_stations[product] = value; applyCounts(next) })} />
                 </div>
               </section>
+              {supported252 && guideSklandImport && <details className="config-252-note config-explanation">
+                <summary>{text.layout252Help}</summary>
+                <p>{copy.common.components_ConfigEditor_109}</p>
+              </details>}
             </div>
           </details>
-          <section className="config-field config-field--inline">
-            <label htmlFor="config-recycling-level" className="config-section-title">{copy.domain.recycling.level}</label>
+          <section className={guideSklandImport ? 'config-editor-card config-recycling-card' : 'config-field config-field--inline'} aria-labelledby="config-recycling-label">
+            <label id="config-recycling-label" htmlFor="config-recycling-level" className={guideSklandImport ? 'config-strategy-heading' : 'config-section-title'}>
+              {guideSklandImport && <RecyclingStationIcon aria-hidden="true" />}{copy.domain.recycling.level}
+            </label>
             <select id="config-recycling-level" aria-describedby="config-recycling-help" className="tool-field" value={config.recycling_station_level ?? 0} disabled={readOnly}
               onChange={(event) => { const level = Number(event.currentTarget.value); update((next) => { next.recycling_station_level = level }) }}>
               <option value={0}>{copy.domain.recycling.disabled}</option>
               {[1, 2, 3].map((level) => <option key={level} value={level}>Lv.{level}</option>)}
             </select>
-            <p id="config-recycling-help" className="config-help">{copy.domain.recycling.help}{profileId && copy.skland.configRecyclingManual}</p>
+            <p id="config-recycling-help" className="config-help">{guideSklandImport && profileId ? text.recyclingHelp : `${copy.domain.recycling.help}${profileId ? copy.skland.configRecyclingManual : ''}`}</p>
           </section>
+          </div>
         </Tabs.Content>
-        <Tabs.Content value="inventory" forceMount hidden={activeSection !== 'inventory'} className="config-task-panel">
-          <section aria-labelledby="config-inventory-heading">
-            <h3 id="config-inventory-heading" className="config-section-title">{copy.common.components_ConfigEditor_077}</h3>
+        <Tabs.Content value="inventory" forceMount hidden={activeSection !== 'inventory'} className={`config-task-panel${guideSklandImport ? ' config-stock-panel' : ''}`}>
+          <section aria-labelledby="config-inventory-heading" className={guideSklandImport ? 'config-editor-card config-stock-card' : undefined}>
+            <h3 id="config-inventory-heading" className={guideSklandImport ? 'config-strategy-heading' : 'config-section-title'}>
+              {guideSklandImport && <InventoryIcon aria-hidden="true" />}{guideSklandImport ? text.schedulingInventory : copy.common.components_ConfigEditor_077}
+            </h3>
             <div className="config-inventory-grid">
               <IntermediateInventoryField product="Pure Gold" label={PRODUCT_LABELS['Pure Gold']}
                 value={inventory['Pure Gold']} canEdit={canUseIntermediateInventory} onChange={updateInventory} />
             </div>
+            {guideSklandImport && showOrundum && <button type="button" className="tool-secondary-action config-stock-link" onClick={showOrundumInventory}>
+              {text.openOrundumInventory}<ArrowRight size={16} aria-hidden="true" />
+            </button>}
+          </section>
+          <section aria-labelledby="config-rebalance-label" className={guideSklandImport ? 'config-editor-card config-rebalance-card' : undefined}>
             <label className="config-switch-row">
-              <span>{copy.common.inventoryProductRebalanceLabel}</span>
-              <Switch checked={allowsInventoryProductRebalance(config, canEdit)} disabled={!canUseIntermediateInventory || rotationMode}
+              <span id="config-rebalance-label">{copy.common.inventoryProductRebalanceLabel}</span>
+              <Switch checked={rebalanceInventory} disabled={!canUseIntermediateInventory || rotationMode} aria-describedby="config-rebalance-help"
                 onChange={(event) => {
                   const enabled = event.currentTarget.checked
                   update((next) => {
@@ -432,7 +502,9 @@ export default function ConfigEditor({
                   })
                 }} />
             </label>
-            <p className="config-help">{rotationMode ? copy.common.inventoryProductRebalanceRotation : copy.common.inventoryProductRebalanceHelp}</p>
+            <p id="config-rebalance-help" className="config-help">{rotationMode ? copy.common.inventoryProductRebalanceRotation : guideSklandImport
+              ? rebalanceInventory ? text.inventoryRebalanceOn : text.inventoryRebalanceOff
+              : copy.common.inventoryProductRebalanceHelp}</p>
           </section>
         </Tabs.Content>
         {showOrundum && <Tabs.Content value="orundum" forceMount hidden={activeSection !== 'orundum'} className="config-task-panel">

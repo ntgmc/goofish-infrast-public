@@ -38,6 +38,17 @@ describe('Drizzle feature settings storage', () => {
     expect(stored.rows[0]?.updated_at.toISOString()).toBe(saved.updated_at)
   })
 
+  it('preserves pause notices during ordinary writes and honors explicit removal', async () => {
+    const features = { ...DEFAULT_SITE_FEATURE_SETTINGS.features, schedule_comparison: false, cultivation_projects: false }
+    const pauseNotices = { schedule_comparison: '正在维护', cultivation_projects: '正在更新数据' }
+    const paused = await saveSiteFeatureSettings(features, 0, pauseNotices)
+    expect((await getSiteFeatureSettings()).pause_notices).toEqual(pauseNotices)
+    const reopened = await saveSiteFeatureSettings({ ...features, schedule_comparison: true }, paused.revision)
+    expect(reopened.pause_notices).toEqual({ cultivation_projects: pauseNotices.cultivation_projects })
+    await saveSiteFeatureSettings(reopened.features, reopened.revision, {})
+    expect((await getSiteFeatureSettings()).pause_notices).toBeUndefined()
+  })
+
   it('retains the stored billing setting while keeping the effective feature retired', async () => {
     const saved = await saveSiteFeatureSettings({ ...DEFAULT_SITE_FEATURE_SETTINGS.features, metered_billing: true }, 0)
     const stored = await getSiteFeatureSettings()

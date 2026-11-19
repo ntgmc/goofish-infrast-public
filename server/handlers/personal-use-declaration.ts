@@ -4,6 +4,7 @@ import {
   toPublicPersonalUseDeclaration,
   type PersonalUseDeclarationAction,
 } from '../personal-use-declaration'
+import { isProfileExpired } from '../../src/lib/product-catalog'
 import { getRequestClientIp } from '../security/client-ip'
 import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson } from '../security/request-validation'
@@ -20,7 +21,7 @@ export default async function personalUseDeclarationHandler(req: Request): Promi
       const profileId = new URL(req.url).searchParams.get('profile_id')
       if (profileId) {
         const profile = await getProfileForUser(auth.user.id, profileId)
-        if (!profile || (!isFreePreviewProfile(profile) && profile.kind !== 'metered_personal')) {
+        if (!profile || (!isFreePreviewProfile(profile) && !isProfileExpired(profile) && profile.kind !== 'metered_personal')) {
           return jsonResponse({ error: '该操作仅适用于免费预览或个人按次档案。' }, 403)
         }
       }
@@ -49,7 +50,7 @@ export default async function personalUseDeclarationHandler(req: Request): Promi
       if (action === 'generated_result_export' || action === 'optimization_generate') {
         if (!profileId) return jsonResponse({ error: '请先选择游戏账号。', code: 'profile_id_invalid' }, 400)
         const profile = await getProfileForUser(auth.user.id, profileId)
-        if (!profile || (!isFreePreviewProfile(profile) && profile.kind !== 'metered_personal')) {
+        if (!profile || (!isFreePreviewProfile(profile) && !isProfileExpired(profile) && profile.kind !== 'metered_personal')) {
           return jsonResponse({ error: '该操作仅适用于免费预览或个人按次档案。' }, 403)
         }
       }

@@ -6,7 +6,7 @@ import FeedbackButton from '../../components/FeedbackDialog'
 import { copy } from '../../copy'
 import { useSiteFeatures } from '../../lib/site-feature-context'
 import type { OptionPanel, V2Session } from './OptionsDrawer'
-import { sectionLabels, v2Path, v2SectionAvailable, type V2Section } from './navigation'
+import { sectionLabels, v2Path, v2SectionAvailable, v2SectionPauseNotice, type V2Section } from './navigation'
 
 const text = copy.v2
 const workspaceEntries = ['overview', 'generation', 'plans', 'lab'] as const
@@ -28,7 +28,7 @@ export default function V2Navigation({ section, session, operatorCount, sampleOp
   onPanel: (panel: OptionPanel) => void
   onClose: () => void
 }) {
-  const { features } = useSiteFeatures()
+  const { features, pauseNotices } = useSiteFeatures()
   const location = useLocation()
   const more = useRef<HTMLDetailsElement>(null)
   useEffect(() => {
@@ -47,11 +47,12 @@ export default function V2Navigation({ section, session, operatorCount, sampleOp
   const signedIn = session.authStatus === 'authenticated' && Boolean(session.user)
   const moreCurrent = moreEntries.some((entry) => entry === section)
   function item(entry: typeof workspaceEntries[number] | typeof utilityEntries[number] | typeof moreEntries[number], label = sectionLabels[entry]) {
-    if (!v2SectionAvailable(entry, features)) return null
+    const pause = v2SectionPauseNotice(entry, pauseNotices)
+    if (!pause && !v2SectionAvailable(entry, features)) return null
     const Icon = icons[entry]
     const current = section === entry
     const active = current || entry === 'tools' && (toolSections.includes(section) || !signedIn && section === 'cultivation-projects')
-    const contents = <><Icon size={19} aria-hidden="true" /><span>{label}</span>
+    const contents = <><Icon size={19} aria-hidden="true" /><span>{label}</span>{pause && <small className="v2-feature-pause-badge">{copy.features.paused_title}</small>}
       {entry === 'announcements' && session.announcementUnreadCount > 0 && <small>{session.announcementUnreadCount}</small>}</>
     return <Link key={entry} className={`v2-nav-item ${active ? 'v2-nav-active' : ''}`} to={v2Path(entry, session.activeProfile?.id)}
       state={{ authBackTo: `${location.pathname}${location.search}${location.hash}` }}
@@ -68,7 +69,7 @@ export default function V2Navigation({ section, session, operatorCount, sampleOp
           {item('pricing', text.guestNavigation.pricing)}
         </>}
       </div>
-      {signedIn && utilityEntries.some((entry) => v2SectionAvailable(entry, features)) && <div className="v2-nav-section" role="group" aria-label={text.sidebar.tools}>
+      {signedIn && utilityEntries.some((entry) => v2SectionAvailable(entry, features) || v2SectionPauseNotice(entry, pauseNotices)) && <div className="v2-nav-section" role="group" aria-label={text.sidebar.tools}>
         <p className="v2-nav-label" aria-hidden="true">{text.sidebar.tools}</p>
         {utilityEntries.map((entry) => item(entry))}
       </div>}

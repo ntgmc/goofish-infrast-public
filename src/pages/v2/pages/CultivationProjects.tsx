@@ -1,6 +1,5 @@
-import { useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
-import { useLocation } from 'react-router'
-import { authPath } from '../../../lib/auth-navigation'
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import GuestAccountLink from '../../../components/GuestAccountLink'
 import { NextIcon as ArrowRight, AddIcon as Plus, RefreshIcon, SaveIcon, CultivationIcon, ResourceCalendarIcon, DailyOutputIcon } from '../../../components/icons'
 import { copy } from '../../../copy'
 import OperatorPicker from '../../../components/OperatorPicker'
@@ -23,21 +22,27 @@ import { MaterialBrowser, MaterialButton } from './ProjectMaterials'
 import ProjectGoal from './ProjectGoal'
 import { ProjectMaaExport } from './ProjectMaaExport'
 import './cultivation-projects.css'
+import AccountChanges from '../AccountChanges'
+import CultivationAdvisor, { cultivationMaterialFacts } from '../CultivationAdvisor'
+import { cultivationChanges } from '../../../lib/account-changes'
+import type { AssistantCandidate } from '../../../lib/workspace-assistant'
+import { useSiteFeatures } from '../../../lib/site-feature-context'
 
 const text = copy.cultivationProjects
 const number = (amount: number) => amount.toLocaleString('zh-CN', { maximumFractionDigits: 1 })
 const profession = (operator: ProjectOperator) => copy.tools.cultivation.professions[operator.profession as keyof typeof copy.tools.cultivation.professions] ?? ''
 
 export default function CultivationProjects({ session, onConfig }: { session: V2Session; onConfig: () => void }) {
-  const location = useLocation()
   const profile = session.activeProfile
   if (session.authLoading) return <Loading label={copy.v2.loading} />
   if (session.authStatus === 'error') return <Notice error>{session.authError?.message ?? text.authFailed}<button className="v2-text-button" onClick={session.retryAuth}>{text.retry}</button></Notice>
-  if (!session.user || !profile?.skland_binding || profile.status !== 'active' || profile.archived_at) return <EmptyState title={session.user ? text.noBinding : text.login} action={<Link className="v2-button v2-button-primary" to={!session.user ? authPath('login', `${location.pathname}${location.search}${location.hash}`) : v2Path('profiles', profile?.id)}>{text.profiles}</Link>} />
+  if (!session.user) return <GuestAccountLink label={copy.v2.guestAccount.projects} description={copy.v2.guestAccount.projectsHelp} />
+  if (!profile?.skland_binding || profile.status !== 'active' || profile.archived_at) return <EmptyState title={text.noBinding} action={<Link className="v2-button v2-button-primary" to={v2Path('profiles', profile?.id)}>{text.profiles}</Link>} />
   return <ProjectWorkspace key={`${session.user.id}:${profile.id}`} session={session} profile={profile} onConfig={onConfig} />
 }
 
 function ProjectWorkspace({ session, profile, onConfig }: { session: V2Session; profile: UserGameAccount; onConfig: () => void }) {
+  const { features } = useSiteFeatures()
   const m = useCultivationProjects(session, profile)
   const [editing, setEditing] = useState<CultivationProject | null>(null)
   const [editorOpen, setEditorOpen] = useState(false)
@@ -45,6 +50,23 @@ function ProjectWorkspace({ session, profile, onConfig }: { session: V2Session; 
   const workbench = useRef<HTMLDivElement>(null)
   const changeView = (next: string) => { setView(next); workbench.current?.scrollIntoView({ block: 'start' }) }
   const route = !m.pendingRefresh ? m.plans?.route : null
+  const previousData = useRef<CultivationData | null>(null)
+  const [changes, setChanges] = useState<AssistantCandidate[] | null>(null)
+  useEffect(() => {
+    const previous = previousData.current
+    const current = m.data
+    previousData.current = current
+    if (!current) { setChanges(null); return }
+    if (previous && (previous.snapshotVersion ?? previous.importedAt) !== (current.snapshotVersion ?? current.importedAt)
+      && Date.parse(current.importedAt) >= Date.parse(previous.importedAt)) {
+      setChanges(cultivationChanges(previous, current, m.projects))
+    }
+  }, [m.data, m.projects])
+  const advisorRows = useMemo(() => m.materials.flatMap(({ candidate, project }) => {
+    if (!candidate || candidate.satisfied || !m.data) return []
+    return [{ id: candidate.key, title: `${candidate.name} · ${copy.cultivationProjects.elites[project.elite]} Lv.${project.level}`,
+      facts: [...cultivationMaterialFacts(candidate.items, m.data, candidate.warnings), copy.v2.workspaceAssistant.cultivationScope] }]
+  }), [m.data, m.materials])
   const [applied, setApplied] = useState(false)
   const canConfigure = Boolean(session.license && canEditConfig(session.license))
   const baseConfig = m.production?.normal?.config ?? session.configOverride ?? session.license?.config
@@ -58,13 +80,18 @@ function ProjectWorkspace({ session, profile, onConfig }: { session: V2Session; 
     setApplied(true)
   }
   return <div className="v2-projects">
-    <div className="v2-tool-source v2-project-source"><div><span className="v2-label">{text.account} · {profile.display_name}</span><p>{text.description}</p><Link className="v2-text-button" to={v2Path('cultivation', profile.id)}>{text.suggestionsEntry}<ArrowRight size={14} /></Link></div><button className="v2-button v2-button-primary" disabled={m.busy} aria-busy={m.busy} onClick={() => void m.load()}>{copy.skland.refresh}<RefreshIcon size={16} aria-hidden="true" /></button>
+    <div className="v2-tool-source v2-project-source"><div><span className="v2-label">{text.account} · {profile.display_name}</span><p>{text.description}</p>{features.cultivation_plan && <Link className="v2-text-button" to={v2Path('cultivation', profile.id)}>{text.suggestionsEntry}<ArrowRight size={14} /></Link>}</div><button className="v2-button v2-button-primary" disabled={m.busy} aria-busy={m.busy} onClick={() => void m.load()}>{copy.skland.refresh}<RefreshIcon size={16} aria-hidden="true" /></button>
       <div className="v2-data-feedback"><DataRefresh pending={m.busy} revision={m.data} error={Boolean(m.error)}
         label={m.phase === 'syncing' ? copy.v2.dataActivity.syncing : copy.v2.dataActivity.calculating} /></div>
     </div>
     <Notice error>{m.error}</Notice><Notice>{m.storageError ? text.storageFailed : null}</Notice>
     {m.busy && !m.data && !m.projects.length && <DataSkeleton layout="projects" />}
     {m.data?.warnings.map((warning) => <Notice key={warning}>{warning}</Notice>)}
+    {changes && m.data && !m.busy && !m.error && <details className="v2-disclosure"><summary>{copy.v2.workspaceAssistant.changes}</summary>
+      <AccountChanges userId={session.user!.id} profileId={profile.id} changes={changes}>
+        {changes.length > 0 && <button type="button" className="v2-text-button" onClick={() => changeView('plan')}>{text.route}</button>}
+      </AccountChanges>
+    </details>}
     {(m.data || m.projects.length > 0) && <>
       <Tabs.Root ref={workbench} value={view} onValueChange={changeView} className="v2-project-workbench">
         <div className="v2-project-toolbar">
@@ -79,6 +106,7 @@ function ProjectWorkspace({ session, profile, onConfig }: { session: V2Session; 
           <div className="v2-project-list-heading"><SectionTitle title={text.targets} description={text.orderHint} />
             <span className="v2-muted">{text.targetCount(m.projects.filter(project => !project.paused).length, m.projects.filter(project => project.paused).length)}</span>
           </div>
+          {!m.busy && !m.pendingRefresh && view === 'targets' && <CultivationAdvisor scope={{ userId: session.user!.id, profileId: profile.id }} rows={advisorRows} />}
           <ol className="v2-project-list">{m.projects.map((project, index) => {
             const operator = m.data?.projectOperators?.find((row) => row.id === project.operatorId)
             const name = operator?.name ?? session.license?.operators?.find((row) => row.id === project.operatorId)?.name ?? project.operatorId

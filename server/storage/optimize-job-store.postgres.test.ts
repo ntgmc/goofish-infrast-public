@@ -850,7 +850,15 @@ describe('PostgreSQL optimization job admission', () => {
     expect(claimed).toMatchObject({ id: admitted.job.id, status: 'running', expires_at: null, execution_stage: 'starting' })
 
     await expect(store.heartbeatAttempt(admitted.job.id, claimed!.attempt_count, 'worker-b', 'attempt-lock', new Date(Date.now() + 60_000).toISOString())).resolves.toBe(false)
-    await expect(store.heartbeatAttempt(admitted.job.id, claimed!.attempt_count, 'worker-a', 'attempt-lock', new Date(Date.now() + 60_000).toISOString())).resolves.toBe(true)
+    const renewedUntil = new Date(Date.now() + 120_000).toISOString()
+    await expect(store.heartbeatAttempt(admitted.job.id, claimed!.attempt_count, 'worker-a', 'attempt-lock', renewedUntil)).resolves.toBe(true)
+    expect((await query(
+      `select job.heartbeat_at = attempt.heartbeat_at as synchronized,
+              job.lock_expires_at = $2::timestamptz as renewed
+       from optimize_jobs job join optimize_job_attempts attempt on attempt.job_id = job.id
+       where job.id = $1 and attempt.attempt_no = job.attempt_count`,
+      [admitted.job.id, renewedUntil],
+    )).rows[0]).toEqual({ synchronized: true, renewed: true })
     await expect(store.updateAttemptStage(admitted.job.id, claimed!.attempt_count, 'worker-b', 'attempt-lock', 'simulating_upgrades')).resolves.toBe(false)
     await expect(store.updateAttemptStage(admitted.job.id, claimed!.attempt_count, 'worker-a', 'attempt-lock', 'simulating_upgrades')).resolves.toBe(true)
     await expect(store.getJob(admitted.job.id)).resolves.toMatchObject({ execution_stage: 'simulating_upgrades' })
@@ -1832,6 +1840,71 @@ describe('PostgreSQL optimization job admission', () => {
       'select record_json from cdk_records where key = $1',
       [key],
     )).rows[0]?.record_json.latest_operator_fingerprint?.hash).toBe(fingerprint.hash)
+  })
+})
+
+describe('PostgreSQL attempt heartbeat atomicity', () => {
+  async function runningJob() {
+    const store = createPostgresOptimizeJobStore()
+    const job = await store.createJob(input())
+    const workerId = `heartbeat-${randomUUID()}`
+    const lockToken = randomUUID()
+    await query(
+      `update optimize_jobs set status = 'running', attempt_count = 1, worker_id = $2, lock_token = $3,
+         heartbeat_at = '2026-01-01', lock_expires_at = '2026-01-02', started_at = '2026-01-01'
+       where id = $1`,
+      [job.id, workerId, lockToken],
+    )
+    await query(
+      `insert into optimize_job_attempts (job_id, attempt_no, worker_id, lock_token, status, started_at, heartbeat_at)
+       values ($1, 1, $2, $3, 'running', '2026-01-01', '2026-01-01')`,
+      [job.id, workerId, lockToken],
+    )
+    return { store, id: job.id, workerId, lockToken }
+  }
+
+  async function records(id: string) {
+    return (await query(
+      `select to_jsonb(job) as job, to_jsonb(attempt) as attempt
+       from optimize_jobs job join optimize_job_attempts attempt on attempt.job_id = job.id
+       where job.id = $1`,
+      [id],
+    )).rows
+  }
+
+  it.each(['attempt', 'worker', 'token', 'cancelled', 'finished'] as const)(
+    'leaves both records unchanged for a %s heartbeat', async (condition) => {
+      const { store, id, workerId, lockToken } = await runningJob()
+      try {
+        if (condition === 'cancelled') await query('update optimize_jobs set cancel_requested_at = now() where id = $1', [id])
+        if (condition === 'finished') await query("update optimize_jobs set status = 'succeeded' where id = $1", [id])
+        const before = await records(id)
+        await expect(store.heartbeatAttempt(
+          id, condition === 'attempt' ? 2 : 1,
+          condition === 'worker' ? 'stale-worker' : workerId,
+          condition === 'token' ? 'stale-token' : lockToken,
+          new Date(Date.now() + 60_000).toISOString(),
+        )).resolves.toBe(false)
+        expect(await records(id)).toEqual(before)
+      } finally {
+        await query('delete from optimize_jobs where id = $1', [id])
+      }
+    },
+  )
+
+  it('rolls back the job renewal when the attempt heartbeat cannot be written', async () => {
+    const { store, id, workerId, lockToken } = await runningJob()
+    const before = await records(id)
+    await query(`alter table optimize_job_attempts add constraint test_heartbeat_rollback check (job_id <> '${id}') not valid`)
+    try {
+      await expect(store.heartbeatAttempt(
+        id, 1, workerId, lockToken, new Date(Date.now() + 60_000).toISOString(),
+      )).rejects.toMatchObject({ code: '23514', constraint: 'test_heartbeat_rollback' })
+      expect(await records(id)).toEqual(before)
+    } finally {
+      await query('alter table optimize_job_attempts drop constraint test_heartbeat_rollback')
+      await query('delete from optimize_jobs where id = $1', [id])
+    }
   })
 })
 

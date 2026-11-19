@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
 import { Navigate, useLocation, useSearchParams } from 'react-router'
 import { BackIcon as ArrowLeft, NextIcon as ArrowRight } from '../../components/icons'
 import { Link } from 'react-router'
+import GuestAccountLink from '../../components/GuestAccountLink'
 import { authPath } from '../../lib/auth-navigation'
 import { copy } from '../../copy'
 import { useSiteFeatures } from '../../lib/site-feature-context'
@@ -11,11 +12,10 @@ import { isFreePreviewProfile, isSchedulableProfile } from '../tool/tool-utils'
 import type { OptimizationTaskCenterController } from '../tool/optimize/useOptimizationTaskCenter'
 import type { AuthSuccessResponse } from '../../lib/types'
 import type { V2Session } from './OptionsDrawer'
-import { sectionLabels, V2_GUEST_SECTIONS, v2Path, v2SectionAvailable, type V2Section } from './navigation'
+import { sectionLabels, V2_GUEST_SECTIONS, v2Path, v2SectionAvailable, v2SectionPauseNotice, type V2Section } from './navigation'
 import { V2SectionLoading } from './V2LoadingScreen'
 import FirstScheduleGuide from './FirstScheduleGuide'
 import ProfileUpgrade, { ProfileUpgradeEntry } from './ProfileUpgrade'
-import { SectionTitle } from './components/WorkspaceUI'
 
 const Profiles = lazy(() => import('./pages/Accounts'))
 const AddAccount = lazy(() => import('./pages/AddAccount'))
@@ -71,13 +71,14 @@ export default function WorkspaceSections({ section, session, workflow, generati
   firstSchedule?: boolean
   configConfirmed?: boolean
 }) {
-  const { features } = useSiteFeatures()
+  const { features, pauseNotices } = useSiteFeatures()
   const { content } = usePublicContent()
   const [params] = useSearchParams()
   const location = useLocation()
   const upgrading = section === 'add-account' && params.get('mode') === 'upgrade' && Boolean(session.activeProfile && isFreePreviewProfile(session.activeProfile)) && features.cdk_redemption
   const title = upgrading ? copy.v2.profileUpgrade.title : section === 'help' ? content.faq.title : section === 'pricing' ? content.pricing.title : sectionLabels[section]
   const available = v2SectionAvailable(section, features)
+  const pause = v2SectionPauseNotice(section, pauseNotices)
   const [openedTools, setOpenedTools] = useState<V2Section[]>([])
   useEffect(() => {
     if (available && ['manual-tool', 'schedule-comparison', 'cultivation', 'thanks-recruitment', 'cultivation-projects', 'training-ratio', 'material-demand', 'depot'].includes(section)) setOpenedTools((current) => current.includes(section) ? current : [...current, section])
@@ -97,15 +98,11 @@ export default function WorkspaceSections({ section, session, workflow, generati
     {guided && <FirstScheduleGuide step={step} />}
     <div className="v2-section-body">
       <Suspense fallback={<V2SectionLoading label={section === 'inventory' ? copy.inventory.loading : undefined} />}>
-        {section === 'overview' ? null : !available ? <p className="v2-panel v2-section-loading" role="status">{copy.v2.featureUnavailable}</p>
-          : section === 'generation' && !signedIn ? <section className="v2-first-schedule-task">
-            <SectionTitle title={copy.v2.firstSchedule.login} description={copy.v2.firstSchedule.loginContinue} />
-            <div className="v2-actions">
-              {features.login && <Link className="v2-button v2-button-primary" to={authPath('login', `${location.pathname}${location.search}${location.hash}`)}>{copy.auth.components_AuthForm_008}</Link>}
-              {features.registration && <Link className={`v2-button ${features.login ? 'v2-button-secondary' : 'v2-button-primary'}`} to={authPath('register', `${location.pathname}${location.search}${location.hash}`)}>{copy.auth.components_AuthForm_009}</Link>}
-              {!features.login && !features.registration && <p role="status">{copy.features.closed_body}</p>}
-            </div>
-          </section>
+        {section === 'overview' ? null : pause ? <div className="v2-panel v2-section-loading v2-feature-pause-notice" role="status"><h2>{copy.features.paused_title}</h2><p>{pause}</p></div>
+          : !available ? <p className="v2-panel v2-section-loading" role="status">{copy.v2.featureUnavailable}</p>
+          : section === 'generation' && !signedIn ? <div className="v2-first-schedule-task">
+            <GuestAccountLink label={features.registration ? copy.v2.guestAccount.firstSchedule : copy.auth.components_AuthForm_008} description={copy.v2.guestAccount.firstScheduleHelp} />
+          </div>
           : needsLogin ? <Navigate to={authPath('login', `${location.pathname}${location.search}${location.hash}`, undefined, location.state?.authBackTo)} replace />
             : needsWorkspace ? section === 'generation' && session.activeProfile && isSchedulableProfile(session.activeProfile)
               ? <div className="v2-panel v2-section-loading"><p>{copy.v2.generationImport}</p><button className="v2-button v2-button-primary" type="button" onClick={onOperators}>{copy.public.pages_LandingPage_001}</button></div>
@@ -142,7 +139,7 @@ export default function WorkspaceSections({ section, session, workflow, generati
       <Suspense fallback={<V2SectionLoading />}>
         {tool === 'manual-tool' && v2SectionAvailable(tool, features) && <ManualTool session={session} workflow={workflow} onDirtyChange={onToolDirtyChange} onOpenProfile={onOpenProfile} onNavigate={onNavigate} />}
         {tool === 'schedule-comparison' && v2SectionAvailable(tool, features) && <ScheduleComparison session={session} onOpenProfile={onOpenProfile} />}
-        {tool === 'cultivation' && v2SectionAvailable(tool, features) && <Cultivation session={session} />}
+        {tool === 'cultivation' && v2SectionAvailable(tool, features) && <Cultivation session={session} upgradeSuggestions={workflow?.suggestions} />}
         {tool === 'thanks-recruitment' && v2SectionAvailable(tool, features) && <ThanksRecruitment session={session} embedded />}
         {tool === 'cultivation-projects' && v2SectionAvailable(tool, features) && <CultivationProjects session={session} onConfig={onConfig} />}
         {tool === 'training-ratio' && v2SectionAvailable(tool, features) && <TrainingRatio session={session} embedded />}

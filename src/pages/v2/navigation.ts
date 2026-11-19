@@ -1,5 +1,5 @@
 import { routesCopy } from '../../copy/zh-CN/routes'
-import type { SiteFeatures } from '../../lib/site-features'
+import type { FeaturePauseNotices, PausableSiteFeature, SiteFeatures } from '../../lib/site-features'
 import { METERED_BILLING_AVAILABLE } from '../../lib/site-features'
 
 const V2_SECTIONS = ['overview', 'generation', 'plans', 'lab', 'tools', 'manual-tool', 'schedule-comparison', 'cultivation', 'thanks-recruitment', 'cultivation-projects', 'training-ratio', 'material-demand', 'depot', 'skland', 'profiles', 'add-account', 'inventory', 'commercial', 'balance', 'announcements', 'settings', 'help', 'updates', 'terms', 'privacy', 'disclaimer', 'support', 'status', 'pricing', 'purchase', 'benchmarks'] as const
@@ -26,17 +26,25 @@ export function v2Path(section: V2Section, profileId?: string | null): string {
   return `/v2${params.size ? `?${params}` : ''}`
 }
 
+const sectionFeatures: Partial<Record<V2Section, PausableSiteFeature>> = {
+  'manual-tool': 'manual_schedule', 'schedule-comparison': 'schedule_comparison', lab: 'scenario_comparison',
+  cultivation: 'cultivation_plan', 'cultivation-projects': 'cultivation_projects', 'training-ratio': 'training_ratio',
+  'thanks-recruitment': 'thanks_recruitment', 'material-demand': 'material_demand', depot: 'depot_value',
+}
+
+export function v2SectionPauseNotice(section: V2Section, notices?: FeaturePauseNotices): string | undefined {
+  const feature = sectionFeatures[section]
+  return feature ? notices?.[feature] : undefined
+}
+
 export function v2SectionAvailable(section: V2Section, features: SiteFeatures): boolean {
+  const feature = sectionFeatures[section]
+  if (feature) return features[feature]
   switch (section) {
-    case 'tools': case 'training-ratio': case 'material-demand': return features.site && features.tools
+    case 'tools': return features.tools
     case 'profiles': return features.site && features.profiles
     case 'add-account': return features.site && features.profiles && (features.free_preview || features.cdk_redemption)
     case 'generation': case 'plans': return features.site && features.profiles
-    case 'lab': return features.site && features.profiles && features.scenario_comparison
-    case 'manual-tool': case 'schedule-comparison': return features.site && features.manual_schedule
-    case 'cultivation': case 'cultivation-projects': return features.site && features.cultivation_plan
-    case 'thanks-recruitment': return features.site && features.thanks_recruitment
-    case 'depot': return features.site && features.depot_value
     case 'skland': return features.site && features.profiles && features.skland
     case 'inventory': return features.site && features.inventory
     case 'commercial': case 'balance': return features.site && METERED_BILLING_AVAILABLE && features.metered_billing

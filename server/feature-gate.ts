@@ -1,5 +1,5 @@
 import type { SiteFeatureKey } from '../src/lib/site-features'
-import { computeEffectiveSiteFeatures } from '../src/lib/site-features'
+import { computeEffectiveSiteFeatures, computeVisiblePauseNotices, isPausableSiteFeature } from '../src/lib/site-features'
 import { getSiteFeatureSettings } from './storage/feature-settings-store'
 
 export async function enforceFeatureGate(req: Request): Promise<Response | null> {
@@ -11,9 +11,11 @@ export async function enforceFeatureGate(req: Request): Promise<Response | null>
 export async function requireSiteFeatures(features: readonly SiteFeatureKey[]): Promise<Response | null> {
   if (features.length === 0) return null
   try {
-    const effective = computeEffectiveSiteFeatures(await getSiteFeatureSettings())
+    const settings = await getSiteFeatureSettings()
+    const effective = computeEffectiveSiteFeatures(settings)
     const disabled = features.find((feature) => !effective[feature])
-    return disabled ? featureDisabledResponse(disabled) : null
+    if (!disabled) return null
+    return featureDisabledResponse(disabled, isPausableSiteFeature(disabled) ? computeVisiblePauseNotices(settings)[disabled] : undefined)
   } catch (error) {
     console.error('feature gate settings error:', error)
     return jsonResponse({ error: '功能状态暂时无法获取。', code: 'feature_settings_unavailable' }, 503, {
@@ -35,7 +37,7 @@ function requiredFeatures(pathname: string, method: string): SiteFeatureKey[] {
   if (pathname === '/api/changelog') return ['changelog']
   if (pathname === '/api/status') return ['service_status']
   if (pathname === '/api/depot-value') return ['depot_value']
-  if (pathname === '/api/cultivation-plan') return ['tools', 'cultivation_plan', 'skland']
+  if (pathname === '/api/cultivation-plan') return ['tools', 'skland']
   if (pathname === '/api/usage-stats') return ['login']
 
   if (pathname === '/api/user/data/credential/clear') return ['profiles']
@@ -80,8 +82,8 @@ function requiredFeatures(pathname: string, method: string): SiteFeatureKey[] {
   return []
 }
 
-function featureDisabledResponse(feature: SiteFeatureKey): Response {
-  return jsonResponse({ error: '该功能当前未开放。', code: 'feature_disabled', feature }, 503, {
+export function featureDisabledResponse(feature: SiteFeatureKey, pauseNotice?: string): Response {
+  return jsonResponse({ error: pauseNotice ?? '该功能当前未开放。', code: 'feature_disabled', feature }, 503, {
     'Cache-Control': 'no-store',
   })
 }

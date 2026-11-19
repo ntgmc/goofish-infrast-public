@@ -1,10 +1,10 @@
 import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
-import { hasCapability, resolveRuntimePermission, type CapabilitySubject } from '../../../src/lib/product-catalog'
+import { hasCapability, isProfileExpired, resolveRuntimePermission, type CapabilitySubject } from '../../../src/lib/product-catalog'
 import { hasTrainingDiagnosisEntitlement } from './entitlements'
 import type { OptimizeResult } from "../../../src/lib/types";
 import type { OptimizationFailureSnapshot, OptimizationJobListItem, OptimizationJobListResponse, OptimizationJobSnapshot } from "../../../src/lib/optimization-contracts";
 import { recordUsageEvent } from "../../handlers/usage-stats";
-import { getProfileForUser, normalizeProfileKind } from "../../storage/user-store";
+import { getProfileForUser } from "../../storage/user-store";
 import { requireUserSession } from "../../handlers/user-auth";
 import { authenticateAdminRequest } from '../../handlers/admin-auth';
 import { getOptimizeJobStore, OptimizeJobAdmissionError, type OptimizeJobPriority, type OptimizeJobQueueEstimate, type OptimizeJobRecord, type OptimizeJobSummaryRecord, type OptimizeJobStore } from "../../storage/optimize-job-store";
@@ -286,9 +286,12 @@ async function canReadOptimizeJob(
   if (!profile) return { ok: false, status: 403, message: '无权查看该任务。' };
   const authorization = await resolveProfileAuthorization(profile)
   if (!authorization.ok) return { ok: false, status: authorization.status, message: authorization.message }
+  if (job.source === 'scenario_comparison' && isProfileExpired(authorization.subject)) {
+    return { ok: false, status: 403, message: '免费预览档案不开放场景对比实验室。' }
+  }
   return {
     ok: true,
-    subject: { kind: normalizeProfileKind(profile), permission: authorization.permission },
+    subject: authorization.subject,
   };
 }
 

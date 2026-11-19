@@ -44,7 +44,7 @@ describe('ProfileExpiryPrompt', () => {
     render(<ProfileExpiryPrompt userId="user-1" profiles={[profile]} onOpenExport={onOpenExport} />)
     expect(screen.getByRole('dialog')).toHaveTextContent('测试档案')
     expect(screen.getByRole('dialog')).toHaveTextContent('2026/10/05 12:00')
-    expect(screen.getByRole('dialog')).toHaveTextContent('提前打开并导出需要保留的排班')
+    expect(screen.getByRole('dialog')).toHaveTextContent('之后自动恢复免费预览，已有记录保留')
     fireEvent.click(screen.getByRole('button', { name: copy.dashboard.profile_expiry.export }))
     expect(onOpenExport).toHaveBeenCalledWith(profile)
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()

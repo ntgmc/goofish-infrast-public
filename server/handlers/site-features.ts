@@ -1,4 +1,4 @@
-import { computeEffectiveSiteFeatures } from '../../src/lib/site-features'
+import { computeEffectiveSiteFeatures, computeVisiblePauseNotices } from '../../src/lib/site-features'
 import { getSiteFeatureSettings } from '../storage/feature-settings-store'
 import { jsonResponse } from './user-auth'
 
@@ -6,9 +6,11 @@ export default async function siteFeaturesHandler(req: Request): Promise<Respons
   if (req.method !== 'GET') return jsonResponse({ error: 'Method not allowed' }, 405)
   try {
     const settings = await getSiteFeatureSettings()
+    const pauseNotices = computeVisiblePauseNotices(settings)
     return jsonResponse({
       version: settings.version,
       features: computeEffectiveSiteFeatures(settings),
+      ...(Object.keys(pauseNotices).length > 0 && { pause_notices: pauseNotices }),
       updated_at: settings.updated_at,
     }, 200, { 'Cache-Control': 'no-store' })
   } catch (error) {

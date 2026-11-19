@@ -31,6 +31,25 @@ describe('feature settings', () => {
     })
   })
 
+  it('preserves legacy closures for projects and schedule comparison until those tools are configured', () => {
+    const legacy = normalizeSiteFeatureSettings({ features: { cultivation_plan: false, manual_schedule: false } })
+    expect(legacy.features).toMatchObject({ cultivation_projects: false, schedule_comparison: false, training_ratio: true, material_demand: true })
+    const features = { ...legacy.features, cultivation_projects: true, schedule_comparison: true, material_demand: false, training_ratio: false }
+    expect(computeEffectiveSiteFeatures({ ...legacy, features })).toMatchObject({ cultivation_plan: false, cultivation_projects: true,
+      manual_schedule: false, schedule_comparison: true, material_demand: false, training_ratio: false })
+    expect(computeEffectiveSiteFeatures({ ...legacy, features: { ...features, tools: false } })).toMatchObject({ cultivation_projects: false, schedule_comparison: false })
+  })
+
+  it('preserves the behavior of legacy AI settings and keeps explicit choices independent', () => {
+    const legacy = normalizeSiteFeatureSettings({ features: { ai_schedule_explanation: true } })
+    expect(legacy.features).toMatchObject({ ai_goal_comparison: true, ai_cultivation_advisor: true, ai_change_summary: true, workspace_page_help: true, schedule_explanation_avatar: true })
+    const features = { ...legacy.features, ai_schedule_explanation: false, ai_cultivation_advisor: false, schedule_explanation_avatar: false }
+    expect(computeEffectiveSiteFeatures({ ...legacy, features })).toMatchObject({ ai_schedule_explanation: false,
+      ai_goal_comparison: true, ai_cultivation_advisor: false, ai_change_summary: true, workspace_page_help: true, schedule_explanation_avatar: false })
+    expect(computeEffectiveSiteFeatures({ ...legacy, features: { ...features, scenario_comparison: false } })).toMatchObject({ ai_goal_comparison: false, ai_change_summary: true })
+    expect(computeEffectiveSiteFeatures({ ...legacy, features: { ...features, v2: false } })).toMatchObject({ ai_goal_comparison: false, ai_change_summary: false, workspace_page_help: false })
+  })
+
   it('requires a complete strict boolean map', () => {
     expect(validateSiteFeatures(DEFAULT_SITE_FEATURE_SETTINGS.features)).toEqual(DEFAULT_SITE_FEATURE_SETTINGS.features)
     expect(() => validateSiteFeatures({ ...DEFAULT_SITE_FEATURE_SETTINGS.features, login: 'yes' })).toThrow(/login/)

@@ -62,6 +62,7 @@ const expectedRoutes = [
   '/api/user/skland/free-preview/login/start',
   '/api/user/status',
   '/api/user/workspace',
+  '/api/user/workspace-assistant',
   '/api/usage-stats',
 ]
 

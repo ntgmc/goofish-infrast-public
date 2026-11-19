@@ -32,15 +32,10 @@ export default async function userScheduleExplanationHandler(req: Request): Prom
     if (!authorization.ok) return jsonResponse({ error: authorization.message, code: authorization.code }, authorization.status)
     const stored = await getProfileOptimizationResult(profile.id, ids.result_id)
     if (!stored) return jsonResponse({ error: '排班结果不存在。' }, 404)
-    const result = projectOptimizeResultForCapabilities(parseOptimizeResult(stored.result), {
-      kind: normalizeProfileKind(profile), permission: authorization.permission,
-    }, Boolean(stored.job_id) && await hasTrainingDiagnosisEntitlement(stored.job_id!))
+    const result = projectOptimizeResultForCapabilities(parseOptimizeResult(stored.result), authorization.subject, Boolean(stored.job_id) && await hasTrainingDiagnosisEntitlement(stored.job_id!))
     const summary = buildScheduleExplanationSummary(result)
     const config = await getScheduleExplanationConfig()
-    let monthly = false
-    for (const candidate of await listStoredProfilesForUser(auth.user.id)) {
-      if (normalizeProfileKind(candidate) === 'cdk' && (await resolveProfileAuthorization(candidate)).ok) { monthly = true; break }
-    }
+    const monthly = await hasMonthlyAiQuota(auth.user.id)
     const input = {
       userId: auth.user.id, profileId: profile.id, resultId: stored.id, config, monthly,
       cacheKey: createHash('sha256').update(JSON.stringify([SCHEDULE_EXPLANATION_VERSION, auth.user.id, profile.id, stored.id, summary])).digest('hex'),
@@ -72,6 +67,15 @@ export default async function userScheduleExplanationHandler(req: Request): Prom
     // Provider errors may contain credentials or report data; never log their payloads.
     return jsonResponse({ error: '读取排班解读失败，请稍后重试。', code: 'ai_unavailable' }, 503)
   }
+}
+
+export async function hasMonthlyAiQuota(userId: string): Promise<boolean> {
+  for (const candidate of await listStoredProfilesForUser(userId)) {
+    if (normalizeProfileKind(candidate) !== 'cdk') continue
+    const access = await resolveProfileAuthorization(candidate)
+    if (access.ok && access.subject.kind === 'cdk') return true
+  }
+  return false
 }
 
 function explanationStream(finish: (onDelta: (text: string) => void) => Promise<ScheduleExplanationState>) {

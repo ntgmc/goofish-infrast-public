@@ -7,7 +7,7 @@ import { query, withTransaction, type QueryClient } from './postgres'
 interface ExplanationInput {
   userId: string
   profileId: string
-  resultId: string
+  resultId: string | null
   cacheKey: string
   monthly: boolean
   config: ScheduleExplanationConfig
@@ -31,7 +31,7 @@ export async function reserveScheduleExplanation(input: ExplanationInput) {
       profile_id, result_id, pricing, cost_basis, reserved_micro_cny)
       values ($1, $2, $3, $4, 'pending', $5, now(), $6, $7, $8::jsonb, 'reserved', $5)`,
     [attemptId, input.userId, input.cacheKey, input.monthly ? await currentMonth(client) : 'trial', input.config.reservation,
-      input.profileId, input.resultId, JSON.stringify(pricing)])
+      input.resultId ? input.profileId : null, input.resultId, JSON.stringify(pricing)])
     return { state: { ...state, available: false, pending: true, quota: { ...state.quota, remaining: state.quota.remaining - 1 } }, attemptId }
   })
 }
@@ -44,7 +44,7 @@ export async function settleScheduleExplanation(input: ExplanationInput, attempt
       duration_ms = $9, settled_at = now()
       where id = $1 and status = 'pending' returning user_id`, [attemptId, text ? 'succeeded' : 'failed', cost,
       costBasis, usage ? JSON.stringify(usage) : null, breakdown ? JSON.stringify(breakdown) : null, providerRequestId, errorCode, durationMs])
-    if (!text || !settled.rows[0]?.user_id) return
+    if (!text || !settled.rows[0]?.user_id || !input.resultId) return
     await client.query(`insert into ai_schedule_explanations (cache_key, user_id, profile_id, result_id, explanation, created_at)
       select $1, $2, history.profile_id, history.id, $5, now() from optimization_result_history history
       join user_game_accounts profile on profile.id = history.profile_id and profile.user_id = $2
@@ -54,10 +54,10 @@ export async function settleScheduleExplanation(input: ExplanationInput, attempt
 }
 
 async function readState(client: QueryClient, input: ExplanationInput): Promise<ScheduleExplanationState> {
-  const cached = await client.query<{ explanation: string; created_at: Date }>(
+  const cached = input.resultId ? await client.query<{ explanation: string; created_at: Date }>(
     'select explanation, created_at from ai_schedule_explanations where cache_key = $1 and user_id = $2 and profile_id = $3 and result_id = $4',
     [input.cacheKey, input.userId, input.profileId, input.resultId],
-  )
+  ) : { rows: [] }
   const config = input.config
   const stats = await client.query<{
     used: number; daily_attempts: number; pending: boolean; running: number

@@ -1,6 +1,7 @@
 .schedule-progress {
   container: schedule-progress / inline-size;
   --progress-color: var(--color-brand-500);
+  --progress-sweep-color: rgb(255 255 255 / .32);
   display: grid;
   gap: var(--space-sm);
   min-width: 0;
@@ -93,6 +94,11 @@
 .schedule-progress-front::before { content: ""; position: absolute; inset-block: 0; inset-inline-start: -28px; width: 28px; background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--progress-color) 30%, var(--color-on-brand)) 85%, var(--color-on-brand)); }
 .schedule-progress[data-stage-motion] .schedule-progress-fill { background: linear-gradient(90deg, color-mix(in oklch, var(--progress-color) 65%, var(--color-surface-2)), var(--progress-color)); }
 
+:root:not(.dark) .schedule-progress[data-stage-motion] { --progress-sweep-color: rgb(255 255 255 / .45); }
+:root:not(.dark) .schedule-progress[data-stage-motion][data-animating="true"] .schedule-progress-fill {
+  background: linear-gradient(90deg in oklab, oklch(0.74 0.14 85), oklch(0.66 0.14 45));
+}
+
 @media (prefers-reduced-motion: reduce) { .schedule-progress-front { display: none; } }
 :root[data-reduced-motion] .schedule-progress-front { display: none; }
 
@@ -101,7 +107,7 @@
     content: "";
     position: absolute;
     inset: 0;
-    background: linear-gradient(90deg, transparent, rgb(255 255 255 / .32), transparent);
+    background: linear-gradient(90deg, transparent, var(--progress-sweep-color), transparent);
     animation: schedule-progress-sweep 2.4s linear infinite;
   }
 }

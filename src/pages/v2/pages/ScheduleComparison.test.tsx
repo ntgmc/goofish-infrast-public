@@ -98,6 +98,38 @@ it.each(['saved/saved', 'saved/json', 'json/json'])('compares %s using the same 
   expect(within(experience).getAllByRole('cell')[0]).toHaveTextContent('10,000')
 })
 
+it('shows the reported simulation stage and advances from A to B only after A succeeds', async () => {
+  const progress = copy.domain.schedule_simulation
+  let finishB!: (value: unknown) => void
+  let resume!: () => void
+  mocks.wait.mockImplementation(() => new Promise<void>((resolve) => { resume = resolve }))
+  mocks.snapshot.mockResolvedValueOnce({ status: 'queued', executionPhase: 'initial_queue' })
+    .mockResolvedValueOnce({ status: 'running', calculationStage: 'generating_schedule' })
+    .mockResolvedValueOnce({ status: 'running', calculationStage: 'persisting_result' })
+    .mockResolvedValueOnce({ status: 'succeeded', result: record('A').result })
+    .mockImplementationOnce(() => new Promise((resolve) => { finishB = resolve }))
+  const user = userEvent.setup()
+  render(view())
+  await upload(user, 'before', 'A')
+  await upload(user, 'after', 'B')
+  await user.click(screen.getByRole('button', { name: text.start }))
+  expect(await screen.findByText(progress.queued)).toBeVisible()
+  expect(screen.getByText(text.before, { selector: '[aria-current="step"] > span' })).toBeVisible()
+  expect(mocks.submit).toHaveBeenCalledTimes(1)
+  await act(async () => { resume() })
+  expect(screen.getByText(progress.running)).toBeVisible()
+  await act(async () => { resume() })
+  expect(screen.getByText(progress.saving)).toBeVisible()
+  await act(async () => { resume() })
+  expect(screen.getByText(text.after, { selector: '[aria-current="step"] > span' })).toBeVisible()
+  expect(screen.getByText(progress.complete)).toBeVisible()
+  expect(screen.queryByRole('region', { name: text.production })).not.toBeInTheDocument()
+  expect(mocks.submit).toHaveBeenCalledTimes(2)
+  await act(async () => { finishB({ status: 'succeeded', result: record('B').result }) })
+  expect(screen.getByText(text.simulated)).toBeInTheDocument()
+  expect(screen.getByRole('region', { name: text.production })).toBeVisible()
+})
+
 it('keeps per-file errors local and clears prior results after replacing an input', async () => {
   const user = userEvent.setup()
   render(view())

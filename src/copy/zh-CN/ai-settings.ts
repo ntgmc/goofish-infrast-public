@@ -1,6 +1,6 @@
 export const aiSettingsCopy = {
   title: 'AI 服务配置',
-  description: '配置排班解读使用的服务商、模型、费用和账号额度。保存后用于新的生成请求，已有解读继续保留。',
+  description: '配置排班解读和工作台助手共用的服务商、模型、费用与账号额度。保存后用于新的 AI 请求。',
   loading: '正在加载 AI 设置…',
   load_failed: '加载 AI 设置失败。',
   save: '保存 AI 设置',
@@ -10,7 +10,7 @@ export const aiSettingsCopy = {
   conflict: '配置已被其他管理员更新，本次修改尚未保存。请重新载入后编辑。',
   discard: '重新载入会丢弃当前未保存的 AI 设置，是否继续？',
   enabled: '开放 AI 排班解读',
-  enabled_help: '与“功能开关”中的 AI 排班解读同步。关闭后停止新的生成，已有解读仍可查看。',
+  enabled_help: '与「功能开关 → 工作台助手」中的排班解读同步。可在那里分别设置各助手，以及暂停生成时是否保留排班解读头像。',
   inherited_off: '上级功能当前关闭，排班解读暂不可用。',
   connection: '服务连接',
   provider: '服务商名称',

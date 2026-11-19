@@ -31,6 +31,28 @@ export const domainCopy = {
     training: "训练室",
     unlock: (elite: number, level: number) => elite === 0 ? `初始 Lv.${level}` : `精英 ${elite} · Lv.${level}`,
   },
+  schedule_simulation: {
+    submitting: '正在提交排班',
+    queued: '正在等待模拟',
+    retry: '等待自动重试',
+    running: '正在模拟产量',
+    runningManual: '正在测算排班',
+    saving: '正在保存结果',
+    reconnecting: '正在重新获取进度',
+    pending: '待模拟',
+    active: '当前',
+    complete: '已完成',
+    compareHint: '两份排班依次模拟，完成后可查看日产量差异。',
+    manualHint: '按提交时的安排测算效率、产量和心情。',
+    hints: {
+      submitting: undefined,
+      running: undefined,
+      queued: '轮到这份排班后会自动开始。',
+      retry: '系统会自动重试，无需重新提交。',
+      reconnecting: '任务会继续处理，无需重新提交。',
+      saving: '模拟已完成，稍后即可查看结果。',
+    },
+  },
   manual_schedule: {
     history_warning: "手动排班 · 按手动安排测算，心情可能无法持续循环，请核对心情测算结果后使用。",
     hint: "调整干员和无人机安排后，可模拟效率、产量和心情。",
@@ -600,6 +622,7 @@ export const domainCopy = {
   // src/lib/production-sanity.ts
   lib_production_sanity_003: " - 消耗 ",
   // src/lib/scenario-comparison.ts
+  scenarioCurrentLayout: '当前布局',
   scenario252FixedProduction: "252 配置的各产物设施数量固定，请使用预设生产方案。",
   // src/lib/scenario-comparison.ts
   lib_scenario_comparison_001: "无人机关闭",

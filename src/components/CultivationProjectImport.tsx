@@ -17,7 +17,7 @@ export default function CultivationProjectImport({ scope, projects, batch = fals
 }) {
   const { features } = useSiteFeatures()
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null)
-  if (!features.site || !features.cultivation_plan || !features.v2 || !projects.length) return null
+  if (!features.cultivation_projects || !projects.length) return null
   function add() {
     try {
       const merged = mergeCultivationProjects(readCultivationProjects(scope), projects)

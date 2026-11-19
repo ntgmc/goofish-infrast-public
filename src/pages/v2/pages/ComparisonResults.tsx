@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { copy, CURRENT_LOCALE } from '../../../copy'
 import type { LicenseConfig } from '../../../lib/types'
 import type { ScenarioComparisonPoint, ScenarioComparisonResult } from '../../../lib/scenario-comparison'
+import type { ComparisonGoal } from '../../../lib/workspace-assistant'
 import ScenarioParetoChart from '../../tool/optimize/scenario-lab/ScenarioParetoChart'
 import { Facts, Notice, SectionTitle } from '../components/WorkspaceUI'
 
@@ -17,14 +18,18 @@ const productionColumns = [
 const sanityColumns = [{ key: 'productionSanityPerDay', label: text.sanity }] as const
 type MetricKey = (typeof productionColumns)[number]['key'] | 'productionSanityPerDay' | 'operationsPerDay'
 
-export default function ComparisonResults({ result, disabled, onApply }: {
+const goalMetricKeys = { lmd: 'lmdPerDay', experience: 'battleRecordPerDay', orundum: 'orundumPerDay', sanity: 'productionSanityPerDay', operations: 'operationsPerDay' } as const
+export const comparisonMetricLabels = { lmd: text.lmd, experience: text.experience, orundum: text.orundum, sanity: text.sanity, operations: text.operations }
+
+export default function ComparisonResults({ result, goal, disabled, onApply }: {
   result: ScenarioComparisonResult
+  goal?: ComparisonGoal | null
   disabled: boolean
   onApply: (config: LicenseConfig) => void
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [baselineId, setBaselineId] = useState<string | null>(null)
-  const [production, setProduction] = useState(false)
+  const [production, setProduction] = useState(Boolean(goal?.metrics.some((metric) => metric === 'lmd' || metric === 'experience' || metric === 'orundum')))
   const [sort, setSort] = useState<{ key: MetricKey; ascending: boolean } | null>(null)
   const available = result.points.filter((point) => point.status === 'succeeded' && (point.verified ?? point.screening))
   const selected = result.points.find((point) => point.id === selectedId)
@@ -45,6 +50,7 @@ export default function ComparisonResults({ result, disabled, onApply }: {
   return <section className="v2-comparison-outcome">
     <SectionTitle title={text.results} description={text.resultsHelp} />
     <Facts items={[[text.count, result.scenarioCount], [text.verified, result.verifiedCount], [text.failed, result.failedCount]]} />
+    {goal && <GoalAdvice points={available} goal={goal} onSelect={setSelectedId} />}
     <div className="v2-comparison-toolbar">
       <div className="v2-view-switch" role="group" aria-label={text.display}>
         <button type="button" aria-pressed={!production} onClick={() => { setProduction(false); setSort(null) }}>{text.sanity}</button>
@@ -86,6 +92,43 @@ export default function ComparisonResults({ result, disabled, onApply }: {
       <ScenarioParetoChart points={result.points} selectedId={selected?.id ?? null} onSelect={setSelectedId} />
     </details>
   </section>
+}
+
+function GoalAdvice({ points, goal, onSelect }: { points: ScenarioComparisonPoint[]; goal: ComparisonGoal; onSelect: (id: string) => void }) {
+  const assistant = copy.v2.workspaceAssistant
+  const verified = points.filter((point) => point.verified)
+  const cohorts: { label: string; points: ScenarioComparisonPoint[] }[] = [{ label: text.verified, points: verified }]
+  if (verified.length < points.length) {
+    cohorts.push({ label: text.estimated, points: points.filter((point) => point.screening).map((point) => ({ ...point, verified: undefined })) })
+  }
+  const comparable = cohorts.filter((cohort) => cohort.points.length >= 2)
+  return <div className="v2-goal-preview">
+    <h3>{assistant.comparisonAdvice}</h3>
+    {!comparable.length && <Notice>{assistant.comparisonNoResult}</Notice>}
+    {comparable.map((cohort) => {
+      const leaders = goal.metrics.flatMap((metric) => {
+        const key = goalMetricKeys[metric]
+        const values = cohort.points.flatMap((point) => {
+          const value = metricValue(point, key)
+          return value === null ? [] : [{ point, value }]
+        }).sort((a, b) => metric === 'operations' ? a.value - b.value : b.value - a.value)
+        if (values.length < 2) return []
+        const best = values[0].value
+        return [{ metric, leader: values[0].point, value: best, tied: values.filter((row) => format(row.value) === format(best)).length, delta: Math.abs(best - values[1].value) }]
+      })
+      const priority = leaders.find((row) => row.metric === goal.priority && row.tied === 1)
+      return <div key={cohort.label} className="v2-change-list">
+        <p className="v2-muted">{assistant.comparisonBasis(cohort.label, cohort.points.length)}</p>
+        {priority ? <div>
+          <strong>{assistant.comparisonPick(comparisonMetricLabels[priority.metric])}</strong>{' '}
+          <button type="button" className="v2-text-button" onClick={() => onSelect(priority.leader.id)}>{priority.leader.label}</button>
+          <p>{goal.metrics.map((metric) => `${comparisonMetricLabels[metric]} ${format(metricValue(priority.leader, goalMetricKeys[metric]))}`).join(' · ')}</p>
+          <p className="v2-muted">{assistant.comparisonLead(comparisonMetricLabels[priority.metric], format(priority.delta), priority.metric === 'operations')}</p>
+        </div> : goal.metrics.length > 1 && new Set(leaders.filter((row) => row.tied === 1).map((row) => row.leader.id)).size > 1 && <p>{assistant.comparisonTradeoff}</p>}
+        <ul>{leaders.filter((row) => row !== priority).map(({ metric, leader, value, tied }) => <li key={metric}>{comparisonMetricLabels[metric]} {format(value)} · {tied > 1 ? assistant.comparisonSame : <button type="button" className="v2-text-button" onClick={() => onSelect(leader.id)}>{leader.label}</button>}</li>)}</ul>
+      </div>
+    })}
+  </div>
 }
 
 function Selected({ point, production, disabled, onApply }: { point: ScenarioComparisonPoint; production: boolean; disabled: boolean; onApply: () => void }) {

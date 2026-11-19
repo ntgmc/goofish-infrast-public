@@ -1,4 +1,4 @@
-import { getProfileForUser, isDepotValueProfile, isFreePreviewProfile } from '../storage/user-store'
+import { getProfileForUser, isDepotValueProfile } from '../storage/user-store'
 import { getPermissionProfile } from '../../src/lib/product-catalog'
 import { jsonResponse, requireUserSession, toPublicUser } from './user-auth'
 import { resolveProfileAuthorization } from './profile-authorization'
@@ -21,7 +21,7 @@ export default async (req: Request): Promise<Response> => {
     return jsonResponse({
       user: toPublicUser(auth.user),
       permission: authorization.permission,
-      permission_label: isFreePreviewProfile(profile) ? '免费预览' : getPermissionProfile(authorization.permission).label,
+      permission_label: authorization.subject.kind === 'free_preview' ? '免费预览' : getPermissionProfile(authorization.permission).label,
       status: authorization.cdkRecord?.status ?? profile.status,
       risk_status: 'ok',
     })

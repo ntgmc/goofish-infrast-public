@@ -79,6 +79,15 @@ describe('personal use declaration endpoint', () => {
     })
   })
 
+  it.each(['GET', 'POST'])('accepts %s for an expired paid profile now using free preview', async (method) => {
+    mocks.isFreePreviewProfile.mockReturnValue(false)
+    mocks.getProfileForUser.mockResolvedValue({ id: 'profile-1', user_id: 'user-1', kind: 'cdk', expires_at: '2020-01-01' })
+    const response = await personalUseDeclarationHandler(new Request(`http://localhost/api/user/personal-use-declaration${method === 'GET' ? '?profile_id=profile-1' : ''}`, {
+      method, ...(method === 'POST' ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(confirmationBody('optimization_generate', 'profile-1')) } : {}),
+    }))
+    expect(response.status).toBe(200)
+  })
+
   it('accepts a personal metered profile without treating it as commercial use', async () => {
     mocks.isFreePreviewProfile.mockReturnValue(false)
     mocks.getProfileForUser.mockResolvedValue({ id: 'profile-1', user_id: 'user-1', kind: 'metered_personal' })

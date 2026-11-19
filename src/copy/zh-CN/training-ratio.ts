@@ -33,7 +33,7 @@ export const trainingRatioCopy = {
   applyManual: '按填写库存计算', noManualInventory: '填写库存后点击“按填写库存计算”查看建议。',
   importedSource: '根据导入库存', manualSource: '根据手动填写的库存', accountLoading: '正在读取账号…',
   import: '读取当前库存', importing: '正在读取库存…', refresh: '刷新库存',
-  loginHint: '登录并绑定森空岛后，可读取当前账号的龙门币和经验库存。',
+  bindingHint: '给当前档案绑定森空岛后，即可读取龙门币和经验库存。',
   account: '选择账号', accountEntry: '管理账号', importFailed: '读取钱书库存失败，请重试。',
   importedAt: '库存读取时间', noInventory: '绑定账号后自动读取库存，也可切换到“手动填写”计算。',
   lmd: '龙门币', exp: '作战经验', books: '按经验书数量填写',

@@ -5,12 +5,14 @@ import { SCHEDULE_MODE_LABELS, normalizeScheduleMode } from '../../../lib/config
 import { formatResultHistorySummary, formatWorkspaceDate } from '../../../lib/workspace-history'
 import { WORKSPACE_RESULT_HISTORY_LIMIT, WORKSPACE_SAVED_CONFIG_LIMIT } from '../../../lib/workspace-limits'
 import { useSiteFeatures } from '../../../lib/site-feature-context'
+import { isProfileExpired } from '../../../lib/product-catalog'
 import { getMaaExportNotice } from '../../tool/optimize/maa-export-notice'
 import type { V2Workflow } from '../WorkspaceSections'
 import type { V2Section } from '../navigation'
 import GenerationProgressDemo from '../GenerationProgressDemo'
 import FeedbackButton from '../../../components/FeedbackDialog'
 import { Facts, Notice, SectionTitle } from '../components/WorkspaceUI'
+import PageHelp from './PageHelp'
 
 const text = copy.optimize
 
@@ -35,7 +37,8 @@ export default function Generation({ workflow: w, progress: progressContent, dis
   const latest = w.latestWorkspaceResult
   const readyLabel = w.resultIsCurrent ? text.pages_tool_optimize_GenerateControlBar_001 : w.hasResult ? text.pages_tool_optimize_GenerateControlBar_002 : text.pages_tool_optimize_GenerateControlBar_003
   const busyLabel = saving ? text.generation.saving : w.licenseSyncing ? text.pages_tool_optimize_GenerateControlBar_004 : progress?.queueStatus === 'queued' ? text.pages_tool_optimize_GenerateControlBar_005 : progress?.completedAt ? text.pages_tool_optimize_GenerateControlBar_006 : text.pages_tool_optimize_GenerateControlBar_007
-  const hasCoupons = (w.priorityCouponBalance?.available ?? 0) > 0 || (!w.userCanUseUpgradeFeatures && (w.itemBalances.training_diagnosis_coupon ?? 0) > 0)
+  const canUseTrainingCoupon = !isProfileExpired(w.profile) && !w.userCanUseUpgradeFeatures && (w.itemBalances.training_diagnosis_coupon ?? 0) > 0
+  const hasCoupons = (w.priorityCouponBalance?.available ?? 0) > 0 || canUseTrainingCoupon
   const configLabel = w.userCanEditConfig ? `${SCHEDULE_MODE_LABELS[normalizeScheduleMode(w.activeConfig.schedule_mode)]} · ${w.activeConfig.layout} · ${w.activeConfig.desc}` : `${SCHEDULE_MODE_LABELS[normalizeScheduleMode(w.activeConfig.schedule_mode)]} · ${w.configPresetLabel}`
   if (preparationStep === 1 || preparationStep === 2) return <section className="v2-first-schedule-task">
     <SectionTitle title={preparationStep === 1 ? copy.v2.firstSchedule.import : copy.v2.firstSchedule.configTitle}
@@ -47,7 +50,10 @@ export default function Generation({ workflow: w, progress: progressContent, dis
     </button>
   </section>
   return <div className="v2-generation-workspace">
-    <div className="v2-generation-state"><span className="v2-status-dot" /><strong>{readyLabel}</strong>{w.configChanged && <span>{text.pages_tool_optimize_GenerateControlBar_009}</span>}</div>
+    <div className="v2-generation-status-line">
+      <div className="v2-generation-state"><span className="v2-status-dot" /><strong>{readyLabel}</strong>{w.configChanged && <span>{text.pages_tool_optimize_GenerateControlBar_009}</span>}</div>
+      <PageHelp key={w.profile.id} page="generation" profileId={w.profile.id} inventoryIssue={Boolean(w.inventoryError)} credentialInvalid={w.profile.skland_binding?.credential_status === 'invalid'} errorCode={error?.code} recoveryAction={error?.recoveryAction} failure={Boolean(error)} jobId={error?.jobId} saveFailed={error?.retry === 'save'} running={busy && Boolean(progress?.jobId) && !progress?.completedAt} onRetrySave={w.retryConfigSave} onRetryJob={!busy ? () => void w.handleGenerate() : undefined} onConfig={onConfig} />
+    </div>
     <div className="v2-generation-flow">
       <section className="v2-generation-preparation"><SectionTitle title={copy.v2.prepare} />
         <div className="v2-preparation-row"><Users size={20} aria-hidden="true" /><div><h3>{text.pages_tool_optimize_GenerateControlBar_015}</h3><strong>{w.mergedOperators.length}{text.pages_tool_optimize_GenerateControlBar_016}</strong></div><button className="v2-text-button" aria-label={copy.v2.operators} onClick={onOperators}>{copy.v2.operators}<ArrowRight size={16} /></button></div>
@@ -59,7 +65,7 @@ export default function Generation({ workflow: w, progress: progressContent, dis
         <p className="v2-generation-export-notice">{exportNotice}</p>
         <details className="v2-generation-options" open={(w.priorityCouponBalance?.available ?? 0) > 0 && !window.matchMedia?.('(max-width: 40rem)').matches}><summary>{copy.v2.generationPage.options}{w.priorityCouponBalance && !hasCoupons && <span>{copy.v2.generationPage.couponsEmpty}</span>}{(w.usePriorityCoupon || w.useTrainingDiagnosisCoupon) && <span>{copy.v2.generationPage.optionsSelected}</span>}<ExpandIcon size={16} aria-hidden="true" /></summary>
         <label className="v2-coupon-option"><input type="checkbox" checked={w.usePriorityCoupon} disabled={(w.priorityCouponBalance?.available ?? 0) < 1 || busy} onChange={(event) => w.setUsePriorityCoupon(event.target.checked)} /><span><strong>{text.pages_tool_optimize_GenerateControlBar_021}</strong><small>{text.pages_tool_optimize_GenerateControlBar_023}</small><small>{copy.v2.generationPage.priorityBalance(w.priorityCouponBalance?.available ?? 0)}{w.priorityCouponBalance?.next_expiry_at ? ` · ${copy.v2.generationPage.priorityExpiry(new Date(w.priorityCouponBalance.next_expiry_at).toLocaleDateString(CURRENT_LOCALE))}` : ''}</small></span></label>
-        {!w.userCanUseUpgradeFeatures && (w.itemBalances.training_diagnosis_coupon ?? 0) > 0 && <label className="v2-coupon-option"><input type="checkbox" checked={w.useTrainingDiagnosisCoupon} disabled={busy} onChange={(event) => w.setUseTrainingDiagnosisCoupon(event.target.checked)} /><span><strong>{copy.inventory.training_coupon}</strong><small>{copy.inventory.training_coupon_help}</small><small>{copy.inventory.coupon_available}{w.itemBalances.training_diagnosis_coupon}</small></span></label>}
+        {canUseTrainingCoupon && <label className="v2-coupon-option"><input type="checkbox" checked={w.useTrainingDiagnosisCoupon} disabled={busy} onChange={(event) => w.setUseTrainingDiagnosisCoupon(event.target.checked)} /><span><strong>{copy.inventory.training_coupon}</strong><small>{copy.inventory.training_coupon_help}</small><small>{copy.inventory.coupon_available}{w.itemBalances.training_diagnosis_coupon}</small></span></label>}
         </details>
         <Notice error>{w.billingQuoteError}{w.billingQuoteError && <button className="v2-text-button" onClick={() => void w.refreshBillingQuote()}>{copy.metered.quote.retry}</button>}</Notice>
         {w.billingQuote?.sufficient === false && <button className="v2-text-button" onClick={() => onNavigate('balance')}>{copy.metered.quote.go_to_balance}</button>}

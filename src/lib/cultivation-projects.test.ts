@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { CultivationCandidate, CultivationData } from './cultivation-contract'
 import { CONFIG_PRESETS } from './config'
 import { getFacilityIds } from './facility-layout'
+import { cultivationChanges } from './account-changes'
+import { copy } from '../copy'
 import { buildMaaCultivationPlan, buildProjectRoute, isCultivationProject, prepareProjectProduction, projectDaysEarlier, readProjectIncome, type CultivationProject, type ProjectOperator } from './cultivation-projects'
 
 const project = (operatorId: string): CultivationProject => ({ operatorId, elite: 2, level: 60, skill: 1, skillLevel: 7, paused: false, deadline: '' })
@@ -16,6 +18,17 @@ const data = (candidates: CultivationCandidate[], overrides: Partial<Cultivation
 })
 const settings = { startDate: '2026-10-06', dailySanity: 0, days: 30, allOpen: false }
 const normal = { lmd: 100, exp: 100, goldNet: 0 }
+
+it('summarizes independently verified target attainment and material readiness after an update', () => {
+  const rows = [candidate('a', { rock: 1 }), candidate('b', { rock: 1 }), candidate('c', { rock: 1 })]
+  const before = data(rows)
+  const after = data([{ ...rows[0], satisfied: true, items: {} }, rows[1], rows[2]], { inventory: { rock: 1 } })
+  expect(cultivationChanges(before, after, [project('a'), project('b'), project('c')])).toEqual([
+    { key: 'goal-1', title: 'a', facts: [copy.v2.workspaceAssistant.newTargets] },
+    { key: 'goal-2', title: 'b', facts: [copy.v2.workspaceAssistant.readyTargets] },
+  ])
+  expect(cultivationChanges(before, after, [{ ...project('a'), level: 70 }])).toEqual([])
+})
 
 describe('MAA operator development import contract', () => {
   const operators: ProjectOperator[] = [
