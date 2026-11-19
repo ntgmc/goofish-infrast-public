@@ -9,6 +9,16 @@
 .facility-layout-heading { justify-content: space-between; }
 .facility-layout-title { flex: 1; justify-content: space-between; }
 .facility-layout-summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-sm); padding-block: var(--space-sm); }
+.facility-layout--preview .facility-layout-title { justify-content: start; }
+.facility-layout--preview .facility-layout-title h3 { font-size: var(--text-sm); }
+.facility-layout--preview .facility-layout-heading > button { padding-inline: var(--space-xs); white-space: nowrap; }
+.facility-layout--preview .facility-layout-grid { margin-top: var(--space-xs); }
+.facility-layout--preview .facility-card { border-top-width: 2px; }
+.facility-card-preview { display: grid; justify-items: center; gap: var(--space-3xs); padding: var(--space-2xs) var(--space-3xs); }
+.facility-card-preview .facility-card-icon { width: 16px; height: 16px; }
+.facility-card-preview .facility-card-identity { flex-direction: row; flex-wrap: wrap; gap: var(--space-3xs); }
+.facility-card-preview .facility-card-name { white-space: normal; text-align: center; font-size: var(--text-xs); }
+.facility-card-preview small { color: var(--theme-ink-secondary); font-size: var(--text-xs); }
 
 .facility-layout-grid {
   display: grid;
@@ -67,6 +77,9 @@
 .facility-card-identity { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-2xs); }
 .facility-card-icon { width: 24px; height: 24px; color: var(--facility-color); }
 .facility-card-name { color: var(--theme-ink-primary); font-size: var(--text-sm); font-weight: 600; white-space: nowrap; }
+.facility-layout--preview .facility-card-select { min-height: 84px; padding: var(--space-2xs) var(--space-3xs) var(--space-sm); }
+.facility-layout--preview .facility-card-edit { inset: auto var(--space-3xs) 2px auto; }
+.facility-layout--preview .facility-card-edit svg { width: 12px; height: 12px; }
 .facility-picker-level-section { display: grid; gap: var(--space-xs); margin-top: var(--space-lg); }
 .facility-picker-level-section h3 { color: var(--theme-ink-primary); font-size: var(--text-sm); font-weight: 600; }
 .facility-picker-levels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2xs); }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { SelectedIcon as Check, ExpandIcon as ChevronDown, ManufactureIcon as Factory, TradingStationIcon as Store, PowerPlantIcon as Zap, SuccessIcon } from './icons'
 import { copy } from '../copy'
 import { getFacilityIds, hasConfirmedFacilityLayout } from '../lib/facility-layout'
@@ -16,8 +16,9 @@ type Room = { type: FacilityType; level: number }
 const TYPES = Object.keys(FACILITIES) as FacilityType[]
 const positionLabel = (position: number) => `B${Math.floor(position / 3) + 1} · ${copy.common.facilityLayoutColumns[position % 3]}`
 
-export default function FacilityLayoutEditor({ config, onUpdate, readOnly = false }: {
+export default function FacilityLayoutEditor({ config, onUpdate, readOnly = false, showLayoutPreview = false }: {
   readOnly?: boolean
+  showLayoutPreview?: boolean
   config: LicenseConfig
   onUpdate: (mutate: (config: LicenseConfig) => void) => void
 }) {
@@ -26,6 +27,7 @@ export default function FacilityLayoutEditor({ config, onUpdate, readOnly = fals
     const levels = type === 'trading' ? config.trading_station_levels : config.manufacturing_station_levels
     return { type, level: type === 'power' ? 3 : levels?.[Number(id.split('_')[1]) - 1] ?? 3 }
   }
+  const layoutId = useId()
   const facilityIds = getFacilityIds(config)
   const savedLayout = hasConfirmedFacilityLayout(config) ? config.facility_layout!.join(',') : ''
   const [editing, setEditing] = useState(false)
@@ -88,72 +90,77 @@ export default function FacilityLayoutEditor({ config, onUpdate, readOnly = fals
     setEditing(false)
     requestAnimationFrame(() => editButtonRef.current?.focus())
   }
+  const displayRooms = collapsed ? config.facility_layout!.map(roomFor) : rooms
+  const status = <span className={`tool-status ${savedLayout ? 'tool-status--success' : 'tool-status--warning'}`}>
+    {savedLayout ? copy.common.facilityLayoutSaved : copy.common.facilityLayoutDraft}
+  </span>
+  const editButton = <button ref={editButtonRef} type="button" disabled={readOnly} className="tool-secondary-action min-h-11 px-4"
+    aria-expanded={false} onClick={() => {
+      setEditing(true)
+      setReviewed(false)
+      onUpdate((next) => { delete next.facility_layout })
+      requestAnimationFrame(() => {
+        const editor = document.getElementById(`${layoutId}-editor`)
+        editor?.focus({ preventScroll: showLayoutPreview })
+        if (showLayoutPreview && editor?.getClientRects().length) editor.scrollIntoView({ block: 'nearest', behavior: 'instant' })
+      })
+    }}>{copy.common.facilityLayoutEdit}</button>
   return (
-    <section className="facility-layout mt-5 border-t border-surface-3/60 pt-5" aria-labelledby="facility-layout-heading">
+    <section className={`facility-layout ${showLayoutPreview ? 'facility-layout--preview' : 'mt-5 border-t border-surface-3/60 pt-5'}`} aria-labelledby={`${layoutId}-heading`}>
       <div className="facility-layout-heading">
         <div className="facility-layout-title">
-          <h3 id="facility-layout-heading" className="font-semibold text-ink-primary">{copy.common.facilityLayoutTitle}</h3>
-          <span className={`tool-status ${savedLayout ? 'tool-status--success' : 'tool-status--warning'}`}>
-            {savedLayout ? copy.common.facilityLayoutSaved : copy.common.facilityLayoutDraft}
-          </span>
+          <h3 id={`${layoutId}-heading`} className="font-semibold text-ink-primary">{copy.common.facilityLayoutTitle}</h3>
+          {status}
         </div>
+        {showLayoutPreview && collapsed && !readOnly && editButton}
       </div>
       <fieldset disabled={readOnly} className="min-w-0 border-0 p-0">
-      {collapsed ? (
+      {collapsed && !showLayoutPreview && (
         <div className="facility-layout-summary">
-          <div role="status">
-            <p className="flex items-center gap-2 font-semibold text-ink-primary">
-              <SuccessIcon size={18} aria-hidden="true" />{copy.common.facilityLayoutComplete}
-            </p>
-          </div>
-          <button ref={editButtonRef} type="button" className="tool-secondary-action min-h-11 px-4"
-            aria-expanded={false}
-            onClick={() => {
-              setEditing(true)
-              setReviewed(false)
-              onUpdate((next) => { delete next.facility_layout })
-              requestAnimationFrame(() => document.getElementById('facility-layout-editor')?.focus())
-            }}>
-            {copy.common.facilityLayoutEdit}
-          </button>
+          <p role="status" className="flex items-center gap-2 font-semibold text-ink-primary">
+            <SuccessIcon size={18} aria-hidden="true" />{copy.common.facilityLayoutComplete}
+          </p>
+          {editButton}
         </div>
-      ) : (
-      <div id="facility-layout-editor" tabIndex={-1}>
-      <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.common.facilityLayoutHelp}</p>
+      )}
+      {(!collapsed || showLayoutPreview) && <div id={`${layoutId}-editor`} className={showLayoutPreview && !collapsed ? 'facility-layout-editing config-review-anchor' : undefined} tabIndex={collapsed ? undefined : -1}>
+      {!collapsed && <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.common.facilityLayoutHelp}</p>}
       <div className="facility-layout-grid">
         {[0, 1, 2].map((floor) => <div key={floor} className="facility-layout-floor">
           <h4 className="facility-layout-floor-label">B{floor + 1}</h4>
           <div className="facility-layout-floor-rooms">
-            {rooms.slice(floor * 3, floor * 3 + 3).map((room, column) => {
+            {displayRooms.slice(floor * 3, floor * 3 + 3).map((room, column) => {
               const position = floor * 3 + column
               const { label, icon: Icon } = FACILITIES[room.type]
+              const identity = <span className="facility-card-identity">
+                <Icon className="facility-card-icon" aria-hidden="true" />
+                <span className="facility-card-name">{label}</span>
+              </span>
               return (
                 <div key={position} className={`facility-card facility-card--${room.type}`}>
+                  {collapsed ? <div className="facility-card-preview">{identity}<small>{room.level}{copy.common.facilityLayoutLevel}</small></div> :
                   <button type="button" className="facility-card-select"
                     aria-label={`${positionLabel(position)} · ${label} · ${room.level}${copy.common.facilityLayoutLevel}`}
                     aria-haspopup="dialog"
                     onClick={(event) => { triggerRef.current = event.currentTarget; setSelectedPosition(position) }}>
                     <span className="facility-card-position">{copy.common.facilityLayoutColumns[column]}<span>{room.level}{copy.common.facilityLayoutLevel}</span></span>
-                    <span className="facility-card-identity">
-                      <Icon className="facility-card-icon" aria-hidden="true" />
-                      <span className="facility-card-name">{label}</span>
-                    </span>
+                    {identity}
                     <span className="facility-card-edit"><ChevronDown size={14} aria-hidden="true" /></span>
-                  </button>
+                  </button>}
                 </div>
               )
             })}
           </div>
         </div>)}
       </div>
-      <div className="facility-layout-footer">
+      {!collapsed && <div className="facility-layout-footer">
         <div className="facility-layout-counts" aria-label={copy.common.facilityLayoutCounts}>
           {TYPES.map((type) => <span key={type}>{FACILITIES[type].label} <strong>{rooms.filter((room) => room.type === type).length}</strong> / {expected.filter((room) => room.type === type).length}</span>)}
         </div>
         <button type="button" className="tool-primary-action min-h-11 px-4" onClick={confirm}>
           {reviewed ? copy.common.facilityLayoutConfirmCollapse : copy.common.facilityLayoutConfirm}
         </button>
-      </div>
+      </div>}
       {reviewed && <p role="status" className="tool-alert mt-3">{copy.common.facilityLayoutReviewHelp}</p>}
       {errors.length > 0 && (
         <div ref={statusRef} role="alert" tabIndex={-1} className="tool-alert tool-alert--warning mt-3">
@@ -161,8 +168,7 @@ export default function FacilityLayoutEditor({ config, onUpdate, readOnly = fals
           <ul className="mt-1 list-inside list-disc">{errors.map((error) => <li key={error}>{error}</li>)}</ul>
         </div>
       )}
-      </div>
-      )}
+      </div>}
       </fieldset>
       <Dialog open={selectedPosition !== null && !readOnly} onOpenChange={(open) => { if (!open) setSelectedPosition(null) }}>
         <DialogContent showCloseButton closeLabel={copy.common.facilityLayoutClose}

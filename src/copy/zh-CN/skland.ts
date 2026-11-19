@@ -47,7 +47,6 @@ export const sklandCopy = {
     failed: '导入未完成',
     previousTitle: '已导入上次可用的数据',
     previousData: (time: string) => `部分数据未能更新，最早获取于 ${time}。`,
-    executionHint: '请确认执行方式。使用 MAA 时，再选换班频率。',
     reviewExecution: '检查排班设置',
     reviewRooms: '查看房间与回收站',
   },

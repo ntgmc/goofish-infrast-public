@@ -65,6 +65,23 @@ it('lets V2 users review scheduling choices before opening the imported rooms', 
   expect(screen.getByRole('combobox', { name: copy.domain.recycling.level })).toBeVisible()
 })
 
+it('shows the imported position and level in the V2 layout preview before editing', async () => {
+  const { config, props } = setup()
+  const configuration = { ...CONFIG_PRESETS['252'], facility_layout: [...config.facility_layout!].reverse() }
+  const fetch = vi.fn().mockResolvedValue(Response.json({ configuration }))
+  vi.stubGlobal('fetch', fetch)
+  const user = userEvent.setup()
+  render(<ConfigEditor {...props} guideSklandImport />)
+  await user.click(screen.getByRole('button', { name: copy.skland.importConfig }))
+  await user.click(await screen.findByRole('button', { name: copy.skland.configReview.reviewExecution }))
+  await user.click(screen.getByRole('button', { name: copy.skland.configReview.reviewRooms }))
+  const layout = screen.getByRole('region', { name: copy.common.facilityLayoutTitle })
+  expect(layout.querySelector('.facility-layout-floor')).toHaveTextContent(copy.common.facilityLayoutPower)
+  expect(screen.queryByRole('button', { name: /^B1 · 左/ })).not.toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: copy.common.facilityLayoutEdit }))
+  expect(screen.getByRole('button', { name: `B1 · 左 · ${copy.common.facilityLayoutPower} · 3${copy.common.facilityLayoutLevel}` })).toBeVisible()
+})
+
 it.each([undefined, 0, 1, 2, 3])('preserves recycling level %s when importing the last available Skland data', async (level) => {
   const { config, props } = setup()
   config.recycling_station_level = level

@@ -1838,6 +1838,11 @@ html:has(.v2-page-transition[data-page-entering="native"]) {
   overflow-y: auto;
 }
 
+.v2-config-drawer .v2-drawer-body { scrollbar-gutter: stable; }
+@supports not (scrollbar-gutter: stable) {
+  .v2-config-drawer .v2-drawer-body { overflow-y: scroll; }
+}
+
 .v2-drawer-wide .v2-drawer-heading {
   padding: 0 0 var(--space-xs);
 }
