@@ -570,7 +570,7 @@ export const v2Copy = {
     navigation: '配置分类',
     common: '常用',
     commonTitle: '常用配置',
-    maaHelp: '由 MAA 按计划换班，也可手动设置队列执行。',
+    maaHelp: '由 MAA 自动换班，也可手动执行。',
     oneShiftDisabled: '一天1换（已停用）',
     rooms: '房间',
     roomSettings: '房间数量与产物',

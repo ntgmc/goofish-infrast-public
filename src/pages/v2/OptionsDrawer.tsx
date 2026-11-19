@@ -91,7 +91,7 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
         {isConfig && (
           <>
             <ConfigCapabilityPreview config={config} enabled={!canEditConfig}>
-            <ConfigEditor showOrundumPreference profileId={session.activeProfile?.id} config={config} canEdit={canEditConfig} readOnly={configReadOnly} canEditIntermediateInventory={canUseIntermediateConfig}
+            <ConfigEditor guideSklandImport showOrundumPreference profileId={session.activeProfile?.id} config={config} canEdit={canEditConfig} readOnly={configReadOnly} canEditIntermediateInventory={canUseIntermediateConfig}
               canSelectPreset={canUseIntermediateConfig} canEditFixedShiftHours={canEditConfig || Boolean(session.activeProfile && hasFreePreviewAccess(session.activeProfile))} permission={permission}
               note={session.activeProfile && hasFreePreviewAccess(session.activeProfile) && !canEditConfig
                 ? `${copy.common.components_ConfigEditor_024}${getProfileAccessLabel(session.activeProfile)}${copy.common.components_ConfigEditor_025}`

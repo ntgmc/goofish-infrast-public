@@ -41,6 +41,30 @@ it.each([
   expect(fetch.mock.calls[0][0]).toBe('/api/user/skland/facilities')
 })
 
+it('lets V2 users review scheduling choices before opening the imported rooms', async () => {
+  const { config, props, update } = setup()
+  config.schedule_mode = 'rotation'
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ configuration: CONFIG_PRESETS['333-lmd'] })))
+  const user = userEvent.setup()
+  render(<ConfigEditor {...props} guideSklandImport />)
+  const text = copy.v2.configEditor
+  const review = copy.skland.configReview
+  const inventory = screen.getByRole('tab', { name: text.inventory })
+  await user.click(inventory)
+  await user.click(screen.getByRole('button', { name: copy.skland.importConfig }))
+  await screen.findByText(review.success)
+  expect(inventory).toHaveAttribute('aria-selected', 'true')
+  expect(update).toHaveBeenCalledTimes(1)
+  expect(config).toMatchObject({ schedule_mode: 'rotation', shift_hours: [12, 12, 12] })
+
+  await user.click(screen.getByRole('button', { name: review.reviewExecution }))
+  expect(screen.getByRole('tab', { name: text.common })).toHaveAttribute('aria-selected', 'true')
+  expect(screen.getByRole('button', { name: copy.common.components_ConfigEditor_007 })).toHaveAttribute('aria-pressed', 'true')
+  await user.click(screen.getByRole('button', { name: review.reviewRooms }))
+  expect(screen.getByRole('tab', { name: new RegExp(text.rooms) })).toHaveAttribute('aria-selected', 'true')
+  expect(screen.getByRole('combobox', { name: copy.domain.recycling.level })).toBeVisible()
+})
+
 it.each([undefined, 0, 1, 2, 3])('preserves recycling level %s when importing the last available Skland data', async (level) => {
   const { config, props } = setup()
   config.recycling_station_level = level
