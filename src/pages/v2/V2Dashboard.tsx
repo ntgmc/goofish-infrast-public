@@ -386,7 +386,9 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
               {label}{view === id && <MotionNavIndicator layoutId="result-tab" variant="underline" />}
             </button>)}
           </div>
-          {view !== 'manual' && <ResultActions plans={result.plans} shift={shift} showShift={view === 'schedule'} onShiftChange={setShift} onExport={() => setExportOpen(true)} sample={sample} busy={busy} loadingResult={loadingResult} />}
+          {view !== 'manual' && <ResultActions plans={result.plans} shift={shift} showShift={view === 'schedule'} onShiftChange={setShift} onExport={() => setExportOpen(true)} sample={sample} busy={busy} loadingResult={loadingResult}>
+            {displayedSection === 'overview' && !sample && view === 'schedule' && session.activeProfile && <PageHelp key={`${session.activeProfile.id}:${arrivalKey}`} page="result" profileId={session.activeProfile.id} maaAvailable={features.maa_export && result.schedule_mode !== 'rotation' && Boolean(exportResultId)} maaDirect={workflow?.userCanExportMaaWithoutCoupon} inventoryIssue={Boolean(workflow?.inventoryError)} couponBalance={workflow?.inventoryLoaded && !workflow.inventoryError ? workflow.itemBalances.maa_export_trial_coupon ?? 0 : undefined} onOpenExport={() => setExportOpen(true)} />}
+          </ResultActions>}
           <div className="v2-feature-content v2-manual-workspace" hidden={view !== 'manual'}>
             {canManual && manualOpened && session.activeProfile && <Suspense fallback={<Loading label={text.loading} />}><ManualScheduleEditor revealCandidates key={manualKey} source={result} profileId={session.activeProfile.id} operators={operators} simulationBaseline={simulationBaseline} onDirtyChange={setManualDirty} renderExport={(props) => workflow && <ManualResultExport key={props.resultId} {...props} workflow={workflow}
               onRecover={(action) => { if (action === 'login') void navigate(authPath('login', returnTo)); else navigateSection(action) }} />} /></Suspense>}
@@ -408,7 +410,6 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
             )}
           </V2Transition>
           </div>
-          {!sample && view === 'schedule' && session.activeProfile && <PageHelp key={arrivalKey} page="result" profileId={session.activeProfile.id} maaAvailable={features.maa_export && result.schedule_mode !== 'rotation' && Boolean(exportResultId)} maaDirect={workflow?.userCanExportMaaWithoutCoupon} couponBalance={workflow?.inventoryLoaded && !workflow.inventoryError ? workflow.itemBalances.maa_export_trial_coupon ?? 0 : undefined} onOpenExport={() => setExportOpen(true)} />}
           {displayedSection === 'overview' && view !== 'manual' && <ScheduleExplanation userId={session.user?.id} profileId={session.activeProfile?.id} resultId={exportResultId} sample={sample} result={result} />}
           {view === 'schedule' && <ScheduleContext result={result} prepared={prepared} config={config} operators={owned} sampleOperators={sampleOperators}
             onConfigure={() => openPanel('config')} onOperators={() => openPanel('operators')} />}
@@ -453,7 +454,8 @@ function FeedbackRegion({ children }: { children: ReactNode }) {
   )
 }
 
-function ResultActions({ plans, shift, showShift, onShiftChange, onExport, sample, busy, loadingResult }: {
+function ResultActions({ children, plans, shift, showShift, onShiftChange, onExport, sample, busy, loadingResult }: {
+  children?: ReactNode
   plans: OptimizeResult['plans']
   shift: number
   showShift: boolean
@@ -474,6 +476,7 @@ function ResultActions({ plans, shift, showShift, onShiftChange, onExport, sampl
       </label>}
       <span className="v2-result-source" title={sample ? text.sampleSource : text.ownSource}>{sample ? <SampleIcon size={14} aria-hidden="true" /> : <ShieldCheck size={14} aria-hidden="true" />}<span className="max-sm:sr-only">{sample ? text.sampleSource : text.ownSource}</span></span>
       <button className="v2-button v2-button-secondary" type="button" disabled={busy || loadingResult} onClick={onExport}><Download size={16} />{text.export}</button>
+      {children}
     </div>
   )
 }

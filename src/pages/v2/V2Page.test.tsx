@@ -1363,6 +1363,24 @@ describe('V2 results-first workspace', () => {
     expect(session.persistWorkspacePatch).not.toHaveBeenCalled()
   })
 
+  it('opens export options from result help and restores focus without downloading', async () => {
+    const workflow = connect()
+    const user = userEvent.setup()
+    const help = copy.v2.workspaceAssistant
+    mount()
+    const trigger = screen.getByRole('button', { name: help.helpTitles.result })
+    await user.click(trigger)
+    const panel = within(await screen.findByRole('dialog', { name: help.helpTitles.result }))
+    await user.click(panel.getByRole('button', { name: help.helpTopics.result[1] }))
+    await user.click(panel.getByRole('button', { name: help.openExport }))
+    expect(await screen.findByRole('dialog', { name: copy.v2.exportTitle })).toBeVisible()
+    expect(screen.queryByRole('dialog', { name: help.helpTitles.result })).not.toBeInTheDocument()
+    expect(workflow.handleDownloadMAA).not.toHaveBeenCalled()
+    expect(mocks.image).not.toHaveBeenCalled()
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(trigger).toHaveFocus())
+  })
+
   it.each(['maa', 'full'] as const)('shows %s failures inside the drawer and retries the same export without losing the selected shift', async (format) => {
     const workflow = connect()
     workflow.exportFailure = { format, resultId: summary.id, error: new Error('连接中断，请检查网络。') }
@@ -1902,10 +1920,10 @@ describe('V2 feature continuity', () => {
     expect(loading.closest('main')).toBe(main)
     expect(screen.getByRole('navigation', { name: copy.v2.navigation })).toBe(navigation)
     expect(document.querySelector('.v2-topbar')).toBe(topbar)
-    expect(screen.queryByRole('heading', { name: copy.inventory.title, level: 2 })).not.toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: copy.inventory.search })).not.toBeInTheDocument()
 
     await act(async () => { finishInventory(new Response(JSON.stringify({ stacks: [], capacities: [], recent_events: [] }), { status: 200 })) })
-    expect(await screen.findByRole('heading', { name: copy.inventory.title, level: 2 })).toBeInTheDocument()
+    expect(await screen.findByRole('textbox', { name: copy.inventory.search })).toBeVisible()
     expect(screen.queryByRole('status', { name: copy.inventory.loading })).not.toBeInTheDocument()
   })
 

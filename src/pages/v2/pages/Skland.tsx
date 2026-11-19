@@ -68,6 +68,7 @@ export default function Skland({ session, onOpenProfile, onProfiles, onConfig }:
             : profile && <button type="button" className="v2-button v2-button-secondary" aria-busy={snapshot.busy} disabled={!canRefresh}
               onClick={() => void refresh()}><RefreshIcon size={16} aria-hidden="true" />{snapshot.busy ? text.refreshing : text.refresh}</button>}
           {session.license && <button type="button" className="v2-button v2-button-secondary" onClick={onConfig}><ConfigIcon size={16} aria-hidden="true" />{text.configure}</button>}
+          <PageHelp page="skland" profileId={profile?.id} credentialInvalid={profile?.skland_binding?.credential_status === 'invalid'} inventoryIssue={Boolean(data?.inventory.error || !data?.inventory.items)} onAuthorize={profile ? () => setBinding(true) : undefined} onRefreshInventory={canRefresh ? () => void refresh() : undefined} />
         </div>
       </div>
       {rebind && <p className="mt-4 text-sm text-ink-secondary">{text.bindFirst}</p>}
@@ -77,7 +78,6 @@ export default function Skland({ session, onOpenProfile, onProfiles, onConfig }:
       <p className="mt-4 text-sm leading-6 text-ink-secondary">{text.snapshotHelp}</p>
       {profile?.skland_binding && <p className="mt-2 text-sm text-ink-muted">UID {profile.skland_binding.uid}</p>}
     </section>
-    <PageHelp page="skland" profileId={profile?.id} credentialInvalid={profile?.skland_binding?.credential_status === 'invalid'} inventoryIssue={Boolean(data?.inventory.error || !data?.inventory.items)} onAuthorize={profile ? () => setBinding(true) : undefined} onRefreshInventory={canRefresh ? () => void refresh() : undefined} />
     {refreshed && data && profile && session.user && <details className="v2-disclosure"><summary>{copy.v2.workspaceAssistant.changes}</summary>
       {changes ? <AccountChanges userId={session.user.id} profileId={profile.id} changes={changes}>
         {features.cultivation_projects && changes.length > 0 && <p className="v2-muted">{copy.v2.workspaceAssistant.gameNext} <Link className="v2-text-button" to={v2Path('cultivation-projects', profile.id)}>{copy.cultivationProjects.openProjects}</Link></p>}

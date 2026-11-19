@@ -18,6 +18,8 @@ function Dialog({
   return <DialogModalContext.Provider value={modal}><DialogPrimitive.Root data-slot="dialog" modal={modal} {...props} /></DialogModalContext.Provider>
 }
 
+const DialogTrigger = DialogPrimitive.Trigger
+
 function DialogPortal({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Portal>) {
@@ -155,4 +157,5 @@ export {
   DialogContent,
   DialogDescription,
   DialogTitle,
+  DialogTrigger,
 }
