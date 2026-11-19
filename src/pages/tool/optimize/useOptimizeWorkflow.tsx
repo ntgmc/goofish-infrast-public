@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef, type FormEvent } from 'react'
-import type { Announcement, AuthSuccessResponse, LicenseConfig, LicenseFile, OptimizeResult, UpgradeSuggestion, UserGameAccount, UserWorkspace, WorkspaceResultHistoryItem } from '../../../lib/types'
+import type { Announcement, AuthSuccessResponse, LicenseConfig, LicenseFile, OptimizeJobStatusResponse, OptimizeResult, UpgradeSuggestion, UserGameAccount, UserWorkspace, WorkspaceResultHistoryItem } from '../../../lib/types'
 import type { SystemItemCode } from '../../../lib/inventory-contracts'
 import { getPermissionMode, mergeOperators } from '../../../lib/license'
 import { canonicalJson } from '../../../lib/crypto'
@@ -8,7 +8,7 @@ import { normalizeConfig, validateConfig, validateScheduleConfig, normalizeSched
 import type { ScheduleProgressState } from '../../../components/ScheduleProgress'
 import { describeConfigDiff } from '../../../lib/workspace-history'
 import { mergeOptimizeJobProgress, buildOptimizeJobStorageKey, writeActiveOptimizeJob, readActiveOptimizeJob, isActiveOptimizeJob, clearActiveOptimizeJob, clearLegacyOptimizeJobStorage, isOptimizeJobPollCancelled } from './job-progress'
-import { getOptimizationFailureJobId, isOptimizationJobCancelledError, useOptimizationJob } from './useOptimizationJob'
+import { getOptimizationFailureJobId, getOptimizationFailureRecovery, isOptimizationJobCancelledError, useOptimizationJob } from './useOptimizationJob'
 import type { OptimizePhase, OptimizeSection } from './types'
 import { hasFreePreviewAccess, isFreePreviewTrialActive } from '../tool-utils'
 import type { ConfigSyncStatus, WorkspacePatch } from '../useToolSession'
@@ -83,7 +83,7 @@ export function useOptimizeWorkflow(props: Props) {
     flushPendingSync: flushPendingLicenseSync,
   } = useLicenseSync(profileId, license.order_hash)
 
-  const [inlineError, setInlineError] = useState<{ scope: 'generate' | 'apply'; message: string; retry?: 'save'; jobId?: string } | null>(null)
+  const [inlineError, setInlineError] = useState<{ scope: 'generate' | 'apply'; message: string; retry?: 'save'; jobId?: string; code?: string; recoveryAction?: OptimizeJobStatusResponse['recovery_action'] } | null>(null)
   useEffect(() => {
     if (configSyncStatus === 'idle') setInlineError((error) => error?.retry === 'save' ? null : error)
   }, [configSyncStatus])
@@ -451,6 +451,7 @@ export function useOptimizeWorkflow(props: Props) {
                 scope: active.mode === 'apply' ? 'apply' : 'generate',
                 message: formatOptimizeError(error instanceof Error ? error.message : String(error)),
                 jobId: getOptimizationFailureJobId(error),
+                ...getOptimizationFailureRecovery(error),
               })
             }
           }
@@ -577,7 +578,7 @@ export function useOptimizeWorkflow(props: Props) {
         })
       } catch (e) {
         if (current() && !isOptimizationJobCancelledError(e)) {
-          setInlineError({ scope: 'generate', message: formatOptimizeError((e as Error).message), jobId: getOptimizationFailureJobId(e) })
+          setInlineError({ scope: 'generate', message: formatOptimizeError((e as Error).message), jobId: getOptimizationFailureJobId(e), ...getOptimizationFailureRecovery(e) })
         }
       } finally {
         if (!current()) return

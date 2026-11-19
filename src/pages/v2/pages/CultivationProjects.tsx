@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import GuestAccountLink from '../../../components/GuestAccountLink'
 import { NextIcon as ArrowRight, AddIcon as Plus, RefreshIcon, SaveIcon, CultivationIcon, ResourceCalendarIcon, DailyOutputIcon } from '../../../components/icons'
 import { copy } from '../../../copy'
@@ -22,6 +22,10 @@ import { MaterialBrowser, MaterialButton } from './ProjectMaterials'
 import ProjectGoal from './ProjectGoal'
 import { ProjectMaaExport } from './ProjectMaaExport'
 import './cultivation-projects.css'
+import AccountChanges from '../AccountChanges'
+import CultivationAdvisor, { cultivationMaterialFacts } from '../CultivationAdvisor'
+import { cultivationChanges } from '../../../lib/account-changes'
+import type { AssistantCandidate } from '../../../lib/workspace-assistant'
 
 const text = copy.cultivationProjects
 const number = (amount: number) => amount.toLocaleString('zh-CN', { maximumFractionDigits: 1 })
@@ -44,6 +48,23 @@ function ProjectWorkspace({ session, profile, onConfig }: { session: V2Session; 
   const workbench = useRef<HTMLDivElement>(null)
   const changeView = (next: string) => { setView(next); workbench.current?.scrollIntoView({ block: 'start' }) }
   const route = !m.pendingRefresh ? m.plans?.route : null
+  const previousData = useRef<CultivationData | null>(null)
+  const [changes, setChanges] = useState<AssistantCandidate[] | null>(null)
+  useEffect(() => {
+    const previous = previousData.current
+    const current = m.data
+    previousData.current = current
+    if (!current) { setChanges(null); return }
+    if (previous && (previous.snapshotVersion ?? previous.importedAt) !== (current.snapshotVersion ?? current.importedAt)
+      && Date.parse(current.importedAt) >= Date.parse(previous.importedAt)) {
+      setChanges(cultivationChanges(previous, current, m.projects))
+    }
+  }, [m.data, m.projects])
+  const advisorRows = useMemo(() => m.materials.flatMap(({ candidate, project }) => {
+    if (!candidate || candidate.satisfied || !m.data) return []
+    return [{ id: candidate.key, title: `${candidate.name} · ${copy.cultivationProjects.elites[project.elite]} Lv.${project.level}`,
+      facts: [...cultivationMaterialFacts(candidate.items, m.data, candidate.warnings), copy.v2.workspaceAssistant.cultivationScope] }]
+  }), [m.data, m.materials])
   const [applied, setApplied] = useState(false)
   const canConfigure = Boolean(session.license && canEditConfig(session.license))
   const baseConfig = m.production?.normal?.config ?? session.configOverride ?? session.license?.config
@@ -64,6 +85,11 @@ function ProjectWorkspace({ session, profile, onConfig }: { session: V2Session; 
     <Notice error>{m.error}</Notice><Notice>{m.storageError ? text.storageFailed : null}</Notice>
     {m.busy && !m.data && !m.projects.length && <DataSkeleton layout="projects" />}
     {m.data?.warnings.map((warning) => <Notice key={warning}>{warning}</Notice>)}
+    {changes && m.data && !m.busy && !m.error && <details className="v2-disclosure"><summary>{copy.v2.workspaceAssistant.changes}</summary>
+      <AccountChanges userId={session.user!.id} profileId={profile.id} changes={changes}>
+        {changes.length > 0 && <button type="button" className="v2-text-button" onClick={() => changeView('plan')}>{text.route}</button>}
+      </AccountChanges>
+    </details>}
     {(m.data || m.projects.length > 0) && <>
       <Tabs.Root ref={workbench} value={view} onValueChange={changeView} className="v2-project-workbench">
         <div className="v2-project-toolbar">
@@ -78,6 +104,7 @@ function ProjectWorkspace({ session, profile, onConfig }: { session: V2Session; 
           <div className="v2-project-list-heading"><SectionTitle title={text.targets} description={text.orderHint} />
             <span className="v2-muted">{text.targetCount(m.projects.filter(project => !project.paused).length, m.projects.filter(project => project.paused).length)}</span>
           </div>
+          {!m.busy && !m.pendingRefresh && view === 'targets' && <CultivationAdvisor scope={{ userId: session.user!.id, profileId: profile.id }} rows={advisorRows} />}
           <ol className="v2-project-list">{m.projects.map((project, index) => {
             const operator = m.data?.projectOperators?.find((row) => row.id === project.operatorId)
             const name = operator?.name ?? session.license?.operators?.find((row) => row.id === project.operatorId)?.name ?? project.operatorId

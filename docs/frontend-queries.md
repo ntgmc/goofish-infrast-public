@@ -28,6 +28,7 @@ TanStack Query v5 管理普通页面读取：库存、新手任务、优化任�
 | QQ 群活动与领取状态 | `['user', userId, null, 'qqbot-activities', groupId, campaignId]` |
 | 钱书平衡的账号培养资料 | `['user', userId, profileId, 'training-ratio', 森空岛快照版本]` |
 | AI 排班解读及共享额度 | `['user', userId, profileId, 'schedule-explanation', resultId]` |
+| V2 工作台助手可用性 | `['user', userId, profileId, 'workspace-assistant']` |
 | 排班历史详情 | `['user', userId, profileId, 'result-history', 'detail', resultId]` |
 | 排班历史分页 | `['user', userId, profileId, 'result-history', 'pages', scope, 首屏快照]` |
 | 公共内容、站点开关、注册配置、服务状态和构建版本 | `['public', 'content'或'features'或'registration-settings'或'service-status'或'service-build', ...条件]` |
@@ -112,6 +113,8 @@ V2 分页按用户或公开身份、页码与未读筛选隔离。直达尚未�
 后台 AI 服务配置沿用 `useAdminDraftQuery` 的管理员、权限和栏目隔离，只有显式保存或重新载入才更新草稿。AI 配置与功能开关采用双版本校验；在另一栏目修改开关后，旧草稿保存会返回冲突，管理员重新载入后可继续。接口只返回密钥是否存在，输入的新密钥在保存成功后清空。
 
 解读查询只读取已有正文、账号共享额度和可用性；生成由用户点击提交，沿用当前报告 ID。当前生成请求通过 SSE 逐段显示临时 Markdown 正文，只有结算完成的最终状态才写入查询缓存；缓存或已有生成也可返回 JSON。收起窗口保留请求和已收到的正文。身份或报告切换时中止浏览器读取，服务端继续完成原请求的保存与结算。读取到服务端进行中状态时每 2.5 秒查询，隐藏页面暂停轮询；断流清除临时正文并重新读取状态，不重发生成。成功后更新当前报告缓存，并使同一用户各档案的解读查询失效，刷新共享额度。失败只重读状态，不自动重新生成。身份或报告变化时重新挂载提交状态；离开或退出后迟到的生成响应不能重建旧用户缓存。已保存的解读继续按当前报告权限读取。成本与调用约束见 [AI 排班解读](ai-schedule-explanation.md)。
+
+工作台助手仅在面板展开后读取可用性和额度。问题、候选、已选指标及应答保存在当前交互内。提交结束时使账号下的解读和助手状态失效，跨页读取沿用同一额度。切换账号、档案或关闭页面时放弃旧请求的浏览器响应。排班变化对比沿用历史详情键，仅展开时读取上一份排班。
 
 ## 保留的专用流程
 

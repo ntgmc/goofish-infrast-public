@@ -26,12 +26,16 @@ import { sectionLabels, V2_GUEST_SECTIONS, v2Path, v2Section, v2SectionAvailable
 import V2Navigation from './V2Navigation'
 import V2TopbarTools from './V2TopbarTools'
 import { normalizeScheduleMode, SCHEDULE_MODE_LABELS, validateScheduleConfig } from '../../lib/config'
-import type { AuthSuccessResponse, LicenseConfig, LicenseOperator, OptimizeResult, PermissionMode } from '../../lib/types'
+import type { AuthSuccessResponse, LicenseConfig, LicenseOperator, OptimizeResult, PermissionMode, UpgradeSuggestion } from '../../lib/types'
 import ScheduleBoard from './ScheduleBoard'
 import ScheduleContext from './ScheduleContext'
 import IncomeAnalysis from './IncomeAnalysis'
 import ProductionSummary from './ProductionSummary'
 import ScheduleExplanation from './ScheduleExplanation'
+import ResultChanges from './ResultChanges'
+import PageHelp from './pages/PageHelp'
+import CultivationAdvisor, { type AdvisorRow } from './CultivationAdvisor'
+import { projectsFromUpgradeSuggestion } from '../../lib/cultivation-project-import'
 import ResultExportDrawer from './ResultExportDrawer'
 import ManualResultExport from './ManualResultExport'
 import OptionsDrawer, { type OptionPanel, type V2Session } from './OptionsDrawer'
@@ -47,6 +51,30 @@ const text = copy.v2
 type View = 'schedule' | 'analysis' | 'manual' | 'training'
 const ManualScheduleEditor = lazy(() => import('../../components/result-panel/ManualScheduleEditor'))
 const UpgradeSuggestions = lazy(() => import('../../components/UpgradeSuggestions'))
+
+function baseAdvisorRows(suggestions: UpgradeSuggestion[]): AdvisorRow[] {
+  const labels = copy.v2.workspaceAssistant
+  const format = (value: number) => value.toLocaleString('zh-CN', { maximumFractionDigits: 1 })
+  return suggestions.flatMap((suggestion, index) => {
+    const title = suggestion.type === 'single' ? suggestion.name : suggestion.ops?.map((operator) => operator.name).join('、')
+    if (!title) return []
+    const gain = suggestion.roi?.daily_sanity_gain
+    const orundum = suggestion.orundum_roi?.sustainable_orundum_gain
+    const cost = suggestion.training_cost
+    const facts = gain == null ? [] : [labels.gain(format(gain))]
+    if (orundum != null) facts.push(labels.orundumGain(format(orundum)))
+    if (cost?.status === 'available') {
+      const total = cost.totals.equivalent_sanity
+      if (total != null) facts.push(labels.totalCost(format(total)))
+      else facts.push(labels.materialUnknown)
+      const covered = !cost.missing.cash && !cost.missing.exp && cost.missing.materials.every((item) => !item.count)
+      if (covered) facts.push(labels.readyMaterials)
+      else if (cost.missing.equivalent_sanity != null) facts.push(labels.missingSanity(format(cost.missing.equivalent_sanity)))
+      if (gain != null && gain > 0 && total != null) facts.push(labels.payback(format(total / gain)))
+    } else facts.push(labels.unknownCost)
+    return [{ id: `upgrade-${index + 1}`, title, facts: facts.slice(0, 4), projects: projectsFromUpgradeSuggestion(suggestion) }]
+  })
+}
 
 export default function V2Dashboard({ session, workflow, taskCenterAction, generationProgress, result, operators, config, sample, configChanged, onUpdateConfig,
   onImportOperators, onGenerate, onExport, sampleOperators = false, busy = false, loadingResult = false, generationDisabledReason, onRetryResult, error, notice,
@@ -165,6 +193,9 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
   const exportResultId = workflow?.currentResult || workflow?.finalResult ? workflow.progress?.historyResultId ?? workflow.progress?.jobId : workflow?.historyItem?.id ?? workflow?.latestWorkspaceResult?.id
   const resultGrid = useRef<HTMLDivElement>(null)
   const arrivalKey = exportResultId ?? manualKey
+  const previousResult = exportResultId && workflow?.latestWorkspaceResult?.id === exportResultId
+    ? workflow.resultHistory?.find((item) => item.id !== exportResultId && item.source !== 'manual' && Date.parse(item.created_at) <= Date.parse(workflow.latestWorkspaceResult!.created_at))
+    : undefined
   const lastArrival = useRef(arrivalKey)
   const revealedCharts = useMemo(() => new Set<string>(), [arrivalKey])
   useLayoutEffect(() => {
@@ -349,6 +380,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
           <div className="v2-overview-metrics"><ProductionSummary result={result} prepared={prepared} sample={sample} userId={session.user?.id} profileId={session.activeProfile?.id} resultId={exportResultId}
             resultConfig={workflow?.historyItem?.result === result ? workflow.historyItem.config : undefined}
             history={[...(workflow?.resultHistory ?? []), ...(workflow?.archivedResults ?? [])]} newResult={Boolean(workflow?.currentResult || workflow?.finalResult)} onConfigure={() => openPanel('config')} /></div>
+          {!sample && session.user && session.activeProfile && previousResult && <ResultChanges key={`${arrivalKey}:${previousResult.id}`} userId={session.user.id} profileId={session.activeProfile.id} result={result} previous={previousResult} />}
           <div className="v2-content-tabs" role="group" aria-label={text.resultTabs}>
             {([['schedule', text.scheduleTab], ['analysis', text.analysisTab], ...(showManual ? [['manual', text.manualTab] as const] : []), ...(restrictedPreview || !sample && (workflow?.suggestions?.length || result.upgrade_suggestions_status) ? [['training', text.trainingTab] as const] : [])] as const).map(([id, label]) => <button type="button" key={id} aria-pressed={view === id} onClick={() => { setView(id); if (id === 'manual') setManualOpened(true) }}>
               {label}{view === id && <MotionNavIndicator layoutId="result-tab" variant="underline" />}
@@ -363,7 +395,9 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
           <div className="v2-result-view" hidden={view === 'manual'}>
           <V2Transition motionKey={view}>
             {view === 'training' ? <section className="v2-panel v2-feature-content v2-training-workspace v2-section-loading">{canViewTraining
-              ? <Suspense fallback={<Loading label={text.loading} />}><UpgradeSuggestionStatusNotice result={result} /><UpgradeSuggestions suggestions={workflow?.suggestions ?? []} embedded projectScope={session.user && session.activeProfile ? { userId: session.user.id, profileId: session.activeProfile.id } : undefined} /></Suspense>
+              ? <Suspense fallback={<Loading label={text.loading} />}><UpgradeSuggestionStatusNotice result={result} />
+                {session.user && session.activeProfile && workflow?.suggestions?.length ? <CultivationAdvisor key={arrivalKey} scope={{ userId: session.user.id, profileId: session.activeProfile.id }} rows={baseAdvisorRows(workflow.suggestions)} /> : null}
+                <UpgradeSuggestions suggestions={workflow?.suggestions ?? []} embedded projectScope={session.user && session.activeProfile ? { userId: session.user.id, profileId: session.activeProfile.id } : undefined} /></Suspense>
               : <LockedCapabilityPreview title={copy.optimize.pages_tool_optimize_ResultSection_016} description={copy.optimize.pages_tool_optimize_ResultSection_017} />}</section> : view === 'analysis' ? (
               <section className="v2-panel v2-analysis"><div className="v2-panel-heading"><h2>{text.analysisTab}</h2><span className="v2-neutral-tag">24h</span></div>{canViewAnalysis
                 ? <IncomeAnalysis key={arrivalKey} result={result} prepared={prepared} revealedCharts={revealedCharts} />
@@ -374,7 +408,8 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
             )}
           </V2Transition>
           </div>
-          {view !== 'manual' && <ScheduleExplanation userId={session.user?.id} profileId={session.activeProfile?.id} resultId={exportResultId} sample={sample} result={result} />}
+          {!sample && view === 'schedule' && session.activeProfile && <PageHelp key={arrivalKey} page="result" profileId={session.activeProfile.id} maaAvailable={features.maa_export && result.schedule_mode !== 'rotation' && Boolean(exportResultId)} maaDirect={workflow?.userCanExportMaaWithoutCoupon} couponBalance={workflow?.inventoryLoaded && !workflow.inventoryError ? workflow.itemBalances.maa_export_trial_coupon ?? 0 : undefined} onOpenExport={() => setExportOpen(true)} />}
+          {displayedSection === 'overview' && view !== 'manual' && <ScheduleExplanation userId={session.user?.id} profileId={session.activeProfile?.id} resultId={exportResultId} sample={sample} result={result} />}
           {view === 'schedule' && <ScheduleContext result={result} prepared={prepared} config={config} operators={owned} sampleOperators={sampleOperators}
             onConfigure={() => openPanel('config')} onOperators={() => openPanel('operators')} />}
           </div>

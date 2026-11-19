@@ -10,7 +10,7 @@ export const aiSettingsCopy = {
   conflict: '配置已被其他管理员更新，本次修改尚未保存。请重新载入后编辑。',
   discard: '重新载入会丢弃当前未保存的 AI 设置，是否继续？',
   enabled: '开放 AI 排班解读',
-  enabled_help: '与“功能开关”中的 AI 排班解读同步。关闭后停止新的生成，已有解读仍可查看。',
+  enabled_help: '与“功能开关”中的 AI 排班解读同步，同时控制 V2 工作台助手。关闭后暂停新的 AI 请求，已有排班解读仍可查看。',
   inherited_off: '上级功能当前关闭，排班解读暂不可用。',
   connection: '服务连接',
   provider: '服务商名称',

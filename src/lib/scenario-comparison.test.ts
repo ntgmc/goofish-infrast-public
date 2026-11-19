@@ -11,6 +11,7 @@ import {
 } from './scenario-comparison'
 import { CONFIG_PRESETS, normalizeConfig, validateConfig } from './config'
 import { scenarioComparisonFactorsSchema } from './scenario-comparison-validation'
+import { comparisonAssistantFactors, parseWorkspaceAssistantReply } from './workspace-assistant'
 
 const balancedPlan: ScenarioProductionPlan = {
   trading: { lmd: 2, orundum: 0 },
@@ -30,6 +31,23 @@ const baseFactors: ScenarioComparisonFactors = {
 }
 
 describe('expandScenarioComparison', () => {
+  it('keeps the real room positions, levels and production when the goal only changes drone policy', () => {
+    const config = { ...CONFIG_PRESETS['252-1'], facility_layout: ['trading_2', 'manufacture_3', 'power_1'], intermediate_inventory: { 'Pure Gold': 30 } }
+    const reply = parseWorkspaceAssistantReply(JSON.stringify({ status: 'ready', answer: '保留当前布局', plans: ['current'],
+      schedules: ['8x3'], drones: ['off', 'lmd'], goal: { metrics: ['lmd'], priority: 'lmd' } }),
+    { task: 'comparison', profile_id: 'test', question: '保持布局，比较无人机。', context: { layout: '2-5-2', schedule: 'maa' } })
+    if (!reply || !('plans' in reply)) throw new Error('Expected a structured comparison')
+    const factors = scenarioComparisonFactorsSchema.parse(comparisonAssistantFactors(reply, config))
+    const expansion = expandScenarioComparison(config, factors)
+    expect(expansion.scenarios.map(({ droneStrategy }) => droneStrategy)).toEqual(['off', 'lmd'])
+    for (const { config: scenario } of expansion.scenarios) {
+      expect(scenario).toMatchObject({ facility_layout: config.facility_layout, trading_station_levels: config.trading_station_levels,
+        manufacturing_station_levels: config.manufacturing_station_levels, product_requirements: config.product_requirements, intermediate_inventory: config.intermediate_inventory })
+    }
+    expect(expansion.scenarios[0].config.drones?.enable).toBe(false)
+    expect(expansion.scenarios[1].config.drones?.targets).toEqual(['LMD'])
+  })
+
   it('expands automatic, fixed and rotation schedules with exact production plans', () => {
     const base = {
       ...CONFIG_PRESETS['243'],

@@ -28,6 +28,7 @@ import {
   workspaceSavedConfigActionSchema,
 } from '../../src/lib/workspace-validation'
 import { scenarioComparisonFactorsSchema } from '../optimization/jobs/runtime-contracts'
+import { workspaceAssistantRequestSchema } from '../../src/lib/workspace-assistant'
 import { manualPlansSchema } from '../../src/lib/manual-schedule'
 import { manualScheduleSourceSchema } from '../../src/lib/manual-schedule-tool'
 
@@ -147,6 +148,7 @@ export const requestSchemas = {
   depotValue: depotValueRequestSchema,
   adminPublicContentImage: imageUploadSchema,
   scheduleExplanation: strict({ profile_id: shortString(128), result_id: shortString(128) }),
+  workspaceAssistant: workspaceAssistantRequestSchema,
   userFeedback: z.union([feedbackRequestSchema, optimizationFailureFeedbackRequestSchema]),
   userFeedbackReply: feedbackReplySchema,
   adminFeedbackUpdate: adminFeedbackUpdateSchema,
@@ -856,6 +858,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/user/onboarding-tasks/claim', route({ POST: json('standard', requestSchemas.onboardingTaskClaim) })],
   ['/api/user/results', route({ GET: none() }, ['profile_id', 'scope', 'cursor', 'limit'])],
   ['/api/user/schedule-explanation', route({ GET: none(), POST: json('standard', requestSchemas.scheduleExplanation) }, ['profile_id', 'result_id'])],
+  ['/api/user/workspace-assistant', route({ GET: none(), POST: json('standard', requestSchemas.workspaceAssistant) }, ['profile_id'])],
   ['/api/user/maa-export', route({ POST: json('standard', requestSchemas.maaExport) })],
   ['/api/user/full-result-export', route({ POST: json('standard', requestSchemas.fullResultExport) })],
   ['/api/user/result-archive', route({ POST: json('standard', requestSchemas.resultArchive) })],

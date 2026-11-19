@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { NextIcon as ArrowRight, RevenueIcon as ChartNoAxesCombined, OperationTimeIcon as Clock3, RestrictedIcon as LockKeyhole, AddIcon as Plus, RemoveIcon as X, TradeoffIcon } from '../../../components/icons'
 import { copy } from '../../../copy'
-import { expandScenarioComparison, getFixedScenarioProductionPlan, SCENARIO_COMPARISON_MAX_ADDITIONAL_CONFIGS, SCENARIO_LAYOUT_LABELS, type ScenarioComparisonFactors, type ScenarioLayout, type ScenarioProductionPlan } from '../../../lib/scenario-comparison'
+import { expandScenarioComparison, getCurrentScenarioProductionPlan, getFixedScenarioProductionPlan, SCENARIO_COMPARISON_MAX_ADDITIONAL_CONFIGS, SCENARIO_DRONE_LABELS, SCENARIO_LAYOUT_LABELS, type ScenarioComparisonFactors, type ScenarioLayout, type ScenarioProductionPlan } from '../../../lib/scenario-comparison'
 import { restoreScenarioComparisonJob, useScenarioComparison } from '../../tool/optimize/scenario-lab/useScenarioComparison'
 import { formatWorkspaceDate } from '../../../lib/workspace-history'
 import { LAYOUTS, SCHEDULES, DRONES, buildPlan, planLabel, planKey } from '../../tool/optimize/scenario-lab/ScenarioFactors'
@@ -15,6 +15,10 @@ import { EmptyState, Loading, Notice, SectionTitle } from '../components/Workspa
 import Link from '../../../components/InternalLink'
 import { useSiteFeatures } from '../../../lib/site-feature-context'
 import { productPolicies } from '../../../lib/product-catalog'
+import WorkspaceAssistant from '../WorkspaceAssistant'
+import { comparisonAssistantContext, comparisonAssistantFactors, type ComparisonGoal } from '../../../lib/workspace-assistant'
+import type { LicenseConfig } from '../../../lib/types'
+import { comparisonMetricLabels } from './ComparisonResults'
 
 const text = copy.optimize
 const ui = copy.v2.comparison
@@ -24,9 +28,12 @@ export default function Comparison({ workflow: w, onConfig }: { workflow: V2Work
 }
 
 function ComparisonWorkspace({ workflow: w, onConfig }: { workflow: V2Workflow; onConfig: () => void }) {
-  const model = useScenarioComparison({ profileId: w.profile.id, operators: w.mergedOperators, config: w.activeConfig, onSettled: w.refreshInventory })
+  const model = useScenarioComparison({ profileId: w.profile.id, operators: w.mergedOperators, config: w.activeConfig, onSettled: w.refreshInventory, allowDisabledDrones: true })
   const expansion = useMemo(() => { try { return { value: expandScenarioComparison(w.activeConfig, model.factors), error: null } } catch (caught) { return { value: null, error: caught instanceof Error ? caught.message : String(caught) } } }, [w.activeConfig, model.factors])
   const [useCoupon, setUseCoupon] = useState(false)
+  const [draftGoal, setDraftGoal] = useState<ComparisonGoal | null>(null)
+  const confirmation = useRef<HTMLDivElement>(null)
+  const assistant = copy.v2.workspaceAssistant
   const couponBalance = w.itemBalances.scenario_simulation_coupon ?? 0
   const remaining = w.scenarioCouponRequired ? couponBalance : w.profile.kind === 'cdk' ? w.profileCapacity?.scenario_comparison_remaining : null
   useEffect(() => {
@@ -36,17 +43,40 @@ function ComparisonWorkspace({ workflow: w, onConfig }: { workflow: V2Workflow; 
   const historyResults = history?.jobs.filter((job) => job.kind === 'scenario_comparison' && job.status === 'succeeded') ?? []
   const skippedCount = expansion.value?.skipped.reduce((sum, item) => sum + item.count, 0) ?? 0
   const quoteUnavailable = w.scenarioQuoteRequired && (!w.scenarioBillingQuote || w.scenarioBillingQuoteLoading || !w.scenarioBillingQuote.sufficient)
-  return <div className="v2-comparison-workspace"><section className="v2-experiment-builder"><SectionTitle title={copy.v2.comparison.builderTitle} description={copy.v2.comparison.builderDescription} /><Factors factors={model.factors} disabled={model.loading} onChange={model.setFactors} />
+  const allowanceUnknown = !w.scenarioQuoteRequired && (!w.inventoryLoaded || Boolean(w.inventoryError) || remaining === undefined)
+  return <div className="v2-comparison-workspace space-y-5">
+  <WorkspaceAssistant key={JSON.stringify(w.activeConfig)} title={assistant.comparison} userId={w.profile.user_id} profileId={w.profile.id} description={assistant.comparisonHelp} example={assistant.comparisonExample} disabled={model.loading}
+    buildRequest={(question) => ({ task: 'comparison', profile_id: w.profile.id, question, context: comparisonAssistantContext(w.activeConfig) })}
+    renderReply={(reply) => {
+      if ('reason' in reply) return <p>{reply.reason}</p>
+      if (!('plans' in reply)) return null
+      try {
+        const factors = comparisonAssistantFactors(reply, w.activeConfig)
+        const { scenarios, skipped } = expandScenarioComparison(w.activeConfig, factors)
+        if (scenarios.length < 2) return <Notice>{assistant.comparisonTooFew}</Notice>
+        return <><p>{reply.answer}</p><p>{assistant.comparisonFocus} · {reply.goal.metrics.map((metric) => comparisonMetricLabels[metric]).join('、')}</p>
+          {reply.goal.priority && <p>{assistant.comparisonFirst} · {comparisonMetricLabels[reply.goal.priority]}</p>}
+          <ScenarioPreview labels={scenarios.map((scenario) => scenario.label)} initiallyOpen />
+          {skipped.length > 0 && <ul>{skipped.map((item) => <li key={`${item.code}:${item.droneStrategy}`}>{ui.skippedItem(item.message, item.count)}</li>)}</ul>}
+          <button type="button" className="v2-button v2-button-secondary" disabled={model.loading} onClick={() => { model.setFactors(factors); setDraftGoal(reply.goal); confirmation.current?.focus() }}>{assistant.applyComparison}</button>
+        </>
+      } catch (error) { return <Notice error>{error instanceof Error ? error.message : assistant.failed}</Notice> }
+    }} />
+  <section className="v2-experiment-builder"><SectionTitle title={copy.v2.comparison.builderTitle} description={copy.v2.comparison.builderDescription} /><Factors factors={model.factors} config={w.activeConfig} disabled={model.loading} onChange={model.setFactors} />
+    {expansion.value && <ScenarioPreview labels={expansion.value.scenarios.map((scenario) => scenario.label)} />}
     {w.scenarioCouponRequired && <label className="v2-factor-choice">
       <input type="checkbox" checked={useCoupon} disabled={model.loading || couponBalance < 1} onChange={(event) => setUseCoupon(event.currentTarget.checked)} />
       <span><strong>{copy.inventory.scenario_coupon}</strong><small>{copy.inventory.scenario_coupon_help} {copy.inventory.coupon_available}{couponBalance}</small></span>
     </label>}
     {w.scenarioCouponRequired && !useCoupon && <Notice>{copy.inventory.scenario_coupon_required}</Notice>}
-    <div className="v2-experiment-run">
+    <div ref={confirmation} tabIndex={-1} className="v2-experiment-run" aria-label={assistant.confirmComparison}>
       <div aria-live="polite" aria-atomic="true">{expansion.value ? <strong>{ui.scenarioCount(expansion.value.scenarios.length)}</strong> : <Notice error>{expansion.error}</Notice>}
-        {!w.scenarioQuoteRequired && <p className="v2-muted">{ui.remainingRuns}：{!w.inventoryLoaded || w.inventoryError || remaining === undefined ? '—' : remaining === null ? <span aria-label={ui.unlimitedRuns}>∞</span> : remaining}</p>}
+        {!w.scenarioQuoteRequired && <p className="v2-muted">{ui.remainingRuns}：{allowanceUnknown ? '—' : remaining === null ? <span aria-label={ui.unlimitedRuns}>∞</span> : remaining}</p>}
+        {w.scenarioBillingQuote ? <p>{copy.metered.quote.summary(w.scenarioBillingQuote.charge, w.scenarioBillingQuote.available, w.scenarioBillingQuote.tier, w.scenarioBillingQuote.sufficient)}</p>
+          : !w.scenarioQuoteRequired && <p>{assistant.usage} · {w.scenarioCouponRequired ? assistant.usageCoupon : allowanceUnknown ? assistant.usageUnknown : remaining === null ? assistant.usageNoLimit : assistant.usageQuota}</p>}
+        {draftGoal && allowanceUnknown && !w.inventoryLoading && <button type="button" className="v2-text-button" onClick={() => void w.refreshInventory()}>{copy.v2.retry}</button>}
       </div>
-      <button type="button" className="v2-button v2-button-primary" aria-busy={model.loading} disabled={model.loading || !expansion.value || (w.scenarioCouponRequired && (!useCoupon || couponBalance < 1)) || quoteUnavailable} onClick={() => void model.run(w.scenarioCouponRequired && useCoupon, w.scenarioBillingQuote)}>{model.loading ? ui.running : ui.run}</button>
+      <button type="button" className="v2-button v2-button-primary" aria-busy={model.loading} disabled={model.loading || !expansion.value || (w.scenarioCouponRequired && (!useCoupon || couponBalance < 1)) || remaining === 0 || quoteUnavailable || Boolean(draftGoal && allowanceUnknown)} onClick={() => void model.run(w.scenarioCouponRequired && useCoupon, w.scenarioBillingQuote, draftGoal ?? undefined)}>{model.loading ? ui.running : ui.run}</button>
     </div>
     {skippedCount > 0 && <details className="v2-comparison-skips"><summary>{ui.skippedCount(skippedCount)}</summary><ul>{expansion.value?.skipped.map((item) => <li key={`${item.code}:${item.droneStrategy}`}>{ui.skippedItem(item.message, item.count)}</li>)}</ul></details>}
     {w.scenarioQuoteRequired && <Notice>{w.scenarioBillingQuoteLoading ? text.pages_tool_optimize_ScenarioLabSection_055 : w.scenarioBillingQuoteError ?? (w.scenarioBillingQuote?.sufficient === false ? text.pages_tool_optimize_ScenarioLabSection_056 : text.pages_tool_optimize_ScenarioLabSection_057)}{w.scenarioBillingQuoteError && <button className="v2-text-button" onClick={() => void w.refreshScenarioBillingQuote()}>{text.pages_tool_optimize_ScenarioLabSection_058}</button>}</Notice>}
@@ -54,14 +84,14 @@ function ComparisonWorkspace({ workflow: w, onConfig }: { workflow: V2Workflow; 
   </section>
   {model.progress && <div className="v2-experiment-progress"><ScheduleProgress progress={model.progress} variant="focus" />{model.canCancel && <button className="v2-button v2-button-secondary" disabled={model.cancelling} onClick={() => { if (window.confirm(text.pages_tool_optimize_ScenarioLabSection_052)) void model.cancel() }}>{model.cancelling ? text.pages_tool_optimize_ScenarioLabSection_053 : text.pages_tool_optimize_ScenarioLabSection_051}</button>}</div>}
   {!model.result && !model.progress && <EmptyState title={copy.v2.comparison.emptyTitle}>{copy.v2.comparison.emptyDescription}</EmptyState>}
-  {model.result && <ComparisonResults result={model.result} disabled={w.loading || model.loading || !w.userCanEditConfig} onApply={(config) => { w.handleApplyScenarioConfig(config); onConfig() }} />}
+  {model.result && <ComparisonResults key={model.job?.id} result={model.result} goal={model.resultGoal} disabled={w.loading || model.loading || !w.userCanEditConfig} onApply={(config) => { w.handleApplyScenarioConfig(config); onConfig() }} />}
   {history && <section className="v2-generation-history" aria-label={ui.historyTitle}>
     <SectionTitle title={ui.historyTitle} description={ui.historyDescription} action={<button type="button" className="v2-button v2-button-secondary" disabled={history.loading || history.refreshing || history.loadingMore} onClick={() => void history.refresh()}>{text.pages_tool_optimize_OptimizationTaskCenter_003}</button>} />
     <Notice error>{history.error}</Notice>
     {history.loading ? <Loading label={text.pages_tool_optimize_OptimizationTaskCenter_004} skeleton="list" /> : <>
       {historyResults.map((job) => <article key={job.id} className="v2-record" aria-current={model.job?.id === job.id ? 'true' : undefined}>
         <div className="v2-record-select"><time dateTime={job.timestamps.finishedAt ?? job.timestamps.submittedAt}>{formatWorkspaceDate(job.timestamps.finishedAt ?? job.timestamps.submittedAt)}</time><strong>{ui.historyResult(formatWorkspaceDate(job.timestamps.submittedAt))}</strong>{!job.resultAvailable && <span>{text.pages_tool_optimize_OptimizationTaskCenter_041}</span>}</div>
-        <button type="button" className="v2-text-button" disabled={model.loading || !job.resultAvailable} onClick={() => restoreScenarioComparisonJob(w.profile.id, job.id)}>{text.pages_tool_optimize_OptimizationTaskCenter_037}</button>
+        <button type="button" className="v2-text-button" disabled={model.loading || !job.resultAvailable} onClick={() => { setDraftGoal(null); restoreScenarioComparisonJob(w.profile.id, job.id, true) }}>{text.pages_tool_optimize_OptimizationTaskCenter_037}</button>
       </article>)}
       {historyResults.length === 0 && !history.error && <EmptyState title={ui.historyEmpty} />}
       {history.hasMore && <button type="button" className="v2-button v2-button-secondary" disabled={history.loadingMore || history.refreshing} onClick={() => void history.loadMore()}>{history.loadingMore ? text.pages_tool_optimize_result_history_loading : text.pages_tool_optimize_result_history_load_more}</button>}
@@ -70,16 +100,21 @@ function ComparisonWorkspace({ workflow: w, onConfig }: { workflow: V2Workflow; 
   </div>
 }
 
-function Factors({ factors, disabled, onChange }: { factors: ScenarioComparisonFactors; disabled: boolean; onChange: (next: ScenarioComparisonFactors) => void }) {
-  const [layoutId, setLayoutId] = useState<ScenarioLayout>('243')
+function ScenarioPreview({ labels, initiallyOpen }: { labels: string[]; initiallyOpen?: boolean }) {
+  return <details className="v2-goal-preview" open={initiallyOpen}><summary>{copy.v2.workspaceAssistant.preview(labels.length)}</summary><ol>{labels.map((label, index) => <li key={index}>{label}</li>)}</ol></details>
+}
+
+function Factors({ factors, config, disabled, onChange }: { factors: ScenarioComparisonFactors; config: LicenseConfig; disabled: boolean; onChange: (next: ScenarioComparisonFactors) => void }) {
+  const [layoutId, setLayoutId] = useState<ScenarioLayout | 'current'>('243')
   const [orundum, setOrundum] = useState(0)
   const [shard, setShard] = useState(0)
   const [gold, setGold] = useState(2)
-  const layout = LAYOUTS.find((item) => item.id === layoutId)!
-  const fixedPlan = getFixedScenarioProductionPlan(layoutId)
+  const layout = layoutId === 'current' ? { trading: config.trading_stations_count, manufacturing: config.manufacturing_stations_count } : LAYOUTS.find((item) => item.id === layoutId)!
+  const fixedPlan = layoutId === 'current' ? getCurrentScenarioProductionPlan(config) : getFixedScenarioProductionPlan(layoutId)
   const draft = fixedPlan ?? buildPlan(layout, Math.min(orundum, layout.trading), Math.min(shard, layout.manufacturing), Math.min(gold, layout.manufacturing - Math.min(shard, layout.manufacturing)))
-  const count = factors.layouts.reduce((sum, entry) => sum + entry.plans.length, 0)
-  const duplicate = factors.layouts.find((entry) => entry.layout === layoutId)?.plans.some((plan) => planKey(plan) === planKey(draft))
+  const count = factors.layouts.reduce((sum, entry) => sum + (entry.layout === 'current' ? 1 : entry.plans.length), 0)
+  const existing = factors.layouts.find((entry) => entry.layout === layoutId)
+  const duplicate = existing && (layoutId === 'current' || existing.plans.some((plan) => planKey(plan) === planKey(draft)))
   const hasMaa = factors.maaSchedules.length > 0
 
   return <fieldset className="v2-experiment-factors" disabled={disabled}>
@@ -90,7 +125,8 @@ function Factors({ factors, disabled, onChange }: { factors: ScenarioComparisonF
       <div className="v2-production-draft">
         <div className="v2-production-draft-heading"><h4>{ui.draftPlan}</h4>
         <label className="v2-field"><span>{ui.layout}</span>
-          <select className="v2-input" aria-label={ui.layout} value={layoutId} onChange={(event) => setLayoutId(event.target.value as ScenarioLayout)}>
+          <select className="v2-input" aria-label={ui.layout} value={layoutId} onChange={(event) => setLayoutId(event.target.value as ScenarioLayout | 'current')}>
+            <option value="current">{SCENARIO_LAYOUT_LABELS.current}</option>
             {LAYOUTS.map((item) => <option key={item.id} value={item.id}>{SCENARIO_LAYOUT_LABELS[item.id]}</option>)}
           </select>
         </label>
@@ -110,10 +146,10 @@ function Factors({ factors, disabled, onChange }: { factors: ScenarioComparisonF
           </div>
         </fieldset>
       </div>
-      <div className="v2-production-add"><p>{fixedPlan ? copy.domain.scenario252FixedProduction : ui.allocationHelp}</p>
+      <div className="v2-production-add"><p>{layoutId === 'current' ? ui.currentProduction : fixedPlan ? copy.domain.scenario252FixedProduction : ui.allocationHelp}</p>
         <button type="button" className="v2-button v2-button-secondary" disabled={duplicate || count >= SCENARIO_COMPARISON_MAX_ADDITIONAL_CONFIGS} onClick={() => {
           const layouts = factors.layouts.filter((item) => item.layout !== layoutId)
-          layouts.push({ layout: layoutId, plans: [...(factors.layouts.find((item) => item.layout === layoutId)?.plans ?? []), draft].sort((a, b) => planKey(a).localeCompare(planKey(b))) })
+          layouts.push({ layout: layoutId, plans: layoutId === 'current' ? [] : [...(existing?.plans ?? []), draft].sort((a, b) => planKey(a).localeCompare(planKey(b))) })
           onChange({ ...factors, layouts: layouts.sort((a, b) => a.layout.localeCompare(b.layout)) })
         }}><Plus size={16} aria-hidden="true" />{duplicate ? ui.duplicatePlan : count >= SCENARIO_COMPARISON_MAX_ADDITIONAL_CONFIGS ? ui.planLimit : ui.addPlan}</button>
       </div>
@@ -121,9 +157,9 @@ function Factors({ factors, disabled, onChange }: { factors: ScenarioComparisonF
       <section className="v2-production-selected" aria-label={ui.selectedPlansTitle}>
         <div className="v2-production-selected-heading"><h4>{ui.selectedPlansTitle}</h4><span>{ui.selectedPlans(count, SCENARIO_COMPARISON_MAX_ADDITIONAL_CONFIGS)}</span></div>
         {count === 0 ? <p className="v2-muted">{ui.noPlans}</p> : <ul className="v2-production-plans">
-          {factors.layouts.flatMap((entry) => entry.plans.map((plan) => <li key={`${entry.layout}:${planKey(plan)}`}>
+          {factors.layouts.flatMap((entry) => (entry.layout === 'current' ? [getCurrentScenarioProductionPlan(config)] : entry.plans).map((plan) => <li key={`${entry.layout}:${planKey(plan)}`}>
             <div className="v2-production-plan-heading"><b>{SCENARIO_LAYOUT_LABELS[entry.layout]}</b>
-            <button type="button" className="v2-icon-button" aria-label={`${text.pages_tool_optimize_scenario_lab_ScenarioFactors_026}${SCENARIO_LAYOUT_LABELS[entry.layout]} ${planLabel(plan)}`} onClick={() => onChange({ ...factors, layouts: factors.layouts.map((row) => row.layout === entry.layout ? { ...row, plans: row.plans.filter((item) => planKey(item) !== planKey(plan)) } : row).filter((row) => row.plans.length > 0) })}><X size={16} aria-hidden="true" /></button></div>
+            <button type="button" className="v2-icon-button" aria-label={`${text.pages_tool_optimize_scenario_lab_ScenarioFactors_026}${SCENARIO_LAYOUT_LABELS[entry.layout]} ${planLabel(plan)}`} onClick={() => onChange({ ...factors, layouts: factors.layouts.filter((row) => row.layout !== 'current' || entry.layout !== 'current').map((row) => row.layout === entry.layout ? { ...row, plans: row.plans.filter((item) => planKey(item) !== planKey(plan)) } : row).filter((row) => row.layout === 'current' || row.plans.length > 0) })}><X size={16} aria-hidden="true" /></button></div>
             <ProductionSummary plan={plan} />
           </li>))}
         </ul>}
@@ -144,7 +180,7 @@ function Factors({ factors, disabled, onChange }: { factors: ScenarioComparisonF
       </fieldset>
       <fieldset disabled={!hasMaa}><legend>{ui.drones}<small>{ui.multipleChoice}</small></legend>
         <div className="v2-drone-choices">
-          {DRONES.map((item) => <label className="v2-factor-choice" key={item.id}>
+          {[...DRONES, { id: 'off' as const, label: SCENARIO_DRONE_LABELS.off }].map((item) => <label className="v2-factor-choice" key={item.id}>
             <input type="checkbox" checked={factors.droneStrategies.includes(item.id)} onChange={() => onChange({ ...factors, droneStrategies: factors.droneStrategies.includes(item.id) ? factors.droneStrategies.filter((id) => id !== item.id) : [...factors.droneStrategies, item.id] })} />
             <span>{item.label}</span>
           </label>)}

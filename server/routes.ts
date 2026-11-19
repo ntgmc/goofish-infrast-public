@@ -49,6 +49,7 @@ import userBalanceHandler from './handlers/user-balance'
 import userCdkHandler from './handlers/user-cdk'
 import userResultsHandler from './handlers/user-results'
 import userScheduleExplanationHandler from './handlers/user-schedule-explanation'
+import userWorkspaceAssistantHandler from './handlers/user-workspace-assistant'
 import adminAiSettingsHandler from './handlers/admin-ai-settings'
 import adminAiUsageHandler from './handlers/admin-ai-usage'
 import personalUseDeclarationHandler from './handlers/personal-use-declaration'
@@ -177,6 +178,7 @@ export const API_ROUTES: ReadonlyArray<readonly [path: string, handler: ApiHandl
   ['/api/user/onboarding-tasks/claim', userInventoryHandler],
   ['/api/user/results', userResultsHandler],
   ['/api/user/schedule-explanation', userScheduleExplanationHandler],
+  ['/api/user/workspace-assistant', userWorkspaceAssistantHandler],
   ['/api/admin/ai-settings', adminAiSettingsHandler],
   ['/api/admin/ai-usage', adminAiUsageHandler],
   ['/api/user/maa-export', userResultsHandler],

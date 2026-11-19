@@ -36,10 +36,11 @@ const scenarioProductionPlanSchema: z.ZodType<ScenarioProductionPlan> = z.strict
   }),
 })
 
-const scenarioLayoutFactorSchema = z.strictObject({
-  layout: z.enum(['153', '243', '252', '252-1', '252-full', '333']),
-  plans: z.array(scenarioProductionPlanSchema).min(1).max(24),
-})
+const scenarioPresetLayoutSchema = z.enum(['153', '243', '252', '252-1', '252-full', '333'])
+const scenarioLayoutFactorSchema = z.discriminatedUnion('layout', [
+  z.strictObject({ layout: scenarioPresetLayoutSchema, plans: z.array(scenarioProductionPlanSchema).min(1).max(24) }),
+  z.strictObject({ layout: z.literal('current'), plans: z.array(scenarioProductionPlanSchema).max(0) }),
+])
 
 export const scenarioComparisonFactorsSchema: z.ZodType<ScenarioComparisonFactors> = z.strictObject({
   layouts: z.array(scenarioLayoutFactorSchema).min(1).max(3),
@@ -58,7 +59,7 @@ export const scenarioComparisonFactorsSchema: z.ZodType<ScenarioComparisonFactor
       context,
     )
   })
-  const planCount = factors.layouts.reduce((sum, entry) => sum + entry.plans.length, 0)
+  const planCount = factors.layouts.reduce((sum, entry) => sum + (entry.layout === 'current' ? 1 : entry.plans.length), 0)
   if (planCount > SCENARIO_COMPARISON_MAX_ADDITIONAL_CONFIGS) {
     context.addIssue({
       code: 'custom',
@@ -126,7 +127,7 @@ export const scenarioComparisonResultSchema: z.ZodType<ScenarioComparisonResult>
     id: boundedString(256),
     label: boundedString(1_000),
     config: extensibleLicenseConfigSchema,
-    layout: z.enum(['153', '243', '252', '252-1', '252-full', '333']),
+    layout: z.union([scenarioPresetLayoutSchema, z.literal('current')]),
     productionPlan: scenarioProductionPlanSchema,
     scheduleMode: z.enum(['maa', 'rotation']),
     scheduleStrategy: z.enum(['variable', '8x3', 'rotation']),

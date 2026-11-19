@@ -12,6 +12,7 @@ import type { V2Section } from '../navigation'
 import GenerationProgressDemo from '../GenerationProgressDemo'
 import FeedbackButton from '../../../components/FeedbackDialog'
 import { Facts, Notice, SectionTitle } from '../components/WorkspaceUI'
+import PageHelp from './PageHelp'
 
 const text = copy.optimize
 
@@ -76,6 +77,7 @@ export default function Generation({ workflow: w, progress: progressContent, dis
       </div>
     </div>
     {progressContent && <div className="v2-generation-progress">{progressContent}</div>}
+    <PageHelp key={w.profile.id} page="generation" profileId={w.profile.id} inventoryIssue={Boolean(w.inventoryError)} credentialInvalid={w.profile.skland_binding?.credential_status === 'invalid'} errorCode={error?.code} recoveryAction={error?.recoveryAction} failure={Boolean(error)} jobId={error?.jobId} saveFailed={error?.retry === 'save'} running={busy && Boolean(progress?.jobId) && !progress?.completedAt} onRetrySave={w.retryConfigSave} onRetryJob={!busy ? () => void w.handleGenerate() : undefined} onConfig={onConfig} />
     <section className="v2-generation-history"><SectionTitle title={text.pages_tool_optimize_OverviewSection_012} action={<button className="v2-text-button" onClick={() => onNavigate('plans')}>{copy.v2.history}<ArrowRight size={16} /></button>} />
       {latest ? <><h3>{latest.name}</h3><p>{formatWorkspaceDate(latest.created_at)} · {formatResultHistorySummary(latest)}</p><div className="v2-actions"><button className="v2-button v2-button-secondary" onClick={() => void w.handleViewHistory(latest)}>{text.pages_tool_optimize_OverviewSection_018}</button>{features.maa_export && <button className="v2-text-button" disabled={w.workspaceBusyAction === `download:${latest.id}` || !latest.maa_exportable} onClick={() => void w.handleDownloadHistory(latest)}>{w.workspaceBusyAction === `download:${latest.id}` ? copy.inventory.export_downloading : text.pages_tool_optimize_OverviewSection_019}</button>}<button className="v2-text-button" disabled={w.loading || !latest.has_config} onClick={() => void w.handleUseHistoryConfig(latest)}>{copy.v2.historyPage.useResultConfig}</button></div></> : <p>{copy.v2.generationPage.historyEmpty}</p>}
       <Facts items={[[copy.v2.savedConfigurations, `${w.savedConfigs.length}/${w.profileCapacity?.plan_slots.limit ?? WORKSPACE_SAVED_CONFIG_LIMIT}`], [copy.v2.savedResults, `${w.profileCapacity?.history_slots.used ?? w.resultHistory.length}/${w.profileCapacity?.history_slots.limit ?? WORKSPACE_RESULT_HISTORY_LIMIT}`]]} />

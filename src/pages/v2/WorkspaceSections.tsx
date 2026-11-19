@@ -137,7 +137,7 @@ export default function WorkspaceSections({ section, session, workflow, generati
       <Suspense fallback={<V2SectionLoading />}>
         {tool === 'manual-tool' && v2SectionAvailable(tool, features) && <ManualTool session={session} workflow={workflow} onDirtyChange={onToolDirtyChange} onOpenProfile={onOpenProfile} onNavigate={onNavigate} />}
         {tool === 'schedule-comparison' && v2SectionAvailable(tool, features) && <ScheduleComparison session={session} onOpenProfile={onOpenProfile} />}
-        {tool === 'cultivation' && v2SectionAvailable(tool, features) && <Cultivation session={session} />}
+        {tool === 'cultivation' && v2SectionAvailable(tool, features) && <Cultivation session={session} upgradeSuggestions={workflow?.suggestions} />}
         {tool === 'thanks-recruitment' && v2SectionAvailable(tool, features) && <ThanksRecruitment session={session} embedded />}
         {tool === 'cultivation-projects' && v2SectionAvailable(tool, features) && <CultivationProjects session={session} onConfig={onConfig} />}
         {tool === 'training-ratio' && v2SectionAvailable(tool, features) && <TrainingRatio session={session} embedded />}

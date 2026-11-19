@@ -11,6 +11,12 @@ import { SklandOverview, SklandInfrastructure } from './SklandGamePanels'
 import type { V2Session } from '../OptionsDrawer'
 import { Notice } from '../components/WorkspaceUI'
 import { DataRefresh } from '../components/DataActivity'
+import AccountChanges from '../AccountChanges'
+import { snapshotChanges } from '../../../lib/account-changes'
+import type { SklandSnapshot } from '../../../lib/skland-snapshot'
+import { v2Path } from '../navigation'
+import Link from '../../../components/InternalLink'
+import PageHelp from './PageHelp'
 
 const text = copy.skland
 
@@ -25,6 +31,15 @@ export default function Skland({ session, onOpenProfile, onProfiles, onConfig }:
   const profile = session.activeProfile
   const snapshot = useSklandSnapshot(session.user?.id, profile, true, 'live')
   const data = snapshot.data
+  const [before, setBefore] = useState<SklandSnapshot | null>(null)
+  const [refreshed, setRefreshed] = useState(false)
+  const changes = before && data ? snapshotChanges(before, data) : null
+  async function refresh() {
+    setBefore(data)
+    setRefreshed(false)
+    const next = await snapshot.refresh()
+    if (next) setRefreshed(true)
+  }
   const [now, setNow] = useState(Date.now)
   useEffect(() => {
     setNow(Date.now())
@@ -33,6 +48,7 @@ export default function Skland({ session, onOpenProfile, onProfiles, onConfig }:
     const timer = window.setTimeout(() => setNow(Date.now()), remaining)
     return () => window.clearTimeout(timer)
   }, [data?.retryAt])
+  const canRefresh = snapshot.available && !snapshot.busy && !(data?.retryAt && Date.parse(data.retryAt) > now)
   const game = data && ['fresh', 'stale'].includes(sklandResourceState(data.game.fetchedAt)) ? data.game.data : null
   const profiles = session.profiles.filter((entry) => entry.status === 'active' && !entry.archived_at)
   const rebind = !profile?.skland_binding || profile.skland_binding.credential_status === 'invalid'
@@ -47,8 +63,8 @@ export default function Skland({ session, onOpenProfile, onProfiles, onConfig }:
         </label> : <button type="button" className="v2-button v2-button-secondary" onClick={onProfiles}>{text.manageAccounts}</button>}
         <div className="v2-actions">
           {profile && rebind ? <button type="button" className="v2-button v2-button-primary" onClick={() => setBinding(true)}><SklandIcon />{text.bind}</button>
-            : profile && <button type="button" className="v2-button v2-button-secondary" aria-busy={snapshot.busy} disabled={snapshot.busy || !snapshot.available || Boolean(data?.retryAt && Date.parse(data.retryAt) > now)}
-              onClick={() => void snapshot.refresh()}><RefreshIcon size={16} aria-hidden="true" />{snapshot.busy ? text.refreshing : text.refresh}</button>}
+            : profile && <button type="button" className="v2-button v2-button-secondary" aria-busy={snapshot.busy} disabled={!canRefresh}
+              onClick={() => void refresh()}><RefreshIcon size={16} aria-hidden="true" />{snapshot.busy ? text.refreshing : text.refresh}</button>}
           {session.license && <button type="button" className="v2-button v2-button-secondary" onClick={onConfig}><ConfigIcon size={16} aria-hidden="true" />{text.configure}</button>}
         </div>
       </div>
@@ -59,6 +75,12 @@ export default function Skland({ session, onOpenProfile, onProfiles, onConfig }:
       <p className="mt-4 text-sm leading-6 text-ink-secondary">{text.snapshotHelp}</p>
       {profile?.skland_binding && <p className="mt-2 text-sm text-ink-muted">UID {profile.skland_binding.uid}</p>}
     </section>
+    <PageHelp page="skland" profileId={profile?.id} credentialInvalid={profile?.skland_binding?.credential_status === 'invalid'} inventoryIssue={Boolean(data?.inventory.error || !data?.inventory.items)} onAuthorize={profile ? () => setBinding(true) : undefined} onRefreshInventory={canRefresh ? () => void refresh() : undefined} />
+    {refreshed && data && profile && session.user && <details className="v2-disclosure"><summary>{copy.v2.workspaceAssistant.changes}</summary>
+      {changes ? <AccountChanges userId={session.user.id} profileId={profile.id} changes={changes}>
+        {changes.length > 0 && <p className="v2-muted">{copy.v2.workspaceAssistant.gameNext} <Link className="v2-text-button" to={v2Path('cultivation-projects', profile.id)}>{copy.cultivationProjects.openProjects}</Link></p>}
+      </AccountChanges> : <p className="v2-muted">{copy.v2.workspaceAssistant.changesMissing}</p>}
+    </details>}
     {data && <Tabs.Root className="v2-data-arrival" value={tab} onValueChange={setTab}>
       <Tabs.List className="mb-5 flex border-b border-surface-3" aria-label={text.title}>
         {(['overview', 'backpack', 'infrastructure'] as const).map((entry) => <Tabs.Trigger key={entry} value={entry}

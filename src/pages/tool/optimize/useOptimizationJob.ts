@@ -42,6 +42,11 @@ export function getOptimizationFailureJobId(error: unknown): string | undefined 
   return error instanceof OptimizationJobTerminalError && error.status !== 'cancelled' ? error.jobId : undefined
 }
 
+export function getOptimizationFailureRecovery(error: unknown) {
+  if (!(error instanceof OptimizationJobTerminalError)) return {}
+  return { ...(error.code && { code: error.code }), ...(error.recoveryAction && { recoveryAction: error.recoveryAction }) }
+}
+
 export function isOptimizationJobCancelledError(error: unknown): boolean {
   return error instanceof OptimizationJobTerminalError && error.status === 'cancelled'
 }
