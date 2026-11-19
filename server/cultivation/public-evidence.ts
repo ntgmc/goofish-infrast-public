@@ -58,6 +58,8 @@ export type PublicRecommendations = Omit<Result, 'recommendations'> & {
 export function compactRecommendations(result: Result): PublicRecommendations {
   const samples: PublicSample[] = [], ids = new Map<Result['recommendations'][number]['samples'][number], number>()
   const groups: PublicRecommendations['groups'] = [], groupIds = new Map<string, number>()
+  const optionIds = new WeakMap<Requirement, number>(), optionSets = new Map<string, Map<string, number>>()
+  let nextOptionId = 0
   const stages = new Map(result.stages.map((row, index) => [row.id, index]))
   return { ...result, groups, samples, recommendations: result.recommendations.map((branch) => ({ ...branch,
     samples: branch.samples.map((sample) => {
@@ -65,11 +67,23 @@ export function compactRecommendations(result: Result): PublicRecommendations {
       if (id !== undefined) return id
       let group = -1
       if (sample.group !== null) {
-        const value = { key: sample.group, options: sample.options.filter((row) => row.operator && !row.warnings.length)
-          .map((row) => ({ operatorId: row.operator!.id, target: row.target, skillId: row.operator!.skills[row.target.skill - 1] ?? '' })) }
-        const key = JSON.stringify(value)
-        if (!groupIds.has(key)) { groupIds.set(key, groups.length); groups.push(value) }
-        group = groupIds.get(key)!
+        const optionKey = sample.options.map((option) => {
+          let id = optionIds.get(option)
+          if (id === undefined) { id = nextOptionId++; optionIds.set(option, id) }
+          return id
+        }).join(',')
+        let matches = optionSets.get(sample.group)
+        const cached = matches?.get(optionKey)
+        if (cached !== undefined) group = cached
+        else {
+          const value = { key: sample.group, options: sample.options.filter((row) => row.operator && !row.warnings.length)
+            .map((row) => ({ operatorId: row.operator!.id, target: row.target, skillId: row.operator!.skills[row.target.skill - 1] ?? '' })) }
+          const key = JSON.stringify(value)
+          if (!groupIds.has(key)) { groupIds.set(key, groups.length); groups.push(value) }
+          group = groupIds.get(key)!
+          if (!matches) { matches = new Map(); optionSets.set(sample.group, matches) }
+          matches.set(optionKey, group)
+        }
       }
       id = samples.length
       samples.push([Number(sample.family), sample.document.homework.id, stages.get(sample.document.homework.stageId)!, sample.weight,
