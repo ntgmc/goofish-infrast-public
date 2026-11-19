@@ -23,7 +23,8 @@
   p { margin-top: var(--space-2xs); font-size: var(--text-sm); color: var(--v2-muted); }
 }
 .v2-schedule-comparison-settings > p { margin-top: var(--space-sm); }
-.v2-schedule-comparison-run { margin-block: var(--space-lg); }
+.v2-schedule-comparison-run { display: grid; justify-items: start; gap: var(--space-xs); margin-block: var(--space-lg); }
+.v2-schedule-comparison-run .schedule-simulation-progress { width: min(100%, 38rem); }
 .v2-schedule-comparison-results {
   margin-top: var(--space-xl);
   min-width: 0;

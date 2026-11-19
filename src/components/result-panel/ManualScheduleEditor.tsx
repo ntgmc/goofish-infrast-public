@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { ExportImageIcon as Download, ClearIcon as Eraser, LockedOperatorIcon as LockKeyhole, UploadIcon as Upload, BackupIcon, LoadingIcon } from '../icons'
 import type { LicenseConfig, LicenseOperator, OptimizeResult } from '../../lib/types'
 import { copy } from '../../copy/index'
+import { ScheduleSimulationProgress, scheduleSimulationStage, type ScheduleSimulationStage } from '../ScheduleSimulationProgress'
 import { canonicalJson } from '../../lib/crypto'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from '../ui/dialog'
 import ResultBoardV2, { type BoardRoom } from './ResultBoardV2'
@@ -22,11 +23,12 @@ import {
   manualSourceKey, parseManualDraft, readManualDraft, saveManualDraft, type ManualDraft, type ManualPlan,
 } from '../../lib/manual-schedule'
 
-export default function ManualScheduleEditor({ source: initialSource, profileId, operators, simulationBaseline, draftStorageKey = profileId, onDirtyChange, renderExport, revealCandidates = false }: {
+export default function ManualScheduleEditor({ source: initialSource, profileId, operators, simulationBaseline, draftStorageKey = profileId, onDirtyChange, renderExport, revealCandidates = false, showSimulationProgress = false }: {
   source: OptimizeResult;
   profileId: string;
   operators: LicenseOperator[];
   revealCandidates?: boolean;
+  showSimulationProgress?: boolean;
   simulationBaseline?: { id?: string; config: LicenseConfig };
   draftStorageKey?: string;
   onDirtyChange?: (dirty: boolean) => void;
@@ -51,7 +53,8 @@ export default function ManualScheduleEditor({ source: initialSource, profileId,
   const [busy, setBusy] = useState(false)
   const [completed, setCompleted] = useState<{ result: OptimizeResult; resultId: string } | null>(null)
   const simulation = completed?.result ?? null
-  const [simulating, setSimulating] = useState(false)
+  const [simulationStage, setSimulationStage] = useState<ScheduleSimulationStage | null>(null)
+  const simulating = simulationStage !== null
   const simulationRun = useRef(0)
   const simulationLock = useRef(false)
   const operatorsKey = canonicalJson(operators)
@@ -132,7 +135,7 @@ export default function ManualScheduleEditor({ source: initialSource, profileId,
     const run = ++simulationRun.current
     const submittedKey = canonicalJson({ source, plans: submittedPlans, operators })
     const isCancelled = () => simulationRun.current !== run
-    setSimulating(true)
+    setSimulationStage('submitting')
     setError(null)
     setCompleted(null)
     try {
@@ -143,6 +146,8 @@ export default function ManualScheduleEditor({ source: initialSource, profileId,
           ? { baselineHistoryId: simulationBaseline.id, plans: submittedPlans }
           : { source: manualResult(source, submittedPlans, true), plans: submittedPlans },
       }, label.simulation_failed)
+      if (isCancelled()) return
+      setSimulationStage(scheduleSimulationStage(accepted))
       let failures = 0
       while (!isCancelled()) {
         try {
@@ -154,10 +159,12 @@ export default function ManualScheduleEditor({ source: initialSource, profileId,
             return
           }
           if (job.status !== 'queued' && job.status !== 'running') throw new Error(job.error.message)
+          setSimulationStage(scheduleSimulationStage(job))
           await waitForOptimizePoll(1000, isCancelled)
         } catch (cause) {
           if (isOptimizeJobPollCancelled(cause)) return
           if (!isRetryableOptimizePollError(cause)) throw cause
+          setSimulationStage('reconnecting')
           await waitForOptimizePoll(getOptimizePollRetryDelayMs(++failures), isCancelled)
         }
       }
@@ -168,7 +175,7 @@ export default function ManualScheduleEditor({ source: initialSource, profileId,
     } finally {
       if (!isCancelled()) {
         simulationLock.current = false
-        setSimulating(false)
+        setSimulationStage(null)
       }
     }
   }
@@ -284,14 +291,14 @@ export default function ManualScheduleEditor({ source: initialSource, profileId,
   return (
     <section className="workspace-manual-editor space-y-4" aria-label={label.title}>
       <div className="tool-alert tool-alert--warning space-y-2 p-4">
-        <p className={simulating ? 'font-semibold tool-loading-status' : 'font-semibold'} role="status" aria-busy={simulating}>{simulating ? label.simulating : simulation ? label.simulated : label.warning}</p>
+        <p className={simulating && !showSimulationProgress ? 'font-semibold tool-loading-status' : 'font-semibold'} role="status" aria-busy={simulating && !showSimulationProgress}>{simulating && !showSimulationProgress ? label.simulating : simulation ? label.simulated : label.warning}</p>
         {!standalone && <p className="text-sm"><LockKeyhole size={14} className="mr-1 inline" aria-hidden="true" />{label.locked}</p>}
       </div>
       <div className="workspace-manual-toolbar tool-panel space-y-3 p-4">
         {draftStorageKey === profileId && <p className="text-sm leading-6 text-ink-secondary">{label.result_scope}</p>}
         <div className="flex flex-wrap gap-2">
-          <button type="button" className="tool-primary-action" disabled={!simulationBaseline || simulating || Boolean(settingsError)} aria-busy={simulating} onClick={() => void simulate()}>
-            {simulating && <LoadingIcon size={16} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />}
+          <button type="button" className="tool-primary-action" disabled={!simulationBaseline || simulating || Boolean(settingsError)} aria-busy={simulating && !showSimulationProgress} onClick={() => void simulate()}>
+            {simulating && !showSimulationProgress && <LoadingIcon size={16} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />}
             {label.simulate}
           </button>
           {completed && renderExport?.({ ...completed, prepared, shift: activePlan })}
@@ -303,6 +310,7 @@ export default function ManualScheduleEditor({ source: initialSource, profileId,
           <button type="button" className="tool-secondary-action" disabled={busy} onClick={() => upload.current?.click()}><Upload size={14} aria-hidden="true" />{label.import}</button>
           <input ref={upload} type="file" accept=".json,application/json" className="hidden" aria-label={label.import} onChange={(event) => void importBackup(event.target.files?.[0])} />
         </div>
+        {showSimulationProgress && simulationStage && <ScheduleSimulationProgress stage={simulationStage} />}
         <p className="text-xs leading-5 text-ink-muted">{label.storage_hint}</p>
         <details className="tool-inset overflow-hidden">
           <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-ink-primary">{label.rules_title}</summary>

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import GuestAccountLink from '../../../components/GuestAccountLink'
 import { ScheduleComparisonIcon, UploadIcon } from '../../../components/icons'
 import FacilityLayoutEditor from '../../../components/FacilityLayoutEditor'
+import { ScheduleSimulationProgress, scheduleSimulationStage, type ScheduleSimulationStage } from '../../../components/ScheduleSimulationProgress'
 import { OperatorAvatarTile } from '../../../components/result-panel/OperatorAvatarStrip'
 import { ROOM_LABELS } from '../../../components/result-panel/labels'
 import { copy, CURRENT_LOCALE } from '../../../copy'
@@ -70,8 +71,8 @@ function ComparisonWorkspace({ userId, profileId, operators, config, workspace }
   const draftKey = `schedule-comparison:${userId}:${profileId}:${inputsKey}`
   const [slots, setSlots] = useTaskDraft<Slot[]>(`${draftKey}:slots`, [{ selection: '' }, { selection: '' }])
   const [outputs, setOutputs] = useState<(OptimizeResult | null)[]>([null, null])
-  const [busy, setBusy] = useState(false)
-  const [progress, setProgress] = useState<string | null>(null)
+  const [progress, setProgress] = useState<{ side: number; stage: ScheduleSimulationStage } | null>(null)
+  const busy = progress !== null
   const [error, setError] = useState<string | null>(null)
   const [preset, setPreset] = useTaskDraft(`${draftKey}:preset`, '')
   const [shiftHours, setShiftHours] = useTaskDraft<string | null>(`${draftKey}:hours`, null)
@@ -91,7 +92,6 @@ function ComparisonWorkspace({ userId, profileId, operators, config, workspace }
   useEffect(() => {
     setSlots((current) => current.map((slot) => ({ ...slot, loading: false })))
     setOutputs([null, null])
-    setBusy(false)
     setProgress(null)
     setError(null)
     simulationLock.current = false
@@ -140,17 +140,20 @@ function ComparisonWorkspace({ userId, profileId, operators, config, workspace }
     simulationLock.current = true
     const run = ++simulationRun.current
     const isCancelled = () => simulationRun.current !== run || currentInputs.current !== inputsKey
-    setBusy(true)
     setError(null)
     setOutputs([null, null])
     let index = 0
     try {
       for (const choice of [left, right]) {
-        setProgress(text.progress(sides[index], text.simulating))
+        const side = index
+        const report = (stage: ScheduleSimulationStage) => setProgress((current) => current?.side === side && current.stage === stage ? current : { side, stage })
+        report('submitting')
         const accepted = await submitOptimizationJob({
           kind: 'schedule', identity: { type: 'profile', profileId }, operators, config: choice.config,
           includeUpgradeSuggestions: false, manualSchedule: { source: choice.source, plans: createManualPlans(choice.source), purpose: 'comparison' },
         }, text.failed)
+        if (isCancelled()) return
+        report(scheduleSimulationStage(accepted))
         let failures = 0
         while (!isCancelled()) {
           try {
@@ -158,16 +161,16 @@ function ComparisonWorkspace({ userId, profileId, operators, config, workspace }
             if (isCancelled()) return
             failures = 0
             if (job.status === 'succeeded') {
-              const side = index
               setOutputs((current) => current.map((output, i) => i === side ? job.result : output))
               break
             }
             if (job.status !== 'queued' && job.status !== 'running') throw new Error(job.error.message)
-            setProgress(text.progress(sides[index], job.status === 'queued' ? text.queued : text.simulating))
+            report(scheduleSimulationStage(job))
             await waitForOptimizePoll(job.pollAfterMs ?? 1000, isCancelled)
           } catch (cause) {
             if (isOptimizeJobPollCancelled(cause)) return
             if (!isRetryableOptimizePollError(cause)) throw cause
+            report('reconnecting')
             await waitForOptimizePoll(getOptimizePollRetryDelayMs(++failures), isCancelled)
           }
         }
@@ -179,7 +182,6 @@ function ComparisonWorkspace({ userId, profileId, operators, config, workspace }
     } finally {
       if (!isCancelled()) {
         simulationLock.current = false
-        setBusy(false)
         setProgress(null)
       }
     }
@@ -218,9 +220,13 @@ function ComparisonWorkspace({ userId, profileId, operators, config, workspace }
       <FacilityLayoutEditor key={JSON.stringify([baseConfig.trading_stations_count, baseConfig.manufacturing_stations_count, baseConfig.trading_station_levels, baseConfig.manufacturing_station_levels])}
         config={baseConfig} onUpdate={(mutate) => { const next = structuredClone(baseConfig); mutate(next); setConfigDraft(next) }} />
     </details>
-    <div className="v2-actions v2-schedule-comparison-run"><button className="v2-button v2-button-primary" disabled={busy || !left || !right} aria-busy={busy} onClick={() => void simulate()}><ScheduleComparisonIcon size={18} aria-hidden="true" />{busy ? text.running : text.start}</button>{busy ? <Loading label={progress || text.running} /> : <p role="status" aria-live="polite">{progress}</p>}</div>
+    <div className="v2-schedule-comparison-run">
+      <button className="v2-button v2-button-primary" disabled={busy || !left || !right} onClick={() => void simulate()}><ScheduleComparisonIcon size={18} aria-hidden="true" />{text.start}</button>
+      {progress && <ScheduleSimulationProgress stage={progress.stage} side={progress.side} steps={sides.map((label, index) => ({ label, complete: Boolean(outputs[index]) }))} />}
+      <p className="sr-only" role="status">{!busy && outputs.every(Boolean) ? text.simulated : ''}</p>
+    </div>
     <Notice error>{error}</Notice>
-    {outputs.some(Boolean) && <ProductionComparison outputs={outputs} names={[left?.name ?? '', right?.name ?? '']} />}
+    {!busy && outputs.some(Boolean) && <ProductionComparison outputs={outputs} names={[left?.name ?? '', right?.name ?? '']} />}
     {differences && <OperatorComparison differences={differences} operators={operators} />}
   </>
 }

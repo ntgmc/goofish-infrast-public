@@ -1,0 +1,70 @@
+.schedule-simulation-progress {
+  display: grid;
+  gap: var(--space-sm);
+  min-width: 0;
+  scroll-margin-block: var(--space-sm);
+  padding: var(--space-sm);
+  border: 1px solid var(--color-v2-line);
+  border-radius: var(--radius-v2-control);
+  background: var(--color-v2-surface);
+  color: var(--color-v2-ink);
+}
+.schedule-simulation-current { display: flex; align-items: center; gap: var(--space-sm); min-width: 0; }
+.schedule-simulation-message { min-width: 0; }
+.schedule-simulation-title { line-height: 1.45; }
+.schedule-simulation-title strong { font-size: var(--text-base); font-weight: 650; }
+.schedule-simulation-message p { margin-top: var(--space-3xs); color: var(--color-v2-secondary); font-size: var(--text-sm); }
+.schedule-simulation-steps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2xs); }
+.schedule-simulation-steps li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0 var(--space-2xs);
+  padding: var(--space-2xs) var(--space-xs);
+  border: 1px solid var(--color-v2-line);
+  border-radius: var(--radius-v2-control);
+  color: var(--color-v2-secondary);
+  font-size: var(--text-sm);
+}
+.schedule-simulation-steps li[aria-current] { background: var(--color-v2-accent-soft); color: var(--color-v2-accent); }
+.schedule-simulation-steps li > span { display: flex; align-items: center; gap: var(--space-2xs); }
+.schedule-simulation-steps li[data-complete] svg { flex: none; color: var(--color-v2-accent); }
+.schedule-simulation-steps small { margin-inline-start: auto; font-size: var(--text-xs); }
+@media (max-width: 27rem) {
+  .schedule-simulation-steps li { display: grid; }
+  .schedule-simulation-steps small { margin-inline-start: 0; }
+}
+
+.schedule-simulation-mark {
+  display: flex;
+  flex: 0 0 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: 44px;
+  border-radius: var(--radius-v2-control);
+  background: var(--color-v2-accent-soft);
+  color: var(--color-v2-accent);
+}
+.schedule-simulation-mark i { display: block; width: 5px; height: 5px; border-radius: 2px; background: currentColor; }
+[data-stage="submitting"] > .schedule-simulation-current i { width: 5px; height: 13px; transform: skewY(-18deg); }
+[data-stage="running"] > .schedule-simulation-current .schedule-simulation-mark { align-items: end; padding-bottom: 11px; }
+[data-stage="running"] > .schedule-simulation-current i { height: 11px; transform-origin: bottom; }
+[data-stage="running"] > .schedule-simulation-current i:nth-child(2) { height: 19px; }
+[data-stage="running"] > .schedule-simulation-current i:nth-child(3) { height: 14px; }
+[data-stage="saving"] > .schedule-simulation-current .schedule-simulation-mark { flex-direction: column; }
+[data-stage="saving"] > .schedule-simulation-current i { width: 16px; height: 3px; transform-origin: left; }
+[data-stage="reconnecting"] > .schedule-simulation-current i:nth-child(2) { opacity: .35; }
+
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-reduced-motion], [data-v2-hidden]) .schedule-simulation-mark i { animation: schedule-simulation-queue 1.45s ease-in-out infinite; }
+  :root:not([data-reduced-motion], [data-v2-hidden]) [data-stage="submitting"] > .schedule-simulation-current i { animation-name: schedule-simulation-submit; }
+  :root:not([data-reduced-motion], [data-v2-hidden]) [data-stage="running"] > .schedule-simulation-current i { animation-name: schedule-simulation-output; }
+  :root:not([data-reduced-motion], [data-v2-hidden]) [data-stage="saving"] > .schedule-simulation-current i { animation-name: schedule-simulation-save; }
+  :root:not([data-reduced-motion], [data-v2-hidden]) .schedule-simulation-mark i:nth-child(2) { animation-delay: -.24s; }
+  :root:not([data-reduced-motion], [data-v2-hidden]) .schedule-simulation-mark i:nth-child(3) { animation-delay: -.48s; }
+}
+@keyframes schedule-simulation-queue { 0%, 65%, 100% { transform: translateY(0); opacity: .5; } 32% { transform: translateY(-4px); opacity: 1; } }
+@keyframes schedule-simulation-submit { 0%, 65%, 100% { transform: translateX(-2px) skewY(-18deg); opacity: .55; } 38% { transform: translateX(3px) skewY(-18deg); opacity: 1; } }
+@keyframes schedule-simulation-output { 0%, 100% { transform: scaleY(.5); } 50% { transform: scaleY(1); } }
+@keyframes schedule-simulation-save { 0%, 100% { transform: scaleX(.45); opacity: .5; } 48% { transform: scaleX(1); opacity: 1; } }
