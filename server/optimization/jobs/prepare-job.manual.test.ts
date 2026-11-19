@@ -83,6 +83,7 @@ describe('manual schedule admission', () => {
 
   it.each([
     ['manual_schedule', { manualSchedule: { baselineHistoryId: 'history-1', plans: createManualPlans(source) } }],
+    ['schedule_comparison', { manualSchedule: { source, plans: createManualPlans(source), purpose: 'comparison' } }],
     ['scenario_comparison', { kind: 'scenario_comparison', manualSchedule: undefined, includeUpgradeSuggestions: undefined,
       factors: { layouts: [{ layout: '243', plans: [{ trading: { lmd: 2, orundum: 0 },
         manufacturing: { pureGold: 2, battleRecord: 2, originiumShard: 0 } }] }],
@@ -117,6 +118,7 @@ describe('manual schedule admission', () => {
   it('preserves comparison purpose through validation without weakening manual simulation authorization', async () => {
     const standalone = createBlankManualSchedule(normalizeConfig(config))
     const body = { manualSchedule: { source: standalone, plans: createManualPlans(standalone), purpose: 'comparison' } }
+    mocks.features.mockResolvedValue({ ...DEFAULT_SITE_FEATURE_SETTINGS, features: { ...DEFAULT_SITE_FEATURE_SETTINGS.features, manual_schedule: false } })
     const result = await prepareOptimizeJob(request(body))
     expect(result.ok).toBe(true)
     if (!result.ok || 'kind' in result.prepared.payload) throw new Error('Expected comparison admission')

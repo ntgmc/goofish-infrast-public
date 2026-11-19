@@ -8,6 +8,7 @@ import { copy } from '../../copy'
 import { apiJson, apiStream } from '../../lib/api-client'
 import { readScheduleExplanationResponse, scheduleExplanationStateSchema } from '../../lib/schedule-explanation'
 import type { OptimizeResult } from '../../lib/types'
+import { useSiteFeatures } from '../../lib/site-feature-context'
 import { useAppReducedMotion } from '../../lib/motion-preference'
 import ExplanationMarkdown from './ExplanationMarkdown'
 import './schedule-explanation.css'
@@ -17,16 +18,20 @@ const text = copy.scheduleExplanation
 export default function ScheduleExplanation({ userId, profileId, resultId, sample, result }: {
   userId?: string; profileId?: string; resultId?: string; sample: boolean; result: OptimizeResult
 }) {
+  const { features, pauseNotices } = useSiteFeatures()
+  if (!features.ai_schedule_explanation && !features.schedule_explanation_avatar) return null
+  const pause = pauseNotices?.ai_schedule_explanation
   if (sample) return <ExplanationWindow sample>
+    {pause && <p className="v2-explanation-status">{pause}</p>}
     <div className="v2-explanation-body"><h3>{text.sampleTitle}</h3>
       <p>{text.sample((result.daily_production?.trading?.LMD ?? 0).toLocaleString('zh-CN'),
         ((result.daily_production?.manufacturing?.['Battle Record'] ?? 0) * 1000).toLocaleString('zh-CN'))}</p></div>
     <p className="v2-explanation-note">{text.sampleAction}</p>
   </ExplanationWindow>
-  return userId && profileId && resultId ? <PersonalExplanation key={`${userId}:${profileId}:${resultId}`} userId={userId} profileId={profileId} resultId={resultId} /> : null
+  return userId && profileId && resultId ? <PersonalExplanation key={`${userId}:${profileId}:${resultId}`} userId={userId} profileId={profileId} resultId={resultId} generationEnabled={features.ai_schedule_explanation} pause={pause} /> : null
 }
 
-function PersonalExplanation({ userId, profileId, resultId }: { userId: string; profileId: string; resultId: string }) {
+function PersonalExplanation({ userId, profileId, resultId, generationEnabled, pause }: { userId: string; profileId: string; resultId: string; generationEnabled: boolean; pause?: string }) {
   const client = useQueryClient()
   const active = useRef(true)
   const streamAbort = useRef<AbortController | null>(null)
@@ -53,30 +58,33 @@ function PersonalExplanation({ userId, profileId, resultId }: { userId: string; 
       if (!active.current || !client.getQueryState(key)) return
       setDraft('')
       client.setQueryData(key, data)
-      await client.invalidateQueries({ predicate: (query) => query.queryKey[0] === 'user' && query.queryKey[1] === userId && query.queryKey[3] === 'schedule-explanation' })
+      await client.invalidateQueries({ predicate: ({ queryKey }) => queryKey[0] === 'user' && queryKey[1] === userId && (queryKey[3] === 'schedule-explanation' || queryKey[3] === 'workspace-assistant') })
     },
     onError: () => { if (active.current) { setDraft(''); void query.refetch({ cancelRefetch: false }) } },
     onSettled: () => { streamAbort.current = null },
   })
   const state = query.data
   const pending = mutation.isPending || state?.pending
+  const available = generationEnabled && state?.available
+  const reason = generationEnabled ? state?.reason : 'disabled'
   const error = (state?.explanation ? null : mutation.error) ?? query.error
   return <ExplanationWindow busy={Boolean(pending)}>
+    {pause && <p role="status" className="v2-explanation-status">{pause}</p>}
     {state?.explanation ? <>
       <ExplanationMarkdown>{state.explanation.text}</ExplanationMarkdown>
       <div className="v2-explanation-notes"><p>{text.saved}</p><p>{text.estimate}</p></div>
     </> : <>
-      {(query.isPending || pending || state?.reason) && <p role="status" className="v2-explanation-status" data-writing={Boolean(pending) || undefined}>
+      {(query.isPending || pending || (reason && !pause)) && <p role="status" className="v2-explanation-status" data-writing={Boolean(pending) || undefined}>
         {pending && <span className="v2-explanation-ink-dots" aria-hidden="true"><i /><i /><i /></span>}
-        {query.isPending ? text.loading : pending ? draft ? text.streaming : text.pending : state?.reason ? text.reason[state.reason] : ''}</p>}
+        {query.isPending ? text.loading : pending ? draft ? text.streaming : text.pending : reason ? text.reason[reason] : ''}</p>}
       {draft && <ExplanationMarkdown revealed={revealed}>{draft}</ExplanationMarkdown>}
       {!pending && <>
         <div className="v2-explanation-heading"><p>{text.description}</p>
-          {state?.available && <button className="v2-explanation-generate" type="button" onClick={() => mutation.mutate()}><GenerateIcon size={16} aria-hidden="true" />{text.generate}</button>}
+          {available && <button className="v2-explanation-generate" type="button" onClick={() => mutation.mutate()}><GenerateIcon size={16} aria-hidden="true" />{text.generate}</button>}
         </div>
         {state && <div className="v2-explanation-notes"><p>{text.quota(state.quota.remaining, state.quota.limit, state.quota.kind === 'monthly')}</p>
           {state.quota.resets_at && <p>{text.reset(new Date(state.quota.resets_at).toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai' }))}</p>}
-          {state.available && state.provider && <p>{text.disclosure(state.provider)}</p>}</div>}
+          {available && state.provider && <p>{text.disclosure(state.provider)}</p>}</div>}
       </>}
     </>}
     {error && <div role="alert" className="v2-explanation-error"><p>{error.message}</p><button type="button" className="v2-text-button" onClick={() => { mutation.reset(); void query.refetch({ cancelRefetch: false }) }}>{text.retry}</button></div>}

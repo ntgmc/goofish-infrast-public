@@ -6,7 +6,7 @@ import GuestAccountLink from '../../../components/GuestAccountLink'
 import { useSiteFeatures } from '../../../lib/site-feature-context'
 import { useListReveal } from '../../../lib/use-list-reveal'
 import type { V2Session } from '../OptionsDrawer'
-import { v2Path } from '../navigation'
+import { v2Path, v2SectionAvailable, v2SectionPauseNotice, type V2Section } from '../navigation'
 import Link from '../../../components/InternalLink'
 import ManualScheduleEditor from '../../../components/result-panel/ManualScheduleEditor'
 import ManualBlankScheduleSetup from '../../../components/ManualBlankScheduleSetup'
@@ -16,34 +16,34 @@ import { useManualTool } from '../../ManualSchedulePage'
 import { Field, Loading, Notice, SectionTitle } from '../components/WorkspaceUI'
 import ManualResultExport from '../ManualResultExport'
 import type { V2Workflow } from '../WorkspaceSections'
-import type { V2Section } from '../navigation'
 import { materialDemandCopy } from '../../../copy/zh-CN/material-demand'
 
 export default function Tools({ profileId }: { profileId?: string }) {
-  const { features } = useSiteFeatures()
+  const { features, pauseNotices } = useSiteFeatures()
   const reveal = useListReveal()
   const text = copy.tools.directory
   const groups = [
     { id: 'base', title: text.groups.base, tools: [
-      { section: 'manual-tool' as const, enabled: features.manual_schedule, icon: CalendarClock, title: copy.tools.manualSchedule.title, description: text.descriptions.manualSchedule },
-      { section: 'schedule-comparison' as const, enabled: features.manual_schedule, icon: ScheduleComparisonIcon, title: copy.tools.scheduleComparison.title, description: text.descriptions.scheduleComparison },
+      { section: 'manual-tool' as const, icon: CalendarClock, title: copy.tools.manualSchedule.title, description: text.descriptions.manualSchedule },
+      { section: 'schedule-comparison' as const, icon: ScheduleComparisonIcon, title: copy.tools.scheduleComparison.title, description: text.descriptions.scheduleComparison },
     ] },
     { id: 'cultivation', title: text.groups.cultivation, tools: [
-      { section: 'cultivation-projects' as const, enabled: features.cultivation_plan, icon: ProjectsIcon, title: copy.cultivationProjects.title, description: text.descriptions.cultivationProjects },
-      { section: 'cultivation' as const, enabled: features.cultivation_plan, icon: CultivationIcon, title: copy.tools.cultivation.title, description: text.descriptions.cultivation },
-      { section: 'training-ratio' as const, enabled: features.tools, icon: Calculator, title: copy.trainingRatio.title, description: text.descriptions.trainingRatio },
-      { section: 'thanks-recruitment' as const, enabled: features.thanks_recruitment, icon: ThanksRecruitmentIcon, title: copy.tools.thanksRecruitment.title, description: text.descriptions.thanksRecruitment },
+      { section: 'cultivation-projects' as const, icon: ProjectsIcon, title: copy.cultivationProjects.title, description: text.descriptions.cultivationProjects },
+      { section: 'cultivation' as const, icon: CultivationIcon, title: copy.tools.cultivation.title, description: text.descriptions.cultivation },
+      { section: 'training-ratio' as const, icon: Calculator, title: copy.trainingRatio.title, description: text.descriptions.trainingRatio },
+      { section: 'thanks-recruitment' as const, icon: ThanksRecruitmentIcon, title: copy.tools.thanksRecruitment.title, description: text.descriptions.thanksRecruitment },
     ] },
     { id: 'materials', title: text.groups.materials, tools: [
-      { section: 'material-demand' as const, enabled: features.tools, icon: MaterialDemandIcon, title: materialDemandCopy.title, description: text.descriptions.materialDemand },
-      { section: 'depot' as const, enabled: features.depot_value, icon: Gem, title: copy.dashboard.pages_tool_dashboard_ToolsSection_001, description: text.descriptions.depot },
+      { section: 'material-demand' as const, icon: MaterialDemandIcon, title: materialDemandCopy.title, description: text.descriptions.materialDemand },
+      { section: 'depot' as const, icon: Gem, title: copy.dashboard.pages_tool_dashboard_ToolsSection_001, description: text.descriptions.depot },
     ] },
-  ].map((group) => ({ ...group, tools: group.tools.filter((tool) => tool.enabled) })).filter((group) => group.tools.length)
+  ].map((group) => ({ ...group, tools: group.tools.map((tool) => ({ ...tool, pause: v2SectionPauseNotice(tool.section, pauseNotices) }))
+    .filter((tool) => tool.pause || v2SectionAvailable(tool.section, features)) })).filter((group) => group.tools.length)
   return <div ref={reveal} className="v2-tools-directory">
     {groups.map((group) => <section key={group.id} aria-labelledby={`v2-tool-group-${group.id}`}>
       <h2 id={`v2-tool-group-${group.id}`}>{group.title}</h2>
       <ul className="v2-tool-list">{group.tools.map((tool) => <li key={tool.section} data-reveal-id={tool.section}>
-        <Link to={v2Path(tool.section, profileId)}><tool.icon size={24} aria-hidden="true" /><div><h3>{tool.title}</h3><p>{tool.description}</p></div><span className="v2-tool-enter"><ArrowRight size={20} aria-hidden="true" /></span></Link>
+        <Link to={v2Path(tool.section, profileId)}><tool.icon size={24} aria-hidden="true" /><div><h3>{tool.title}{tool.pause && <span className="v2-feature-pause-badge">{copy.features.paused_title}</span>}</h3><p>{tool.pause ?? tool.description}</p></div><span className="v2-tool-enter"><ArrowRight size={20} aria-hidden="true" /></span></Link>
       </li>)}</ul>
     </section>)}
     {!groups.length && <Notice>{copy.v2.featureUnavailable}</Notice>}

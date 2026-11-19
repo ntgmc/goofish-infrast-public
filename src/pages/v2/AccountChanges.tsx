@@ -14,7 +14,7 @@ export default function AccountChanges({ userId, profileId, changes, children }:
   return <div className="v2-change-list">
     <ChangeList changes={changes} />
     {children}
-    {changes.length > 1 && <WorkspaceAssistant key={JSON.stringify(changes)} userId={userId} profileId={profileId} title={text.changesFocus} description={text.changesHelp} fixedQuestion={text.changesQuestion}
+    {changes.length > 1 && <WorkspaceAssistant key={JSON.stringify(changes)} task="changes" userId={userId} profileId={profileId} title={text.changesFocus} description={text.changesHelp} fixedQuestion={text.changesQuestion}
       buildRequest={(question) => ({ task: 'changes', profile_id: profileId, question, candidates: changes.slice(0, 12) })}
       renderReply={(reply) => 'keys' in reply && reply.keys.length ? <ChangeList changes={reply.keys.flatMap((key) => changes.find((change) => change.key === key) ?? [])} /> : <p>{text.noneSelected}</p>} />}
   </div>

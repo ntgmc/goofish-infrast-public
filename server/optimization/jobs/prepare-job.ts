@@ -40,9 +40,10 @@ export async function prepareOptimizeJob(
   try {
     const body = await getValidatedJson(req, requestSchemas.optimizationJob) as unknown as CreateOptimizationJobRequest;
     isScenarioComparison = body.kind === 'scenario_comparison';
-    const featureGate = await requireSiteFeatures(body.kind === 'scenario_comparison'
-      ? ['scenario_comparison']
-      : body.manualSchedule ? ['manual_schedule'] : ['schedule_generation']);
+    const feature = body.kind === 'scenario_comparison' ? 'scenario_comparison'
+      : !body.manualSchedule ? 'schedule_generation'
+      : 'source' in body.manualSchedule && body.manualSchedule.purpose === 'comparison' ? 'schedule_comparison' : 'manual_schedule';
+    const featureGate = await requireSiteFeatures([feature]);
     if (featureGate) return { ok: false, response: featureGate };
     const rawBody = body as unknown as Record<string, unknown>;
     if ('use_priority_coupon' in rawBody && typeof rawBody.use_priority_coupon !== 'boolean') {

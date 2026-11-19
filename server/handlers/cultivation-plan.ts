@@ -1,10 +1,10 @@
 import type { OperationsTool } from '../../src/lib/operations-tools'
 import { recordToolRun } from '../storage/tool-usage-store'
 import { defaultCultivationQuery } from '../../src/lib/cultivation-contract'
-import { computeEffectiveSiteFeatures } from '../../src/lib/site-features'
+import { computeEffectiveSiteFeatures, computeVisiblePauseNotices } from '../../src/lib/site-features'
 import { getSiteFeatureSettings } from '../storage/feature-settings-store'
 import { CultivationReadError, readCultivationPlan } from '../cultivation/worker-client'
-import { requireSiteFeatures } from '../feature-gate'
+import { featureDisabledResponse } from '../feature-gate'
 import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson, RequestInputError } from '../security/request-validation'
 import { getSklandSnapshot, SklandSnapshotError } from '../skland-snapshot'
@@ -12,8 +12,6 @@ import { requireUserSession, jsonResponse } from './user-auth'
 
 export default async function cultivationPlanHandler(req: Request): Promise<Response> {
   if (req.method !== 'POST') return jsonResponse({ error: '方法不允许。' }, 405)
-  const gated = await requireSiteFeatures(['tools', 'skland'])
-  if (gated) return gated
   const startedAt = Date.now()
   let tool: OperationsTool = 'cultivation'
   let userId: string | undefined
@@ -31,6 +29,9 @@ export default async function cultivationPlanHandler(req: Request): Promise<Resp
     if (!binding?.encrypted_cred) return jsonResponse({ error: '请先在档案中绑定森空岛，再导入练度和材料。' }, 400)
     const featureSettings = await getSiteFeatureSettings()
     const effectiveFeatures = computeEffectiveSiteFeatures(featureSettings)
+    if (!effectiveFeatures.skland) return featureDisabledResponse('skland')
+    const feature = tool === 'cultivation' ? 'cultivation_plan' : tool
+    if (!effectiveFeatures[feature]) return featureDisabledResponse(feature, computeVisiblePauseNotices(featureSettings)[feature])
     const snapshot = await getSklandSnapshot(profile)
     const data = await readCultivationPlan({ game: snapshot.game!.data, inventory: snapshot.inventory!.data,
       importedAt: snapshot.inventory!.fetchedAt, snapshotVersion: snapshot.version, warnings: Object.values(snapshot.errors),

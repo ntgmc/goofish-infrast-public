@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import GuestAccountLink from '../../../components/GuestAccountLink'
 import { useTaskDraft } from '../../../lib/task-drafts'
+import { useSiteFeatures } from '../../../lib/site-feature-context'
 import { allocateCultivationMaterials } from '../../../lib/cultivation-planner'
 import { matchesSearch } from '../../../lib/search'
 import { RefreshIcon, UndoIcon, ExcludeIcon, NextIcon, ExternalLinkIcon } from '../../../components/icons'
@@ -26,10 +27,11 @@ type Model = ReturnType<typeof useCultivation>
 const text = copy.tools.cultivation
 
 export default function Cultivation({ session, upgradeSuggestions }: { session: V2Session; upgradeSuggestions?: UpgradeSuggestion[] }) {
+  const { features } = useSiteFeatures()
   const m = useCultivation(session)
   const [view, setView] = useTaskDraft('cultivation:view', 'priorities')
   const appliedQuery = m.appliedOptions.recommendation ?? defaultCultivationQuery
-  const projectScope = session.user && m.profileId ? { userId: session.user.id, profileId: m.profileId } : null
+  const projectScope = features.cultivation_projects && session.user && m.profileId ? { userId: session.user.id, profileId: m.profileId } : null
   const importProjects = m.recommendations?.flatMap((candidate) => { const project = projectFromCultivationCandidate(candidate); return project ? [project] : [] }) ?? []
   return <div className="v2-cultivation-workspace">
     <div className="v2-cultivation-source">

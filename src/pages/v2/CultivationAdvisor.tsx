@@ -25,8 +25,8 @@ export function cultivationMaterialFacts(items: Record<string, number>, data: Cu
 type Props = { scope: CultivationProjectScope; rows: AdvisorRow[]; title?: string; description?: string }
 
 export default function CultivationAdvisor(props: Props) {
-  const { features } = useSiteFeatures()
-  return features.ai_schedule_explanation && props.rows.length ? <Advisor key={`${props.scope.userId}:${props.scope.profileId}`} {...props} /> : null
+  const { features, pauseNotices } = useSiteFeatures()
+  return (features.ai_cultivation_advisor || pauseNotices?.ai_cultivation_advisor) && props.rows.length ? <Advisor key={`${props.scope.userId}:${props.scope.profileId}`} {...props} /> : null
 }
 
 function Advisor({ scope, rows, title = text.cultivation, description = text.cultivationHelp }: Props) {
@@ -36,7 +36,7 @@ function Advisor({ scope, rows, title = text.cultivation, description = text.cul
   const visible = rows.filter((row) => matchesSearch(row.title, search) || selected.includes(row.id)).slice(0, Math.max(12, selected.length))
   const signature = JSON.stringify(chosen.map(({ id, title, facts }) => [id, title, facts]))
   if (!rows.length) return null
-  return <WorkspaceAssistant revision={signature} title={title} userId={scope.userId} profileId={scope.profileId} description={description} example={text.cultivationExample} disabled={!chosen.length}
+  return <WorkspaceAssistant task="cultivation" revision={signature} title={title} userId={scope.userId} profileId={scope.profileId} description={description} example={text.cultivationExample} disabled={!chosen.length}
       renderControls={(busy) => <details className="v2-disclosure"><summary>{text.cultivationCandidates} · {chosen.length}</summary>
         <Field label={copy.tools.cultivation.search} type="search" value={search} onChange={(event) => setSearch(event.currentTarget.value)} />
         {!visible.length && <p>{copy.tools.cultivation.noMatches}</p>}

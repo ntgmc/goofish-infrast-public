@@ -26,6 +26,7 @@ import AccountChanges from '../AccountChanges'
 import CultivationAdvisor, { cultivationMaterialFacts } from '../CultivationAdvisor'
 import { cultivationChanges } from '../../../lib/account-changes'
 import type { AssistantCandidate } from '../../../lib/workspace-assistant'
+import { useSiteFeatures } from '../../../lib/site-feature-context'
 
 const text = copy.cultivationProjects
 const number = (amount: number) => amount.toLocaleString('zh-CN', { maximumFractionDigits: 1 })
@@ -41,6 +42,7 @@ export default function CultivationProjects({ session, onConfig }: { session: V2
 }
 
 function ProjectWorkspace({ session, profile, onConfig }: { session: V2Session; profile: UserGameAccount; onConfig: () => void }) {
+  const { features } = useSiteFeatures()
   const m = useCultivationProjects(session, profile)
   const [editing, setEditing] = useState<CultivationProject | null>(null)
   const [editorOpen, setEditorOpen] = useState(false)
@@ -78,7 +80,7 @@ function ProjectWorkspace({ session, profile, onConfig }: { session: V2Session; 
     setApplied(true)
   }
   return <div className="v2-projects">
-    <div className="v2-tool-source v2-project-source"><div><span className="v2-label">{text.account} · {profile.display_name}</span><p>{text.description}</p><Link className="v2-text-button" to={v2Path('cultivation', profile.id)}>{text.suggestionsEntry}<ArrowRight size={14} /></Link></div><button className="v2-button v2-button-primary" disabled={m.busy} aria-busy={m.busy} onClick={() => void m.load()}>{copy.skland.refresh}<RefreshIcon size={16} aria-hidden="true" /></button>
+    <div className="v2-tool-source v2-project-source"><div><span className="v2-label">{text.account} · {profile.display_name}</span><p>{text.description}</p>{features.cultivation_plan && <Link className="v2-text-button" to={v2Path('cultivation', profile.id)}>{text.suggestionsEntry}<ArrowRight size={14} /></Link>}</div><button className="v2-button v2-button-primary" disabled={m.busy} aria-busy={m.busy} onClick={() => void m.load()}>{copy.skland.refresh}<RefreshIcon size={16} aria-hidden="true" /></button>
       <div className="v2-data-feedback"><DataRefresh pending={m.busy} revision={m.data} error={Boolean(m.error)}
         label={m.phase === 'syncing' ? copy.v2.dataActivity.syncing : copy.v2.dataActivity.calculating} /></div>
     </div>

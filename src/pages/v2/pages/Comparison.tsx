@@ -45,7 +45,7 @@ function ComparisonWorkspace({ workflow: w, onConfig }: { workflow: V2Workflow; 
   const quoteUnavailable = w.scenarioQuoteRequired && (!w.scenarioBillingQuote || w.scenarioBillingQuoteLoading || !w.scenarioBillingQuote.sufficient)
   const allowanceUnknown = !w.scenarioQuoteRequired && (!w.inventoryLoaded || Boolean(w.inventoryError) || remaining === undefined)
   return <div className="v2-comparison-workspace space-y-5">
-  <WorkspaceAssistant key={JSON.stringify(w.activeConfig)} title={assistant.comparison} userId={w.profile.user_id} profileId={w.profile.id} description={assistant.comparisonHelp} example={assistant.comparisonExample} disabled={model.loading}
+  <WorkspaceAssistant key={JSON.stringify(w.activeConfig)} task="comparison" title={assistant.comparison} userId={w.profile.user_id} profileId={w.profile.id} description={assistant.comparisonHelp} example={assistant.comparisonExample} disabled={model.loading}
     buildRequest={(question) => ({ task: 'comparison', profile_id: w.profile.id, question, context: comparisonAssistantContext(w.activeConfig) })}
     renderReply={(reply) => {
       if ('reason' in reply) return <p>{reply.reason}</p>

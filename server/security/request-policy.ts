@@ -18,7 +18,7 @@ import {
 } from '../../src/lib/auth-constraints'
 import { publicContentDraftSchema } from '../../src/lib/public-content'
 import { imageUploadSchema } from '../../src/lib/image-upload'
-import { SITE_FEATURE_KEYS, type SiteFeatureKey } from '../../src/lib/site-features'
+import { FEATURE_PAUSE_NOTICE_LIMIT, PAUSABLE_SITE_FEATURES, SITE_FEATURE_KEYS, type SiteFeatureKey } from '../../src/lib/site-features'
 import { listAdminIssuablePermissions } from '../../src/lib/product-catalog'
 import type { ProductPermissionMode } from '../../src/lib/types'
 import {
@@ -272,7 +272,13 @@ export const requestSchemas = {
     admin_invite_email_reserve: z.number().int().min(0).max(300),
     password_reset_email_reserve: z.number().int().min(0).max(300),
   }),
-  adminFeatureSettings: strict({ features: siteFeaturesSchema, expected_revision: expectedRevisionSchema }),
+  adminFeatureSettings: strict({
+    features: siteFeaturesSchema,
+    pause_notices: z.partialRecord(z.enum(PAUSABLE_SITE_FEATURES), z.string().trim().min(1).max(FEATURE_PAUSE_NOTICE_LIMIT)).optional(),
+    expected_revision: expectedRevisionSchema,
+  }).refine(({ features, pause_notices }) => !PAUSABLE_SITE_FEATURES.some((feature) => features[feature] && pause_notices?.[feature]), {
+    path: ['pause_notices'], message: '暂停说明只能用于已暂停的功能。',
+  }),
   adminAiSettings: adminAiSettingsUpdateSchema,
   adminPublicContent: publicContentDraftSchema.extend({ expected_revision: expectedRevisionSchema }),
   adminRegistrationInvitationCreate: strict({
@@ -858,7 +864,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/user/onboarding-tasks/claim', route({ POST: json('standard', requestSchemas.onboardingTaskClaim) })],
   ['/api/user/results', route({ GET: none() }, ['profile_id', 'scope', 'cursor', 'limit'])],
   ['/api/user/schedule-explanation', route({ GET: none(), POST: json('standard', requestSchemas.scheduleExplanation) }, ['profile_id', 'result_id'])],
-  ['/api/user/workspace-assistant', route({ GET: none(), POST: json('standard', requestSchemas.workspaceAssistant) }, ['profile_id'])],
+  ['/api/user/workspace-assistant', route({ GET: none(), POST: json('standard', requestSchemas.workspaceAssistant) }, ['profile_id', 'task'])],
   ['/api/user/maa-export', route({ POST: json('standard', requestSchemas.maaExport) })],
   ['/api/user/full-result-export', route({ POST: json('standard', requestSchemas.fullResultExport) })],
   ['/api/user/result-archive', route({ POST: json('standard', requestSchemas.resultArchive) })],

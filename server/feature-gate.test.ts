@@ -146,7 +146,8 @@ describe('feature gate', () => {
   })
 
   it.each([
-    ['cultivation_plan', '/api/cultivation-plan', 'POST'],
+    ['tools', '/api/cultivation-plan', 'POST'],
+    ['skland', '/api/cultivation-plan', 'POST'],
     ['service_status', '/api/status', 'GET'],
     ['changelog', '/api/changelog', 'GET'],
     ['notifications', '/api/user/notifications', 'GET'],

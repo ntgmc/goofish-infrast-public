@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import type { AiGenerationAccounting } from '../../src/lib/ai-usage'
-import { parseWorkspaceAssistantReply } from '../../src/lib/workspace-assistant'
+import { WORKSPACE_ASSISTANT_FEATURES } from '../../src/lib/site-features'
+import { parseWorkspaceAssistantReply, workspaceAssistantTaskSchema } from '../../src/lib/workspace-assistant'
 import { getValidatedJson, RequestInputError } from '../security/request-validation'
 import { requestSchemas } from '../security/request-policy'
 import { generateAiText } from '../schedule-explanation'
@@ -18,19 +19,23 @@ export default async function userWorkspaceAssistantHandler(req: Request): Promi
     if (!auth) return jsonResponse({ error: '请先登录。' }, 401)
     if (req.method !== 'GET' && req.method !== 'POST') return jsonResponse({ error: '方法不允许。' }, 405)
     const body = req.method === 'POST' ? await getValidatedJson(req, requestSchemas.workspaceAssistant, true) : null
-    const profileId = body?.profile_id ?? new URL(req.url).searchParams.get('profile_id')
+    const params = new URL(req.url).searchParams
+    const profileId = body?.profile_id ?? params.get('profile_id')
     if (!profileId || profileId.length > 128) return jsonResponse({ error: '请先选择档案。' }, 400)
+    const task = workspaceAssistantTaskSchema.safeParse(body?.task ?? params.get('task'))
+    if (!task.success) return jsonResponse({ error: '请选择要使用的助手功能。', code: 'invalid_request' }, 400)
     const profile = await getProfileForUser(auth.user.id, profileId)
     if (!profile) return jsonResponse({ error: '账号档案不存在。' }, 404)
     const authorization = await resolveProfileAuthorization(profile)
     if (!authorization.ok) return jsonResponse({ error: authorization.message, code: authorization.code }, authorization.status)
-    const config = await getScheduleExplanationConfig()
+    const config = await getScheduleExplanationConfig(WORKSPACE_ASSISTANT_FEATURES[task.data])
     const input = {
       userId: auth.user.id, profileId: profile.id, resultId: null,
       cacheKey: createHash('sha256').update(JSON.stringify(['workspace-assistant', auth.user.id, profile.id, body])).digest('hex'),
       monthly: await hasMonthlyAiQuota(auth.user.id), config,
     }
     if (!body) return jsonResponse(await readScheduleExplanation(input))
+    if (!config.enabled) return jsonResponse({ reply: null, state: await readScheduleExplanation(input) })
     const { attemptId, state } = await reserveScheduleExplanation(input)
     if (!attemptId) return jsonResponse({ reply: null, state })
     const started = Date.now()

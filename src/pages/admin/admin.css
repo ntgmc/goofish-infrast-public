@@ -72,6 +72,15 @@
 .admin-registration-heading { display: grid; gap: var(--space-md); }
 .admin-registration-switches { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-xs); }
 .admin-feature-option { min-width: 0; padding-block: var(--space-xs); border-bottom: 1px solid var(--color-v2-line); cursor: pointer; }
+.admin-settings .admin-feature-grid { align-items: start; gap: var(--space-sm); }
+.admin-feature-card { display: grid; gap: var(--space-xs); min-width: 0; padding: var(--space-sm); border: 1px solid var(--color-v2-line); border-radius: var(--radius-v2-control); }
+.admin-feature-card[data-mode="paused"] { grid-column: 1 / -1; border-color: var(--color-v2-accent); background: var(--color-v2-accent-soft); }
+.admin-feature-card-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(8.25rem, auto); align-items: center; gap: var(--space-xs) var(--space-sm); }
+.admin-feature-card-row select { min-height: 44px; width: 100%; background-color: var(--color-v2-surface); }
+.admin-feature-notice { display: grid; gap: var(--space-2xs); padding-top: var(--space-xs); border-top: 1px solid var(--color-v2-line); }
+.admin-feature-notice textarea { min-height: 5.5rem; resize: vertical; background-color: var(--color-v2-surface); }
+.admin-feature-notice-help { display: flex; justify-content: space-between; align-items: start; gap: var(--space-xs); }
+@media (max-width: 24rem) { .admin-feature-card-row { grid-template-columns: minmax(0, 1fr); } }
 .admin-settings label:has(> input[type="checkbox"]) { display: flex; min-height: 44px; align-items: center; justify-content: space-between; gap: var(--space-sm); }
 .admin-settings label > input[type="checkbox"] { order: 1; flex: none; margin: 0; }
 .admin-settings .admin-danger-actions { display: flex; justify-content: flex-end; margin-top: var(--space-lg); padding-top: var(--space-sm); border-top: 1px solid var(--color-v2-line); }

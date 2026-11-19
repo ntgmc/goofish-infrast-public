@@ -7,6 +7,7 @@ const question = z.string().trim().min(1).max(300)
 const candidateKey = z.string().regex(/^[a-z0-9-]{1,48}$/)
 const candidate = z.strictObject({ key: candidateKey, title: z.string().min(1).max(80), facts: z.array(z.string().min(1).max(140)).min(1).max(4) })
 const profileId = z.string().trim().min(1).max(128)
+export const workspaceAssistantTaskSchema = z.enum(['comparison', 'cultivation', 'changes'])
 
 export const workspaceAssistantRequestSchema = z.discriminatedUnion('task', [
   z.strictObject({ task: z.literal('comparison'), profile_id: profileId, question, context: z.strictObject({

@@ -12,7 +12,7 @@ import { isFreePreviewProfile, isSchedulableProfile } from '../tool/tool-utils'
 import type { OptimizationTaskCenterController } from '../tool/optimize/useOptimizationTaskCenter'
 import type { AuthSuccessResponse } from '../../lib/types'
 import type { V2Session } from './OptionsDrawer'
-import { sectionLabels, V2_GUEST_SECTIONS, v2Path, v2SectionAvailable, type V2Section } from './navigation'
+import { sectionLabels, V2_GUEST_SECTIONS, v2Path, v2SectionAvailable, v2SectionPauseNotice, type V2Section } from './navigation'
 import { V2SectionLoading } from './V2LoadingScreen'
 import FirstScheduleGuide from './FirstScheduleGuide'
 import ProfileUpgrade, { ProfileUpgradeEntry } from './ProfileUpgrade'
@@ -71,13 +71,14 @@ export default function WorkspaceSections({ section, session, workflow, generati
   firstSchedule?: boolean
   configConfirmed?: boolean
 }) {
-  const { features } = useSiteFeatures()
+  const { features, pauseNotices } = useSiteFeatures()
   const { content } = usePublicContent()
   const [params] = useSearchParams()
   const location = useLocation()
   const upgrading = section === 'add-account' && params.get('mode') === 'upgrade' && Boolean(session.activeProfile && isFreePreviewProfile(session.activeProfile)) && features.cdk_redemption
   const title = upgrading ? copy.v2.profileUpgrade.title : section === 'help' ? content.faq.title : section === 'pricing' ? content.pricing.title : sectionLabels[section]
   const available = v2SectionAvailable(section, features)
+  const pause = v2SectionPauseNotice(section, pauseNotices)
   const [openedTools, setOpenedTools] = useState<V2Section[]>([])
   useEffect(() => {
     if (available && ['manual-tool', 'schedule-comparison', 'cultivation', 'thanks-recruitment', 'cultivation-projects', 'training-ratio', 'material-demand', 'depot'].includes(section)) setOpenedTools((current) => current.includes(section) ? current : [...current, section])
@@ -97,7 +98,8 @@ export default function WorkspaceSections({ section, session, workflow, generati
     {guided && <FirstScheduleGuide step={step} />}
     <div className="v2-section-body">
       <Suspense fallback={<V2SectionLoading label={section === 'inventory' ? copy.inventory.loading : undefined} />}>
-        {section === 'overview' ? null : !available ? <p className="v2-panel v2-section-loading" role="status">{copy.v2.featureUnavailable}</p>
+        {section === 'overview' ? null : pause ? <div className="v2-panel v2-section-loading v2-feature-pause-notice" role="status"><h2>{copy.features.paused_title}</h2><p>{pause}</p></div>
+          : !available ? <p className="v2-panel v2-section-loading" role="status">{copy.v2.featureUnavailable}</p>
           : section === 'generation' && !signedIn ? <div className="v2-first-schedule-task">
             <GuestAccountLink label={features.registration ? copy.v2.guestAccount.firstSchedule : copy.auth.components_AuthForm_008} description={copy.v2.guestAccount.firstScheduleHelp} />
           </div>

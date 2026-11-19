@@ -1,4 +1,4 @@
-import type { AdminSiteFeatureSettingsV1, SiteFeatureSettingsV1, SiteFeatures } from '../../src/lib/site-features'
+import type { AdminSiteFeatureSettingsV1, FeaturePauseNotices, SiteFeatures } from '../../src/lib/site-features'
 import {
   DEFAULT_SITE_FEATURE_SETTINGS,
   SITE_FEATURE_KEYS,
@@ -41,14 +41,11 @@ export async function getSiteFeatureSettings(): Promise<AdminSiteFeatureSettings
   return { ...normalizeSiteFeatureSettings(row?.recordJson), revision: row?.revision ?? 0 }
 }
 
-export async function saveSiteFeatureSettings(features: SiteFeatures, expectedRevision: number): Promise<AdminSiteFeatureSettingsV1> {
+export async function saveSiteFeatureSettings(features: SiteFeatures, expectedRevision: number, pauseNotices?: FeaturePauseNotices): Promise<AdminSiteFeatureSettingsV1> {
   await ensureSchema()
   const updatedAt = new Date().toISOString()
-  const saved: SiteFeatureSettingsV1 = {
-    version: 1,
-    features: { ...features },
-    updated_at: updatedAt,
-  }
+  const existingNotices = pauseNotices === undefined && expectedRevision > 0 ? (await getSiteFeatureSettings()).pause_notices : undefined
+  const saved = normalizeSiteFeatureSettings({ features, pause_notices: pauseNotices ?? existingNotices, updated_at: updatedAt })
   const values = { recordJson: saved, updatedAt }
   const rows = await retryPostgresQuery(() => expectedRevision === 0
     ? getDrizzle().insert(featureSettings)

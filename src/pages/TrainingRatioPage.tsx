@@ -106,7 +106,7 @@ function TrainingRatioContent({ session, embedded }: { session: Session; embedde
           </> : <p role="status" aria-busy={m.source !== 'manual' && m.busy} className={m.source !== 'manual' && m.busy ? 'tool-loading-status' : undefined}>{m.source === 'manual' ? text.noManualInventory : m.busy ? text.importing : text.noInventory}</p>}
         </section>
       </div>
-      <TrainingRatioEvidence accountMode={accountMode} projectHref={features.cultivation_plan ? v2Path('cultivation-projects', profile?.id) : undefined} />
+      <TrainingRatioEvidence accountMode={accountMode} projectHref={features.cultivation_projects ? v2Path('cultivation-projects', profile?.id) : undefined} />
     </Root>
   </div>
 }

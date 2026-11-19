@@ -4,6 +4,7 @@ import { GenerateIcon } from '../../components/icons'
 import { copy } from '../../copy'
 import { askWorkspaceAssistant, readWorkspaceAssistant } from '../../lib/workspace-assistant-client'
 import { useSiteFeatures } from '../../lib/site-feature-context'
+import { WORKSPACE_ASSISTANT_FEATURES } from '../../lib/site-features'
 import type { WorkspaceAssistantReply, WorkspaceAssistantRequest } from '../../lib/workspace-assistant'
 import { Notice } from './components/WorkspaceUI'
 import './workspace-assistant.css'
@@ -11,6 +12,7 @@ import './workspace-assistant.css'
 const text = copy.v2.workspaceAssistant
 
 type Props = {
+  task: WorkspaceAssistantRequest['task']
   title: string
   userId: string
   profileId: string
@@ -25,11 +27,16 @@ type Props = {
 }
 
 export default function WorkspaceAssistant(props: Props) {
-  const { features } = useSiteFeatures()
-  return features.ai_schedule_explanation ? <AssistantPanel key={`${props.userId}:${props.profileId}`} {...props} /> : null
+  const { features, pauseNotices } = useSiteFeatures()
+  const feature = WORKSPACE_ASSISTANT_FEATURES[props.task]
+  const pause = pauseNotices?.[feature]
+  if (pause) return <details className="v2-workspace-assistant"><summary>{props.title} <span className="v2-feature-pause-badge">{copy.features.paused_title}</span></summary>
+    <div className="v2-workspace-assistant-body v2-feature-pause-notice"><p>{pause}</p></div>
+  </details>
+  return features[feature] ? <AssistantPanel key={`${props.userId}:${props.profileId}:${props.task}`} {...props} /> : null
 }
 
-function AssistantPanel({ title, userId, profileId, description, example, fixedQuestion, disabled, revision, renderControls, buildRequest, renderReply }: Props) {
+function AssistantPanel({ task, title, userId, profileId, description, example, fixedQuestion, disabled, revision, renderControls, buildRequest, renderReply }: Props) {
   const id = useId()
   const client = useQueryClient()
   const [open, setOpen] = useState(false)
@@ -39,8 +46,8 @@ function AssistantPanel({ title, userId, profileId, description, example, fixedQ
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const request = useRef<AbortController | null>(null)
-  const queryKey = ['user', userId, profileId, 'workspace-assistant'] as const
-  const availability = useQuery({ queryKey, enabled: open, queryFn: ({ signal }) => readWorkspaceAssistant(profileId, signal) })
+  const queryKey = ['user', userId, profileId, 'workspace-assistant', task] as const
+  const availability = useQuery({ queryKey, enabled: open, queryFn: ({ signal }) => readWorkspaceAssistant(profileId, task, signal) })
   const state = availability.data
   const input = fixedQuestion ?? question.trim()
   useEffect(() => () => request.current?.abort(), [])

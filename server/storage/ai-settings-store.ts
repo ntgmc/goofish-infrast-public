@@ -1,6 +1,6 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto'
 import { aiConfigurationIssues, aiSettingsSchema, DEFAULT_AI_SETTINGS, getAiRequestReservation, type AdminAiSettings, type AiSettings, type AiSettingsUpdate } from '../../src/lib/ai-settings'
-import { computeEffectiveSiteFeatures, normalizeSiteFeatureSettings } from '../../src/lib/site-features'
+import { computeEffectiveSiteFeatures, MODEL_FEATURES, normalizeSiteFeatureSettings, type ModelFeature } from '../../src/lib/site-features'
 import { getSecretKeyring } from '../handlers/license-utils'
 import { recordAdminOperationAuditInTransaction } from './admin-operation-audit-store'
 import { getSiteFeatureSettings } from './feature-settings-store'
@@ -20,9 +20,9 @@ export async function getAdminAiSettings(): Promise<AdminAiSettings> {
     effective_enabled: computeEffectiveSiteFeatures(features).ai_schedule_explanation, feature_revision: features.revision }
 }
 
-export async function getScheduleExplanationConfig() {
+export async function getScheduleExplanationConfig(feature: ModelFeature = 'ai_schedule_explanation') {
   const [stored, features] = await Promise.all([readStoredSettings(), getSiteFeatureSettings()])
-  const enabled = computeEffectiveSiteFeatures(features).ai_schedule_explanation && aiConfigurationIssues(stored.settings, Boolean(stored.encrypted_api_key)).length === 0
+  const enabled = computeEffectiveSiteFeatures(features)[feature] && aiConfigurationIssues(stored.settings, Boolean(stored.encrypted_api_key)).length === 0
   return { ...stored.settings, enabled, apiKey: enabled ? decryptKey(stored.encrypted_api_key!) : '',
     reservation: getAiRequestReservation(stored.settings),
     dailyBudget: Math.floor(stored.settings.dailyBudget * 1e6), monthlyBudget: Math.floor(stored.settings.monthlyBudget * 1e6) }
@@ -41,7 +41,9 @@ export async function saveAdminAiSettings(update: AiSettingsUpdate, actorUsernam
     if ((featureRow?.revision ?? 0) !== update.expected_feature_revision) throw new SettingsConflictError()
     const features = normalizeSiteFeatureSettings(featureRow?.record_json)
     const encryptedKey = update.clear_api_key ? null : update.api_key ? encryptKey(update.api_key) : previous?.encrypted_api_key ?? null
-    if (update.enabled) {
+    const before = { settings: previous?.settings ?? DEFAULT_AI_SETTINGS, enabled: features.features.ai_schedule_explanation, has_api_key: Boolean(previous?.encrypted_api_key) }
+    features.features.ai_schedule_explanation = update.enabled
+    if (MODEL_FEATURES.some((feature) => features.features[feature])) {
       const issues = aiConfigurationIssues(update.settings, Boolean(encryptedKey))
       if (issues.length) throw new AiSettingsValidationError(issues)
     }
@@ -49,8 +51,6 @@ export async function saveAdminAiSettings(update: AiSettingsUpdate, actorUsernam
     await client.query(`insert into ai_settings (key, settings, encrypted_api_key, revision, updated_at) values ('global', $1::jsonb, $2, $3, $4)
       on conflict (key) do update set settings = excluded.settings, encrypted_api_key = excluded.encrypted_api_key, revision = excluded.revision, updated_at = excluded.updated_at`,
     [JSON.stringify(update.settings), encryptedKey, update.expected_revision + 1, updatedAt])
-    const before = { settings: previous?.settings ?? DEFAULT_AI_SETTINGS, enabled: features.features.ai_schedule_explanation, has_api_key: Boolean(previous?.encrypted_api_key) }
-    features.features.ai_schedule_explanation = update.enabled
     features.updated_at = updatedAt
     const savedFeatures = await client.query(`insert into feature_settings (key, record_json, revision, updated_at) values ('global', $1::jsonb, $2, $3)
       on conflict (key) do update set record_json = excluded.record_json, revision = excluded.revision, updated_at = excluded.updated_at

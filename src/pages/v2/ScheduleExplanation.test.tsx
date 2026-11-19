@@ -5,10 +5,12 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { copy } from '../../copy'
 import type { ScheduleExplanationState } from '../../lib/schedule-explanation'
+import { DEFAULT_SITE_FEATURES } from '../../lib/site-features'
 import type { OptimizeResult } from '../../lib/types'
 import ScheduleExplanation from './ScheduleExplanation'
 
-const mocks = vi.hoisted(() => ({ api: vi.fn() }))
+const mocks = vi.hoisted(() => ({ api: vi.fn(), features: vi.fn() }))
+vi.mock('../../lib/site-feature-context', () => ({ useSiteFeatures: () => ({ features: mocks.features() }) }))
 vi.mock('../../lib/api-client', async (original) => ({ ...await original<object>(), apiJson: mocks.api,
   apiStream: async (url: string, options: unknown, consume: (response: Response) => Promise<unknown>) => {
     const value = await mocks.api(url, options)
@@ -27,6 +29,7 @@ beforeEach(() => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
   Object.assign(HTMLElement.prototype, { setPointerCapture: vi.fn(), hasPointerCapture: vi.fn(() => false) })
   state = structuredClone(initial)
+  mocks.features.mockReturnValue({ ...DEFAULT_SITE_FEATURES, ai_schedule_explanation: true })
   mocks.api.mockReset().mockImplementation(async (_url: string, options: { method?: string }) => {
     if (options.method === 'POST') state = { ...state, available: false, explanation: { text: '第一段解读。\n\n第二段解读。', created_at: new Date().toISOString() } }
     return state
@@ -67,6 +70,23 @@ it.each(['quota', 'budget', 'disabled', 'daily_limit', 'busy'] as const)('explai
   fireEvent.click(screen.getByRole('button', { name: text.title }))
   expect(await screen.findByText(text.reason[reason])).toBeVisible()
   expect(screen.queryByRole('button', { name: text.generate })).not.toBeInTheDocument()
+})
+
+it('hides the paused avatar by request and preserves view access when the avatar is kept', async () => {
+  mocks.features.mockReturnValue({ ...DEFAULT_SITE_FEATURES, schedule_explanation_avatar: false })
+  const mounted = mount()
+  expect(screen.queryByRole('button', { name: text.title })).not.toBeInTheDocument()
+  expect(mocks.api).not.toHaveBeenCalled()
+
+  mocks.features.mockReturnValue({ ...DEFAULT_SITE_FEATURES })
+  mounted.rerender(mounted.tree('u1'))
+  fireEvent.click(screen.getByRole('button', { name: text.title }))
+  expect(await screen.findByText(text.reason.disabled)).toBeVisible()
+  expect(screen.queryByRole('button', { name: text.generate })).not.toBeInTheDocument()
+
+  mocks.features.mockReturnValue({ ...DEFAULT_SITE_FEATURES, schedule_explanation_avatar: false, ai_schedule_explanation: true })
+  mounted.rerender(mounted.tree('u1'))
+  expect(await screen.findByRole('button', { name: text.generate })).toBeVisible()
 })
 
 it('recovers a failed generation by reading its status without automatically resubmitting', async () => {

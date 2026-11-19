@@ -5,6 +5,34 @@ sends `expected_updated_at`, the handler checks it against the current profile,
 and the storage transaction checks it again while holding the profile row lock.
 Keep both checks so an administrator cannot overwrite a newer change.
 
+## Tool availability
+
+Supported tools and model assistants offer three states under 功能开关. Open
+allows normal use. Hide removes the entry and shows the default unavailable
+message on a direct visit. Pause keeps the entry and shows the administrator's
+public explanation while blocking new operations. A disabled parent hides its
+child's pause notice until the parent reopens. Enter up to 280 characters of
+public information, such as the affected operation and what users can do next.
+Schedule explanation keeps its separate avatar preference and continues to serve
+saved explanations while new generation is paused.
+
+The pause notices are stored with the existing versioned feature settings.
+Saving the draft applies the switch and its explanation together.
+
+Under 功能开关 → 公开工具, administrators can pause saved-schedule comparison,
+manual scheduling, cultivation projects, cultivation recommendations, LMD and
+EXP ratio, and material demand trends independently. The public tools switch
+controls the directory and its tools. Schedule comparison and manual simulation
+also require scheduling and an eligible account profile. The cultivation API
+applies the switch for the requested calculation mode before loading account
+data. Operator training with manually entered resources is available while the
+LMD and EXP ratio switch is on.
+
+Legacy settings with manual scheduling or cultivation recommendations turned
+off start with saved-schedule comparison or cultivation projects turned off,
+respectively. Saving the settings persists each switch separately. Existing
+schedules, jobs and cultivation targets are preserved when a switch is closed.
+
 ## Optimization submission rate exemption
 
 The `security_admin` role includes `optimization_rate_limit_bypass`. Log in to

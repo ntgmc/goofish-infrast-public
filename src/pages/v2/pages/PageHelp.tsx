@@ -45,6 +45,7 @@ export default function PageHelp(props: Props) {
   const action = answer && 'action' in answer ? answer.action : undefined
   const label = answer && 'label' in answer ? answer.label : undefined
   const section = answer?.section
+  if (!features.workspace_page_help) return null
   return <details className="v2-workspace-assistant">
     <summary>{text.help}</summary>
     <div className="v2-workspace-assistant-body">

@@ -1,4 +1,4 @@
-import { computeEffectiveSiteFeatures } from '../../src/lib/site-features'
+import { computeEffectiveSiteFeatures, MODEL_FEATURES } from '../../src/lib/site-features'
 import { aiConfigurationIssues } from '../../src/lib/ai-settings'
 import { getAdminAiSettings } from '../storage/ai-settings-store'
 import { requestSchemas } from '../security/request-policy'
@@ -21,11 +21,12 @@ export default async function adminFeatureSettingsHandler(req: Request): Promise
   )
   if (!parsed.success) return invalidSettingsResponse(parsed.error.issues)
   try {
-    if (parsed.data.features.ai_schedule_explanation) {
+    if (MODEL_FEATURES.some((feature) => parsed.data.features[feature])) {
       const ai = await getAdminAiSettings()
       if (aiConfigurationIssues(ai.settings, ai.has_api_key).length) return jsonResponse({ error: '请先在 AI 服务中完成连接、密钥和计价配置。', code: 'ai_settings_incomplete' }, 400)
     }
-    return settingsResponse(await saveSiteFeatureSettings(parsed.data.features, parsed.data.expected_revision))
+    const { features, expected_revision, pause_notices } = parsed.data
+    return settingsResponse(await saveSiteFeatureSettings(features, expected_revision, pause_notices))
   } catch (error) {
     if (error instanceof SettingsConflictError) return settingsConflictResponse()
     throw error

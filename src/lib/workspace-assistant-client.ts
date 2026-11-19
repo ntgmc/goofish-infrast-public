@@ -4,8 +4,8 @@ import { apiJson } from './api-client'
 import { scheduleExplanationStateSchema } from './schedule-explanation'
 import { workspaceAssistantReplySchema, type WorkspaceAssistantRequest } from './workspace-assistant'
 
-export async function readWorkspaceAssistant(profileId: string, signal?: AbortSignal) {
-  return scheduleExplanationStateSchema.parse(await apiJson(`/api/user/workspace-assistant?${new URLSearchParams({ profile_id: profileId })}`, {
+export async function readWorkspaceAssistant(profileId: string, task: WorkspaceAssistantRequest['task'], signal?: AbortSignal) {
+  return scheduleExplanationStateSchema.parse(await apiJson(`/api/user/workspace-assistant?${new URLSearchParams({ profile_id: profileId, task })}`, {
     signal, fallbackMessage: copy.v2.workspaceAssistant.failed,
   }))
 }
