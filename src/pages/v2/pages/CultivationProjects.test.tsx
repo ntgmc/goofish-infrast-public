@@ -1,5 +1,8 @@
 // @vitest-environment jsdom
+import { StrictMode } from 'react'
+import { render as renderUi } from '@testing-library/react'
 import { act, cleanup, render, screen, waitFor, within } from '../../../test/query-render'
+import QueryProvider from '../../../lib/query-provider'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -12,8 +15,8 @@ import CultivationProjects from './CultivationProjects'
 import UpgradeSuggestions from '../../../components/UpgradeSuggestions'
 import type { UpgradeSuggestion } from '../../../lib/types'
 
-const mocks = vi.hoisted(() => ({ api: vi.fn(), result: vi.fn(), refresh: vi.fn() }))
-vi.mock('../../../hooks/useSklandSnapshot', () => ({ useSklandSnapshot: () => ({ data: null, busy: false, error: '', refresh: mocks.refresh }) }))
+const mocks = vi.hoisted(() => ({ api: vi.fn(), result: vi.fn(), refresh: vi.fn(), snapshot: vi.fn() }))
+vi.mock('../../../hooks/useSklandSnapshot', () => ({ useSklandSnapshot: mocks.snapshot }))
 vi.mock('../../../lib/api-client', () => ({ apiJson: mocks.api }))
 vi.mock('../../tool/optimize/optimization-api', () => ({ fetchResultHistoryDetail: mocks.result }))
 const text = { ...copy.cultivationProjects, import: copy.skland.refresh, refresh: copy.skland.refresh }
@@ -55,6 +58,7 @@ function session(id = 'mine'): V2Session {
 beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn()
   localStorage.clear()
+  mocks.snapshot.mockReturnValue({ data: null, busy: false, error: '', refresh: mocks.refresh, available: true, expired: false })
   mocks.api.mockImplementation(async (_url, options) => data(options.json.projects))
   mocks.result.mockImplementation(async (_profile, id) => ({ id, config: CONFIG_PRESETS['243'], result: {
     daily_production: { manufacturing: { 'Battle Record': id === 'temporary' ? 0.5 : 0.1 }, trading: { LMD: id === 'temporary' ? 100 : 300 }, net: { 'Pure Gold': 0 } },
@@ -80,6 +84,47 @@ it('keeps saved goals mounted while syncing and calculating their first material
   expect(view.container.querySelector('.v2-project-list > li')).toBe(row)
   expect(screen.getByRole('heading', { name: /测试干员/ })).toBeInTheDocument()
   expect(screen.queryByRole('status', { name: copy.v2.dataActivity.calculating })).not.toBeInTheDocument()
+})
+
+it.each([false, true])('finishes automatic calculation when entering with a cached snapshot (StrictMode: %s)', async (strict) => {
+  const goal: CultivationProject = { operatorId: 'char_test', elite: 2, level: 60, skill: 1, skillLevel: 7, paused: false, deadline: '' }
+  localStorage.setItem('maatool:cultivation-projects:user1:mine', JSON.stringify([goal]))
+  mocks.snapshot.mockReturnValue({ data: { version: 'cached' }, busy: false, error: '', refresh: mocks.refresh, available: true, expired: false })
+  mocks.api.mockResolvedValue({ ...data([goal]), snapshotVersion: 'cached' })
+  const page = <MemoryRouter><CultivationProjects session={session()} onConfig={vi.fn()} /></MemoryRouter>
+  renderUi(strict ? <StrictMode><QueryProvider>{page}</QueryProvider></StrictMode> : <QueryProvider>{page}</QueryProvider>)
+  await waitFor(() => expect(screen.getByRole('button', { name: text.refresh })).toBeEnabled())
+  expect(screen.getByRole('heading', { name: /测试干员/ })).toBeInTheDocument()
+  expect(screen.queryByRole('status', { name: copy.v2.dataActivity.calculating })).not.toBeInTheDocument()
+  expect(mocks.api).toHaveBeenCalledOnce()
+  expect(mocks.api.mock.calls[0][1].signal.aborted).toBe(false)
+  expect(mocks.refresh).not.toHaveBeenCalled()
+})
+
+it('resumes a cancelled snapshot calculation and ignores the old request while its replacement is loading', async () => {
+  const snapshot = { data: { version: 'cached' }, busy: false, error: '', refresh: mocks.refresh, available: true, expired: false }
+  mocks.snapshot.mockReturnValue(snapshot)
+  let finishFirst!: (result: CultivationData) => void, finishSecond!: (result: CultivationData) => void
+  mocks.api.mockReturnValueOnce(new Promise<CultivationData>(resolve => { finishFirst = resolve }))
+    .mockReturnValueOnce(new Promise<CultivationData>(resolve => { finishSecond = resolve }))
+  const current = session()
+  const page = () => <MemoryRouter><CultivationProjects session={current} onConfig={vi.fn()} /></MemoryRouter>
+  const view = render(page())
+  await waitFor(() => expect(mocks.api).toHaveBeenCalledOnce())
+  mocks.snapshot.mockReturnValue({ ...snapshot, available: false })
+  view.rerender(page())
+  expect(mocks.api.mock.calls[0][1].signal.aborted).toBe(true)
+  mocks.snapshot.mockReturnValue(snapshot)
+  view.rerender(page())
+  await waitFor(() => expect(mocks.api).toHaveBeenCalledTimes(2))
+  await act(async () => finishFirst({ ...data(), snapshotVersion: 'cached' }))
+  expect(screen.getByRole('button', { name: text.refresh })).toBeDisabled()
+  expect(screen.getByRole('status', { name: copy.v2.dataActivity.calculating })).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: text.add })).not.toBeInTheDocument()
+  await act(async () => finishSecond({ ...data(), snapshotVersion: 'cached' }))
+  expect(screen.getByRole('button', { name: text.refresh })).toBeEnabled()
+  expect(screen.getByRole('button', { name: text.add })).toBeEnabled()
+  expect(mocks.refresh).not.toHaveBeenCalled()
 })
 
 it('turns a selected goal into an income-linked route and changes configuration only on an explicit action', async () => {

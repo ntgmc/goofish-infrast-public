@@ -103,8 +103,14 @@ export function useCultivation(session: ReturnType<typeof useToolSession>) {
   useEffect(() => {
     const version = snapshot.data?.version
     if (!version || busy || data?.snapshotVersion === version || calculatedVersion.current === `${profileId}:${version}`) return
-    calculatedVersion.current = `${profileId}:${version}`
-    void load(appliedOptions.recommendation ?? defaultCultivationQuery, true, false)
+    let cancelled = false
+    // Wait for mount cleanup before marking this snapshot as requested.
+    queueMicrotask(() => {
+      if (cancelled) return
+      calculatedVersion.current = `${profileId}:${version}`
+      void load(appliedOptions.recommendation ?? defaultCultivationQuery, true, false)
+    })
+    return () => { cancelled = true }
   }, [snapshot.data?.version, busy, profileId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const exclude = useCallback((id: string, remove: boolean) => {
