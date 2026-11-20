@@ -26,6 +26,8 @@
   --explanation-strong: 500;
 }
 .v2-dialog.v2-explanation-float { background: transparent; }
+.v2-explanation-toolbar { white-space: nowrap; }
+.v2-explanation-toolbar > img { flex: none; border-radius: 50%; }
 .v2-explanation-launcher {
   display: flex;
   flex: none;

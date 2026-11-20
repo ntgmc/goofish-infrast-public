@@ -1,6 +1,6 @@
 import { memo, useId, useRef, useState, type KeyboardEvent, type ComponentType } from 'react'
 import { AnimatePresence, LayoutGroup, motion, useIsPresent } from 'motion/react'
-import { OpenDetailsIcon as ArrowUpRight, DormitoryIcon as BedDouble, ControlRoomIcon as Building2, ShiftTimeIcon as Clock3, DroneIcon as Drone, ManufactureIcon as Factory, TrainingRoomIcon as GraduationCap, GridViewIcon as LayoutGrid, ListViewIcon as List, RecruitmentIcon as UserRoundSearch, MeetingRoomIcon, OperatorsIcon as Users, ProcessingRoomIcon as Wrench, PowerPlantIcon as Zap, RecyclingStationIcon, UnknownFacilityIcon, FiammettaIcon } from '../../components/icons'
+import { OpenDetailsIcon as ArrowUpRight, DormitoryIcon as BedDouble, ControlRoomIcon as Building2, DroneIcon as Drone, ManufactureIcon as Factory, TrainingRoomIcon as GraduationCap, GridViewIcon as LayoutGrid, ListViewIcon as List, RecruitmentIcon as UserRoundSearch, MeetingRoomIcon, OperatorsIcon as Users, ProcessingRoomIcon as Wrench, PowerPlantIcon as Zap, RecyclingStationIcon, UnknownFacilityIcon, FiammettaIcon } from '../../components/icons'
 import { copy } from '../../copy'
 import type { PreparedResult } from '../../components/result-panel/formatters'
 import OperatorSkillPreview from '../../components/result-panel/OperatorSkillPreview'
@@ -80,7 +80,7 @@ export default memo(function ScheduleBoard({ result, prepared, expanded, onExpan
     { label: text.supportAndDormitories, compact: !expanded, rooms: allRooms.filter((room) => !['trading', 'manufacture', 'control', 'power'].includes(room.roomType)) },
   ]
   const count = new Set(plan?.rows.flatMap((row) => row.operators.map((operator) => operator.name))).size
-  const hours = result.shift_hours ?? result.plans.map((plan) => plan.shift_hours ?? 8)
+  const hours = result.plans.map((plan, index) => result.shift_hours?.[index] ?? plan.shift_hours ?? 8)
 
   function moveTab(event: KeyboardEvent<HTMLButtonElement>, index: number) {
     const count = result.plans.length
@@ -96,22 +96,6 @@ export default memo(function ScheduleBoard({ result, prepared, expanded, onExpan
   return (
     <OperatorSkillPreview><LayoutGroup id={id}>
     <section className="v2-schedule" aria-label={text.result}>
-      <div className="v2-panel-heading">
-        <span className="v2-schedule-count">{text.shifts(result.plans.length)}</span>
-        <div className="v2-board-controls">
-        <button type="button" className="v2-text-button" aria-pressed={expanded} aria-controls={`${id}-panel`} onClick={() => onExpandedChange(!expanded)}>
-          {expanded ? text.compactRooms : text.expandRooms}
-        </button>
-        <div className="v2-view-toggle" role="group" aria-label={text.result}>
-          <button type="button" aria-label={text.grid} aria-pressed={view === 'grid'} onClick={() => onViewChange('grid')}>
-            {view === 'grid' && <MotionNavIndicator layoutId="board-view" />}<LayoutGrid size={16} />
-          </button>
-          <button type="button" aria-label={text.list} aria-pressed={view === 'list'} onClick={() => onViewChange('list')}>
-            {view === 'list' && <MotionNavIndicator layoutId="board-view" />}<List size={17} />
-          </button>
-        </div>
-        </div>
-      </div>
       <div className="v2-shifts" role="tablist" aria-label={text.shiftTabs}>
         {result.plans.map((plan, index) => {
           const start = hours.slice(0, index).reduce((sum, value) => sum + value, 0)
@@ -121,15 +105,30 @@ export default memo(function ScheduleBoard({ result, prepared, expanded, onExpan
               onClick={() => onShiftChange(index)} onKeyDown={(event) => moveTab(event, index)}>
               {selected === index && <MotionNavIndicator layoutId="shift" />}
               <span className="v2-shift-label">{plan.name || text.shift(index + 1)}{selected === index && <span className="v2-shift-dot" />}</span>
-              <small>{String(start % 24).padStart(2, '0')}:00 — {String((start + hours[index]) % 24).padStart(2, '0')}:00</small>
+              <small>{shiftTime(start)}–{shiftTime(start + hours[index])}</small>
             </button>
           )
         })}
       </div>
       <div id={`${id}-panel`} role="tabpanel" aria-labelledby={`${id}-tab-${selected}`} tabIndex={0}>
         <div className="v2-transition-pane">
-        <div className="v2-board-meta"><span><Users size={14} />{text.assigned(count)}</span><span><Clock3 size={14} />{text.shiftHours(String(hours[selected] ?? 8))}</span>
-          {fiammettaTarget && <span><FiammettaIcon size={14} aria-hidden="true" />{copy.domain.components_result_panel_ResultBoard_017}{fiammettaTarget}</span>}
+        <div className="v2-board-meta">
+          <div className="v2-board-facts"><span><Users size={14} aria-hidden="true" />{text.assigned(count)}</span>
+            {fiammettaTarget && <span><FiammettaIcon size={14} aria-hidden="true" />{copy.domain.components_result_panel_ResultBoard_017}{fiammettaTarget}</span>}
+          </div>
+          <div className="v2-board-controls">
+            <button type="button" className="v2-text-button" aria-pressed={expanded} aria-controls={`${id}-panel`} onClick={() => onExpandedChange(!expanded)}>
+              {expanded ? text.compactRooms : text.expandRooms}
+            </button>
+            <div className="v2-view-toggle" role="group" aria-label={text.result}>
+              <button type="button" aria-label={text.grid} aria-pressed={view === 'grid'} onClick={() => onViewChange('grid')}>
+                {view === 'grid' && <MotionNavIndicator layoutId="board-view" />}<LayoutGrid size={16} aria-hidden="true" />
+              </button>
+              <button type="button" aria-label={text.list} aria-pressed={view === 'list'} onClick={() => onViewChange('list')}>
+                {view === 'list' && <MotionNavIndicator layoutId="board-view" />}<List size={17} aria-hidden="true" />
+              </button>
+            </div>
+          </div>
         </div>
         {roomGroups.filter((group) => group.rooms.length > 0).map((group) => (
           <section key={group.label} className="v2-room-group" aria-label={group.label}>
@@ -157,6 +156,11 @@ export default memo(function ScheduleBoard({ result, prepared, expanded, onExpan
     </LayoutGroup></OperatorSkillPreview>
   )
 })
+
+function shiftTime(hours: number) {
+  const minutes = Math.round(hours * 60) % (24 * 60)
+  return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
+}
 
 function FacilityIcon({ room }: { room: BoardRoom }) {
   const Icon = ROOM_ICONS[room.roomType] ?? UnknownFacilityIcon

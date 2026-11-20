@@ -15,6 +15,7 @@ import ExplanationMarkdown from './ExplanationMarkdown'
 import './schedule-explanation.css'
 
 const text = copy.scheduleExplanation
+const TOOLBAR_MEDIA = '(max-width: 39.999rem)'
 
 export default function ScheduleExplanation({ userId, profileId, resultId, sample, result }: {
   userId?: string; profileId?: string; resultId?: string; sample: boolean; result: OptimizeResult
@@ -96,9 +97,19 @@ function PersonalExplanation({ userId, profileId, resultId, generationEnabled, p
 
 function ExplanationWindow({ children, sample = false, busy = false }: { children: ReactNode; sample?: boolean; busy?: boolean }) {
   const [open, setOpen] = useState(false)
+  const [toolbar, setToolbar] = useState(() => Boolean(window.matchMedia?.(TOOLBAR_MEDIA).matches))
+  useEffect(() => {
+    const media = window.matchMedia?.(TOOLBAR_MEDIA)
+    if (!media) return
+    const update = () => setToolbar(media.matches)
+    update()
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [])
   const [position, setPosition] = useState<{ right: number; bottom: number } | null>(null)
   const [container, setContainer] = useState<HTMLDivElement | null>(null)
   const trigger = useRef<HTMLButtonElement>(null)
+  const toolbarTrigger = useRef<HTMLButtonElement>(null)
   const panel = useRef<HTMLDivElement>(null)
   const feedback = useRef<ReturnType<typeof animate> | null>(null)
   const reducedMotion = useAppReducedMotion()
@@ -173,12 +184,16 @@ function ExplanationWindow({ children, sample = false, busy = false }: { childre
       }
     },
   }
-  return createPortal(<Dialog modal={false} open={open} onOpenChange={setOpen}>
-    <div ref={setContainer} className="v2-dialog v2-explanation-float" style={position ?? undefined} data-dragging={dragging || undefined}>
+  return <Dialog modal={false} open={open} onOpenChange={setOpen}>
+    {toolbar && <button ref={toolbarTrigger} type="button" className="v2-button v2-button-secondary v2-explanation-toolbar" aria-label={text.title}
+      aria-haspopup="dialog" aria-expanded={open} aria-controls={id} onClick={() => setOpen(!open)}>
+      <img src="/webp96/char_002_amiya.webp" alt="" width={20} height={20} />{text.launcher}
+    </button>}
+    {createPortal(<div ref={setContainer} className="v2-dialog v2-explanation-float" style={position ?? undefined} data-dragging={dragging || undefined}>
       <DialogContent unstyled ref={panel} portalContainer={container} id={id} className="v2-dialog v2-explanation-window" aria-describedby={undefined}
         onOpenAutoFocus={(event) => { event.preventDefault(); panel.current?.focus({ preventScroll: true }) }}
         onInteractOutside={(event) => event.preventDefault()}
-        onCloseAutoFocus={(event) => { event.preventDefault(); trigger.current?.focus({ preventScroll: true }) }}>
+        onCloseAutoFocus={(event) => { event.preventDefault(); (toolbarTrigger.current ?? trigger.current)?.focus({ preventScroll: true }) }}>
         <header className="v2-explanation-titlebar">
           <DialogTitle className="sr-only">{text.title}</DialogTitle>
           <button type="button" className="v2-explanation-drag" aria-label={text.moveHint} {...dragHandlers}>
@@ -187,14 +202,14 @@ function ExplanationWindow({ children, sample = false, busy = false }: { childre
         </header>
         <div className="v2-explanation-content" aria-busy={busy}>{children}</div>
       </DialogContent>
-      <button ref={trigger} type="button" className="v2-explanation-launcher" aria-label={text.title} aria-description={text.moveHint} aria-haspopup="dialog" aria-expanded={open} aria-controls={id}
+      {(!toolbar || open) && <button ref={trigger} type="button" className="v2-explanation-launcher" aria-label={toolbar ? text.collapse : text.title} aria-description={text.moveHint} aria-haspopup="dialog" aria-expanded={open} aria-controls={id}
         {...dragHandlers} onClick={(event) => { if (!dragged.current || event.detail === 0) setOpen(!open) }}>
         <span className="v2-explanation-invitation">{open ? text.collapse : text.launcher}</span>
         <span className="v2-explanation-avatar"><img src="/webp96/char_002_amiya.webp" alt="" width={64} height={64} draggable={false} /><span className="v2-explanation-badge" aria-hidden="true">AI</span>
           {busy && <span className="v2-explanation-dot" aria-hidden="true" />}</span>
-      </button>
-    </div>
-  </Dialog>, document.body)
+      </button>}
+    </div>, document.body)}
+  </Dialog>
 }
 
 function parseState(value: unknown) {

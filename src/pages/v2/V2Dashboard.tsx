@@ -3,7 +3,7 @@ import { AnimatePresence, LayoutGroup, motion, useIsPresent } from 'motion/react
 import { useAppReducedMotion } from '../../lib/motion-preference'
 import { authPath } from '../../lib/auth-navigation'
 import './auth.css'
-import { NextIcon as ArrowRight, ExpandIcon as ChevronDown, BreadcrumbIcon, ExportIcon as Download, MenuIcon as Menu, GenerateIcon, LoadingIcon, ConfigIcon as Settings2, DataSourceIcon as ShieldCheck, InfoIcon as Sparkles, CloseIcon as X, PreviewIcon, SampleIcon } from '../../components/icons'
+import { NextIcon as ArrowRight, ExpandIcon as ChevronDown, BreadcrumbIcon, ExportIcon as Download, MenuIcon as Menu, GenerateIcon, LoadingIcon, ConfigIcon as Settings2, InfoIcon as Sparkles, CloseIcon as X, PreviewIcon } from '../../components/icons'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import Link from '../../components/InternalLink'
 import FeedbackButton from '../../components/FeedbackDialog'
@@ -166,6 +166,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
     }
   }, [mobileNavigation])
   const [downloadNotice, setDownloadNotice] = useState(false)
+  const feedback = loadingResult ? text.loadingResult : error ?? notice ?? (downloadNotice ? text.exported : null)
   const reduceMotion = useAppReducedMotion()
   const motionId = useId()
   const prepared = useMemo(() => prepareResult(result, result.schedule_mode === 'rotation', result.dormitory_rule === 'maa_pure_autofill', operators), [result, operators])
@@ -191,7 +192,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
   const canViewTraining = Boolean(!isProfileExpired(session.activeProfile ?? {}) && (workflow?.userCanUseUpgradeFeatures || workflow?.suggestions?.length))
   const manualKey = useMemo(() => manualSourceKey(result), [result])
   const exportResultId = workflow?.currentResult || workflow?.finalResult ? workflow.progress?.historyResultId ?? workflow.progress?.jobId : workflow?.historyItem?.id ?? workflow?.latestWorkspaceResult?.id
-  const resultGrid = useRef<HTMLDivElement>(null)
+  const resultContent = useRef<HTMLDivElement>(null)
   const arrivalKey = exportResultId ?? manualKey
   const previousResult = exportResultId && workflow?.latestWorkspaceResult?.id === exportResultId
     ? workflow.resultHistory?.find((item) => item.id !== exportResultId && item.source !== 'manual' && Date.parse(item.created_at) <= Date.parse(workflow.latestWorkspaceResult!.created_at))
@@ -203,7 +204,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
     const changed = lastArrival.current !== arrivalKey
     lastArrival.current = arrivalKey
     if (!changed || reduceMotion || !(workflow?.currentResult || workflow?.finalResult)) return
-    const animations = [...(resultGrid.current?.querySelectorAll<HTMLElement>('.v2-overview-metrics, .v2-room-group') ?? [])]
+    const animations = [...(resultContent.current?.querySelectorAll<HTMLElement>('.v2-overview-metrics, .v2-room-group') ?? [])]
       .filter((element) => typeof element.animate === 'function')
       .map((element, index) => element.animate([{ opacity: 0.6, transform: 'translateY(6px)' }, { opacity: 1, transform: 'translateY(0)' }],
         { duration: 280, delay: index * 60, fill: 'backwards', easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }))
@@ -353,9 +354,11 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
             firstSchedule={firstSchedule} configConfirmed={configConfirmed} />
           <div hidden={displayedSection !== 'overview'}>
           <div className="v2-page-title v2-overview-heading">
-            <div className="v2-overview-title"><h1>{sample ? text.exampleSchedule : text.title}</h1><span className="v2-ready-tag">{sample ? text.sample : SCHEDULE_MODE_LABELS[resultMode]}</span></div>
+            <div className="v2-overview-title"><h1>{sample ? text.exampleSchedule : text.title}</h1><span className="v2-ready-tag">{sample ? text.sampleSource : SCHEDULE_MODE_LABELS[resultMode]}</span>
+              {!sample && <span className="sr-only">{text.ownSource}</span>}
+            </div>
             <div className="v2-banner-actions">
-              <button type="button" className="v2-button v2-button-white v2-config-button" aria-label={text.configure} title={text.configure} onClick={() => openPanel('config')}><Settings2 size={16} aria-hidden="true" /><span>{text.configure}</span></button>
+              <button type="button" className="v2-button v2-button-white" aria-label={text.configure} title={text.configure} onClick={() => openPanel('config')}><Settings2 size={16} aria-hidden="true" /><span>{text.configure}</span></button>
               <button type="button" className="v2-button v2-button-primary" disabled={busy || loadingResult || Boolean(sample ? startDisabledReason : generationDisabledReason)}
                 aria-describedby={sample && startDisabledReason ? 'v2-start-unavailable' : undefined} title={sample ? startDisabledReason ?? undefined : generationDisabledReason ?? undefined}
                 onClick={() => sample ? navigateSection('generation') : onGenerate?.()}>{busy ? <LoadingIcon size={16} className="v2-spin" aria-hidden="true" /> : <GenerateIcon size={16} aria-hidden="true" />}{busy ? text.generating : sample ? text.generateMine : text.regenerate}</button>
@@ -365,30 +368,38 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
           {session.activeProfile && <ProfileUpgradeEntry profile={session.activeProfile} />}
           <InventoryDepletionWarning result={result} className="v2-inventory-warning" action={<button type="button" className="v2-button v2-button-secondary" onClick={() => openPanel('config')}><Settings2 size={16} aria-hidden="true" />{text.configure}</button>} />
           <AnimatePresence initial={false}>
-          {(loadingResult || error || notice || downloadNotice || configChanged) && <FeedbackRegion key="feedback">
+          {feedback && <FeedbackRegion key="feedback" immediate={Boolean(error)}>
           <div className={`v2-feedback ${error ? 'v2-feedback-error' : loadingResult ? 'tool-loading-status' : ''}`} role={error ? 'alert' : 'status'} aria-busy={loadingResult && !error} aria-live="polite">
-            {loadingResult ? text.loadingResult : error ?? notice ?? (downloadNotice ? text.exported : sample ? text.demoConfigChanged : text.configChanged)}
+            {feedback}
             {error && (workflow?.inlineError?.retry === 'save'
               ? <button type="button" disabled={busy || session.configSyncStatus === 'pending' || session.configSyncStatus === 'saving'} onClick={session.retryConfigSave}>{session.configSyncStatus === 'pending' || session.configSyncStatus === 'saving' ? copy.optimize.generation.saving : copy.optimize.generation.retry_save}</button>
               : onRetryResult && <button type="button" onClick={onRetryResult}>{text.retry}</button>)}
             {error === workflow?.inlineError?.message && workflow?.inlineError?.jobId && <FeedbackButton key={workflow.inlineError.jobId} failureJobId={workflow.inlineError.jobId} className="v2-button v2-button-secondary" />}
           </div></FeedbackRegion>}
+          {configChanged && !loadingResult && <FeedbackRegion key="config-changed">
+            <div className="v2-feedback v2-overview-stale" role={feedback && !error ? undefined : 'status'}>
+              <Settings2 size={16} aria-hidden="true" />{sample ? text.demoConfigChanged : text.configChanged}
+            </div>
+          </FeedbackRegion>}
           </AnimatePresence>
           {generationProgress}
           {children}
-          <div ref={resultGrid} className="v2-results-grid">
+          <div ref={resultContent}>
           <div className="v2-overview-metrics"><ProductionSummary result={result} prepared={prepared} sample={sample} userId={session.user?.id} profileId={session.activeProfile?.id} resultId={exportResultId}
             resultConfig={workflow?.historyItem?.result === result ? workflow.historyItem.config : undefined}
             history={[...(workflow?.resultHistory ?? []), ...(workflow?.archivedResults ?? [])]} newResult={Boolean(workflow?.currentResult || workflow?.finalResult)} onConfigure={() => openPanel('config')} /></div>
-          {!sample && session.user && session.activeProfile && previousResult && <ResultChanges key={`${arrivalKey}:${previousResult.id}`} userId={session.user.id} profileId={session.activeProfile.id} result={result} previous={previousResult} />}
+          <div className="v2-result-toolbar">
           <div className="v2-content-tabs" role="group" aria-label={text.resultTabs}>
             {([['schedule', text.scheduleTab], ['analysis', text.analysisTab], ...(showManual ? [['manual', text.manualTab] as const] : []), ...(restrictedPreview || !sample && (workflow?.suggestions?.length || result.upgrade_suggestions_status) ? [['training', text.trainingTab] as const] : [])] as const).map(([id, label]) => <button type="button" key={id} aria-pressed={view === id} onClick={() => { setView(id); if (id === 'manual') setManualOpened(true) }}>
               {label}{view === id && <MotionNavIndicator layoutId="result-tab" variant="underline" />}
             </button>)}
           </div>
-          {view !== 'manual' && <ResultActions plans={result.plans} shift={shift} showShift={view === 'schedule'} onShiftChange={setShift} onExport={() => setExportOpen(true)} sample={sample} busy={busy} loadingResult={loadingResult}>
+          {view !== 'manual' && <div className="v2-result-actions" role="group" aria-label={text.result}>
+            <button className="v2-button v2-button-secondary" type="button" disabled={busy || loadingResult} onClick={() => setExportOpen(true)}><Download size={16} aria-hidden="true" />{text.export}</button>
             {displayedSection === 'overview' && !sample && view === 'schedule' && session.activeProfile && <PageHelp key={`${session.activeProfile.id}:${arrivalKey}`} page="result" profileId={session.activeProfile.id} maaAvailable={features.maa_export && result.schedule_mode !== 'rotation' && Boolean(exportResultId)} maaDirect={workflow?.userCanExportMaaWithoutCoupon} inventoryIssue={Boolean(workflow?.inventoryError)} couponBalance={workflow?.inventoryLoaded && !workflow.inventoryError ? workflow.itemBalances.maa_export_trial_coupon ?? 0 : undefined} onOpenExport={() => setExportOpen(true)} />}
-          </ResultActions>}
+            {displayedSection === 'overview' && <ScheduleExplanation userId={session.user?.id} profileId={session.activeProfile?.id} resultId={exportResultId} sample={sample} result={result} />}
+          </div>}
+          </div>
           <div className="v2-feature-content v2-manual-workspace" hidden={view !== 'manual'}>
             {canManual && manualOpened && session.activeProfile && <Suspense fallback={<Loading label={text.loading} />}><ManualScheduleEditor revealCandidates showSimulationProgress key={manualKey} source={result} profileId={session.activeProfile.id} operators={operators} simulationBaseline={simulationBaseline} onDirtyChange={setManualDirty} renderExport={(props) => workflow && <ManualResultExport key={props.resultId} {...props} workflow={workflow}
               onRecover={(action) => { if (action === 'login') void navigate(authPath('login', returnTo)); else navigateSection(action) }} />} /></Suspense>}
@@ -410,9 +421,9 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
             )}
           </V2Transition>
           </div>
-          {displayedSection === 'overview' && view !== 'manual' && <ScheduleExplanation userId={session.user?.id} profileId={session.activeProfile?.id} resultId={exportResultId} sample={sample} result={result} />}
           {view === 'schedule' && <ScheduleContext result={result} prepared={prepared} config={config} operators={owned} sampleOperators={sampleOperators}
             onConfigure={() => openPanel('config')} onOperators={() => openPanel('operators')} />}
+          {!sample && session.user && session.activeProfile && previousResult && <ResultChanges key={`${arrivalKey}:${previousResult.id}`} userId={session.user.id} profileId={session.activeProfile.id} result={result} previous={previousResult} />}
           </div>
           <div className="v2-sample-notice"><span className="v2-notice-icon"><Sparkles size={16} /></span><p>{text.estimateNotice}</p>{sample && signedIn && <button type="button" onClick={() => openPanel('account')}>{text.account}<ArrowRight size={14} /></button>}</div>
           </div>
@@ -441,42 +452,15 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
   )
 }
 
-function FeedbackRegion({ children }: { children: ReactNode }) {
+function FeedbackRegion({ children, immediate = false }: { children: ReactNode; immediate?: boolean }) {
   const reduceMotion = useAppReducedMotion()
   const isPresent = useIsPresent()
   return (
     <motion.div className="v2-feedback-region" aria-hidden={isPresent ? undefined : true} inert={isPresent ? undefined : true}
-      initial={{ opacity: 0, height: reduceMotion ? 'auto' : 0 }} animate={{ opacity: 1, height: 'auto' }}
+      initial={immediate || reduceMotion ? false : { opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
       exit={{ opacity: 0, height: reduceMotion ? 'auto' : 0 }}
       transition={{ duration: reduceMotion ? 0 : motionTokens.duration.enter, ease: motionTokens.ease.enter }}>
       {children}
     </motion.div>
-  )
-}
-
-function ResultActions({ children, plans, shift, showShift, onShiftChange, onExport, sample, busy, loadingResult }: {
-  children?: ReactNode
-  plans: OptimizeResult['plans']
-  shift: number
-  showShift: boolean
-  onShiftChange: (shift: number) => void
-  onExport: () => void
-  sample: boolean
-  busy: boolean
-  loadingResult: boolean
-}) {
-  const selected = Math.min(shift, Math.max(plans.length - 1, 0))
-  return (
-    <div className="v2-result-actions" role="group" aria-label={text.result}>
-      {showShift && <label className="v2-current-shift">
-        <span>{text.currentShift}</span>
-        <select aria-label={text.shiftTabs} value={selected} onChange={(event) => onShiftChange(Number(event.currentTarget.value))}>
-          {plans.map((plan, index) => <option key={index} value={index}>{plan.name || text.shift(index + 1)}</option>)}
-        </select>
-      </label>}
-      <span className="v2-result-source" title={sample ? text.sampleSource : text.ownSource}>{sample ? <SampleIcon size={14} aria-hidden="true" /> : <ShieldCheck size={14} aria-hidden="true" />}<span className="max-sm:sr-only">{sample ? text.sampleSource : text.ownSource}</span></span>
-      <button className="v2-button v2-button-secondary" type="button" disabled={busy || loadingResult} onClick={onExport}><Download size={16} />{text.export}</button>
-      {children}
-    </div>
   )
 }

@@ -1159,6 +1159,7 @@ describe('V2 results-first workspace', () => {
   it('preserves the selected shift, Fiammetta target and display mode across result views without generating', async () => {
     const workflow = connect()
     const result = structuredClone(SAMPLE_RESULT)
+    result.shift_hours = [7.5, 8, 8.5]
     result.plans[0].Fiammetta = { enable: true, target: ' 但书 ', order: 'pre' }
     result.plans[1].Fiammetta = { enable: true, target: '德克萨斯', order: 'post' }
     result.plans[2].Fiammetta = { enable: false, target: '但书', order: 'pre' }
@@ -1166,7 +1167,9 @@ describe('V2 results-first workspace', () => {
     const user = userEvent.setup()
     const page = mount()
     expect(within(screen.getByRole('tabpanel')).getByText('菲亚梅塔 → 但书')).toBeInTheDocument()
-    await user.click(screen.getByRole('tab', { name: /第2班/ }))
+    expect(screen.getByRole('tab', { name: /第1班.*00:00–07:30/ })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /第3班.*15:30–00:00/ })).toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: /第2班.*07:30–15:30/ }))
     expect(within(screen.getByRole('tabpanel')).getByText('菲亚梅塔 → 德克萨斯')).toBeInTheDocument()
     expect(within(screen.getByRole('tabpanel')).queryByText('菲亚梅塔 → 但书')).not.toBeInTheDocument()
     const room = within(screen.getByRole('tabpanel')).getByRole('button', { name: /贸易站.*推进之王/ })

@@ -153,7 +153,7 @@ function Metric({ label, value, format = formatAmount, unit, hint, change, produ
     <div className="v2-metric-top"><span>{label}</span><span className="v2-metric-icon" aria-hidden="true">{product ? <ProductIcon product={product} size={24} /> : icon}</span></div>
     <p className="v2-metric-value">{value === null ? '—' : <TweenValue value={value} format={format} />}<small>{unit}</small></p>
     {hint && <p className="v2-metric-hint">{hint}</p>}
-    {change && <p className="v2-metric-change">{change !== text.sameAsPrevious && <span>{text.changeFromPrevious} </span>}<AnimatedValue value={change} /></p>}
+    {change && change !== text.sameAsPrevious && change !== text.productionChangeUnavailable && <p className="v2-metric-change"><span>{text.changeFromPrevious} </span><AnimatedValue value={change} /></p>}
     {children}
   </section></RevealItem>
 }
