@@ -3,7 +3,7 @@ import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import { useInternalHref } from '../../../components/InternalLink'
 import { copy } from '../../../copy/index'
 import { ApiError, apiJson, getApiErrorMessage } from '../../../lib/api-client'
-import type { BalancePage, PublicBalanceTransaction } from '../../../lib/balance-contracts'
+import { formatPoints, type BalancePage, type PublicBalanceTransaction } from '../../../lib/balance-contracts'
 import { getMeteredBillingPolicy } from '../../../lib/metered-billing'
 
 const meteredPolicy = getMeteredBillingPolicy()
@@ -178,10 +178,6 @@ export default function BalanceSection({ userId, activeProfileId, redemptionEnab
 
 function transactionLabel(kind: PublicBalanceTransaction['kind']): string {
   return copy.balance[kind]
-}
-
-export function formatPoints(value: string): string {
-  return value.endsWith('.00') ? value.slice(0, -3) : value
 }
 
 function formatDate(value: string): string {

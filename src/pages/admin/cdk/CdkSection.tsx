@@ -6,6 +6,7 @@ import { AdminTabs } from '../shared/AdminTabs'
 import { MAX_CDK_BATCH_COUNT, cdkProductPermissions, permissionLabels, type GeneratedPermission } from '../contracts'
 import { formatDate } from '../shared/helpers'
 import { copy } from '../../../copy'
+import { formatPoints } from '../../../lib/balance-contracts'
 
 const tabs = [{ id: 'records', label: '记录检索' }, { id: 'generate', label: '生成 CDK' }, { id: 'analysis', label: '分布分析' }] as const
 export default function CdkSection({ model: c, active }: { model: AdminController; active: boolean }) {
@@ -38,7 +39,7 @@ export default function CdkSection({ model: c, active }: { model: AdminControlle
         <label><span className="mb-2 block text-sm">订单备注</span><input value={c.orderNote} maxLength={120} onChange={(e) => c.setOrderNote(e.currentTarget.value)} className="tool-field" placeholder="闲鱼订单号、用户昵称或售后备注" /></label>
       </fieldset><button type="submit" disabled={c.busyAction === 'generate'} className="tool-primary-action mt-5">{c.busyAction === 'generate' ? '生成中…' : '生成 CDK'}</button>
       {c.generatedCodes.length > 0 && <div className="mt-5 border-t border-surface-3 pt-5"><div className="admin-actions"><div><h3 className="font-semibold">已生成 {c.generatedCodes.length} 个 CDK</h3>
-        <p className="mt-1 text-xs text-ink-muted">{c.generatedCodes[0].cdk_type === 'balance' ? copy.balance.cdk_value(c.generatedCodes[0].amount!)
+        <p className="mt-1 text-xs text-ink-muted">{c.generatedCodes[0].cdk_type === 'balance' ? copy.balance.cdk_value(formatPoints(c.generatedCodes[0].amount!))
           : c.generatedCodes[0].cdk_type === 'item' ? c.generatedCodes[0].item_name ?? c.generatedCodes[0].item_code : permissionLabels[c.generatedCodes[0].permission!]}</p></div>
         <div className="flex flex-wrap gap-2"><button type="button" onClick={c.handleCopyGeneratedCdks} className="tool-secondary-action">复制全部</button><button type="button" onClick={c.handleDownloadGeneratedCdks} className="tool-secondary-action">下载 CSV</button></div></div>
         <ul className="max-h-64 overflow-auto">{c.generatedCodes.map((item) => <li key={item.code} className="flex flex-wrap justify-between gap-2 border-b border-surface-3 py-3"><span className="break-all font-mono text-sm">{item.code}</span><span className="text-xs text-ink-muted">{formatDate(item.created_at)}</span></li>)}</ul>

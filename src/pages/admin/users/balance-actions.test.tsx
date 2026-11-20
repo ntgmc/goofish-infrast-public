@@ -23,7 +23,7 @@ it('keeps a successful adjustment separate from failed reads and never repeats t
   const hook = renderHook(() => useAdminUserBalance({ username: 'alice', capabilities: ['user_manage'], userId: 'user-1', active: true, ...effects }))
   await waitFor(() => expect(hook.result.current.balance?.balance.available).toBe('12.00'))
   await act(async () => { expect(await hook.result.current.handleAdjustUserBalance('credit', '1.00', 'audit reason', 'same-key', 'root-secret')).toBe(true) })
-  expect(effects.setNotice).toHaveBeenCalledWith('已增加 1.00 积分')
+  expect(effects.setNotice).toHaveBeenCalledWith('已增加 1 积分')
   expect(effects.setError).toHaveBeenLastCalledWith('积分调整已成功，数据刷新失败，请手动刷新。')
   expect(hook.result.current.balance?.balance.available).toBe('12.00')
   hook.unmount()

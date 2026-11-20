@@ -4,7 +4,7 @@ import { Link } from 'react-router'
 import { adminPath } from '../../../lib/app-routes'
 import SklandIcon from '../../../components/SklandIcon'
 import type { AdminBalanceTransaction, BalancePage } from '../../../lib/balance-contracts'
-import { normalizePointsAmount } from '../../../lib/balance-contracts'
+import { formatPoints, normalizePointsAmount } from '../../../lib/balance-contracts'
 import { type AppUserSummary, type AdminProfileSummary, type AdminUserDetail, type AdminProfileOperatorData, permissionLabels, appUserStatusLabels, type AdminCapability } from '../contracts'
 import { AdminTabs } from '../shared/AdminTabs'
 import { AdminDetailDialog } from '../shared/AdminDetailDialog'
@@ -263,9 +263,9 @@ function UserBalanceCard({
       </summary>
       <div className="border-t border-surface-3 p-4">
         <div>
-          <p className="text-3xl font-semibold tabular-nums text-ink-primary">{balance?.balance.available ?? '0.00'}</p>
-          <p className="mt-1 text-xs text-ink-muted">可用 {balance?.balance.available ?? '0.00'} · 使用中暂扣 {balance?.balance.reserved ?? '0.00'} · 待补扣 {balance?.balance.debt ?? '0.00'}</p>
-          <p className="mt-1 text-xs text-ink-muted">累计获得 {balance?.balance.lifetime_credited ?? '0.00'} · 已撤销发放 {balance?.balance.qualification_reversed ?? '0.00'}</p>
+          <p className="text-3xl font-semibold tabular-nums text-ink-primary">{formatPoints(balance?.balance.available ?? '0.00')}</p>
+          <p className="mt-1 text-xs text-ink-muted">可用 {formatPoints(balance?.balance.available ?? '0.00')} · 使用中暂扣 {formatPoints(balance?.balance.reserved ?? '0.00')} · 待补扣 {formatPoints(balance?.balance.debt ?? '0.00')}</p>
+          <p className="mt-1 text-xs text-ink-muted">累计获得 {formatPoints(balance?.balance.lifetime_credited ?? '0.00')} · 已撤销发放 {formatPoints(balance?.balance.qualification_reversed ?? '0.00')}</p>
         </div>
 
         <form onSubmit={submit} className="mt-4 grid gap-3 lg:grid-cols-[140px_180px_1fr_180px_auto]" noValidate>
@@ -331,8 +331,8 @@ function UserBalanceCard({
               {(balance?.transactions ?? []).map((transaction) => (
                 <tr key={transaction.id}>
                   <td className="px-2 py-2">{transaction.service ? copy.balance.services[transaction.service] : adminBalanceKindLabel(transaction.kind)}</td>
-                  <td className={`px-2 py-2 font-mono font-medium ${transaction.amount.startsWith('-') ? 'text-error' : 'text-success'}`}>{transaction.amount.startsWith('-') ? transaction.amount : `+${transaction.amount}`}</td>
-                  <td className="px-2 py-2 font-mono">{transaction.balance_after}</td>
+                  <td className={`px-2 py-2 font-mono font-medium ${transaction.amount.startsWith('-') ? 'text-error' : 'text-success'}`}>{transaction.amount.startsWith('-') ? formatPoints(transaction.amount) : `+${formatPoints(transaction.amount)}`}</td>
+                  <td className="px-2 py-2 font-mono">{formatPoints(transaction.balance_after)}</td>
                   <td className="max-w-72 px-2 py-2"><div>{transaction.admin_username ?? '-'}{transaction.approved_by ? ` / ${transaction.approved_by} 审批` : ''}</div><div className="truncate text-ink-muted" title={transaction.reason ?? undefined}>{transaction.reason ?? '-'}</div></td>
                   <td className="max-w-52 px-2 py-2 font-mono text-ink-muted"><div>{transaction.reference_type}</div><div className="truncate" title={transaction.reference_id}>{transaction.reference_id}</div></td>
                   <td className="whitespace-nowrap px-2 py-2">{formatDate(transaction.created_at)}</td>
@@ -409,7 +409,7 @@ function EffectiveCommercialAdminControls({ userId }: { userId: string }) {
       return
     }
     if (suspended && !limits.suspended && limits.inflight_jobs > 0
-      && !window.confirm(`当前仍有 ${limits.inflight_jobs} 个计算中任务、暂扣 ${limits.inflight_reserved} 积分。暂停仅阻止新任务，计算中任务仍会继续并按结果结算。确认继续？`)) return
+      && !window.confirm(`当前仍有 ${limits.inflight_jobs} 个计算中任务、暂扣 ${formatPoints(limits.inflight_reserved)} 积分。暂停仅阻止新任务，计算中任务仍会继续并按结果结算。确认继续？`)) return
     const signature = JSON.stringify({ active, total, suspended, normalizedReason, revision: limits.revision })
     const request = requestIdentity.current?.signature === signature
       ? requestIdentity.current
@@ -443,7 +443,7 @@ function EffectiveCommercialAdminControls({ userId }: { userId: string }) {
     {loading && <p className="mt-2 text-sm text-ink-muted" role="status">正在加载商用账户真实状态…</p>}
     {limits && <>
       <p className="mt-1 text-xs text-ink-muted">档案用量：活跃 {limits.active} / {limits.active_limit}，总量 {limits.total} / {limits.total_limit}；状态：{limits.suspended ? '已暂停' : '正常'}；revision {limits.revision}</p>
-      <p className="mt-1 text-xs text-ink-muted">计算中任务 {limits.inflight_jobs} 个 · 暂扣 {limits.inflight_reserved} 积分。暂停只阻止新任务，计算中任务仍会继续并结算。</p>
+      <p className="mt-1 text-xs text-ink-muted">计算中任务 {limits.inflight_jobs} 个 · 暂扣 {formatPoints(limits.inflight_reserved)} 积分。暂停只阻止新任务，计算中任务仍会继续并结算。</p>
     </>}
     <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4"><input aria-label="商用活跃档案上限" disabled={!limits || loading || busy} value={activeLimit} onChange={(event) => { setActiveLimit(event.currentTarget.value); resetRequestIdentity() }} className="tool-field" inputMode="numeric" /><input aria-label="商用档案总量上限" disabled={!limits || loading || busy} value={totalLimit} onChange={(event) => { setTotalLimit(event.currentTarget.value); resetRequestIdentity() }} className="tool-field" inputMode="numeric" /><input aria-label="商用变更原因" disabled={!limits || loading || busy} value={reason} onChange={(event) => { setReason(event.currentTarget.value); resetRequestIdentity() }} className="tool-field" placeholder="必填，将写入审计" /><input aria-label="商用 Root 口令" type="password" disabled={!limits || loading || busy} value={rootPassword} onChange={(event) => { setRootPassword(event.currentTarget.value); resetRequestIdentity() }} className="tool-field" autoComplete="off" placeholder="高风险操作二次认证" /></div>
     <div className="mt-3 flex flex-wrap gap-2"><button type="button" disabled={!limits || loading || busy} onClick={() => void save()} className="tool-secondary-action">保存限额</button><button type="button" disabled={!limits || loading || busy} onClick={() => void save(!limits?.suspended)} className={limits?.suspended ? 'tool-primary-action' : 'tool-danger-action'}>{limits?.suspended ? '恢复商用' : '暂停商用'}</button>{!limits && !loading && <button type="button" onClick={() => void load()} className="tool-secondary-action">重新加载</button>}</div>

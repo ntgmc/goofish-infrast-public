@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { OptimizeResult, UpgradeTrainingCost } from '../src/lib/types'
-import sampleResult from '../src/pages/v2/sample-result.json'
+import sampleResult from '../src/pages/v2/test-fixtures/sample-252-result.json'
 import { buildScheduleExplanationSummary, generateScheduleExplanation } from './schedule-explanation'
 import { aiConfigurationIssues, aiSettingsSchema, DEFAULT_AI_SETTINGS } from '../src/lib/ai-settings'
 

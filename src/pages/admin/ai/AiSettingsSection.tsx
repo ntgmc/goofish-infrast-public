@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { copy } from '../../../copy'
 import { AI_CREDIT_SERVICES } from '../../../lib/ai-credits'
+import { formatPoints } from '../../../lib/balance-contracts'
 import { AI_PROTOCOLS, adminAiSettingsUpdateSchema, aiConfigurationIssues, aiSettingsSchema, type AdminAiSettings, type AiSettings } from '../../../lib/ai-settings'
 import { adminApiJson } from '../../../lib/admin-api-client'
 import { useAdminDraftQuery } from '../../../lib/admin-draft-query'
@@ -30,7 +31,12 @@ export default function AiSettingsSection() {
   const [notice, setNotice] = useState<string | null>(null)
   const errorRef = useRef<HTMLDivElement>(null)
   const apply = useCallback((value: AdminAiSettings) => {
-    setData(value); setApiKey(''); setClearKey(false); setReason(''); setDirty(false); setIssues({}); setError(null)
+    const creditPrices = { ...value.settings.creditPrices }
+    for (const service of AI_CREDIT_SERVICES) {
+      const price = creditPrices[service]
+      if (price !== null) creditPrices[service] = formatPoints(price)
+    }
+    setData({ ...value, settings: { ...value.settings, creditPrices } }); setApiKey(''); setClearKey(false); setReason(''); setDirty(false); setIssues({}); setError(null)
   }, [])
   const client = useQueryClient()
   const query = useAdminDraftQuery('ai', '/api/admin/ai-settings', apply)

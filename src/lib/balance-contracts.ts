@@ -53,6 +53,10 @@ export function pointsToMinor(value: string): bigint {
   return BigInt(match[1]!) * 100n + BigInt((match[2] ?? '').padEnd(2, '0'))
 }
 
+export function formatPoints(value: string): string {
+  return value.includes('.') ? value.replace(/\.?0+$/, '') : value
+}
+
 export function normalizePointsAmount(value: unknown): string | null {
   if (typeof value !== 'string') return null
   const match = /^(0|[1-9]\d{0,6})(?:\.(\d{1,2}))?$/.exec(value)

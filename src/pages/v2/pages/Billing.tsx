@@ -1,5 +1,6 @@
 import { copy } from '../../../copy'
-import { useBalance, formatPoints } from '../../tool/dashboard/BalanceSection'
+import { useBalance } from '../../tool/dashboard/BalanceSection'
+import { formatPoints } from '../../../lib/balance-contracts'
 import { useCommercialProfiles } from '../../tool/dashboard/CommercialProfilesSection'
 import { AI_CREDIT_SERVICES } from '../../../lib/ai-credits'
 import { useInternalHref } from '../../../components/InternalLink'

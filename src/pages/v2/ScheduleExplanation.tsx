@@ -6,6 +6,7 @@ import { CloseIcon, GenerateIcon } from '../../components/icons'
 import { useInternalHref } from '../../components/InternalLink'
 import { Dialog, DialogClose, DialogContent, DialogTitle } from '../../components/ui/dialog'
 import { copy } from '../../copy'
+import { formatPoints } from '../../lib/balance-contracts'
 import { apiJson, apiStream } from '../../lib/api-client'
 import { readScheduleExplanationResponse, scheduleExplanationStateSchema } from '../../lib/schedule-explanation'
 import type { OptimizeResult } from '../../lib/types'
@@ -83,9 +84,9 @@ function PersonalExplanation({ userId, profileId, resultId, generationEnabled, p
       {draft && <ExplanationMarkdown revealed={revealed}>{draft}</ExplanationMarkdown>}
       {!pending && <>
         <div className="v2-explanation-heading"><p>{text.description}</p>
-          {available && <button className="v2-explanation-generate" type="button" onClick={() => mutation.mutate()}><GenerateIcon size={16} aria-hidden="true" />{state && state.credits.charge !== '0.00' ? copy.balance.paid_action(text.generate, state.credits.charge) : text.generate}</button>}
+          {available && <button className="v2-explanation-generate" type="button" onClick={() => mutation.mutate()}><GenerateIcon size={16} aria-hidden="true" />{state && state.credits.charge !== '0.00' ? copy.balance.paid_action(text.generate, formatPoints(state.credits.charge)) : text.generate}</button>}
         </div>
-        {state && <div className="v2-explanation-notes">{state.credits.price && <p>{copy.balance.cost(state.credits.charge, state.credits.available)}</p>}
+        {state && <div className="v2-explanation-notes">{state.credits.price && <p>{copy.balance.cost(formatPoints(state.credits.charge), formatPoints(state.credits.available))}</p>}
           {available && state.provider && <p>{text.disclosure(state.provider)}</p>}
           {(reason === 'balance' || reason === 'debt' || reason === 'pricing_changed') && <button type="button" className="v2-text-button" onClick={() => void query.refetch({ cancelRefetch: false })}>{text.retry}</button>}
           {(reason === 'balance' || reason === 'debt') && <a className="v2-text-button" href={resolveHref('/tool/balance')}>{copy.balance.go_to_points}</a>}</div>}

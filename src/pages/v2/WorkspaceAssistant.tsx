@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { GenerateIcon } from '../../components/icons'
 import { useInternalHref } from '../../components/InternalLink'
 import { copy } from '../../copy'
+import { formatPoints } from '../../lib/balance-contracts'
 import { askWorkspaceAssistant, readWorkspaceAssistant } from '../../lib/workspace-assistant-client'
 import { useSiteFeatures } from '../../lib/site-feature-context'
 import { WORKSPACE_ASSISTANT_FEATURES } from '../../lib/site-features'
@@ -89,9 +90,9 @@ function AssistantPanel({ task, title, userId, profileId, description, example, 
         <div id={id} className="v2-workspace-assistant-status" aria-live="polite">
           {availability.isLoading && text.loading}
           {availability.isError && <>{text.failed} <button type="button" className="v2-text-button" onClick={() => void availability.refetch()}>{copy.v2.retry}</button></>}
-          {state && <>{state.credits.price && <p>{copy.balance.cost(state.credits.charge, state.credits.available)}</p>}{state.available && state.provider && <p>{text.disclosure(state.provider)}</p>}{state.reason && <p>{text.unavailable[state.reason]}{(state.reason === 'busy' || state.reason === 'pricing_changed' || state.reason === 'balance' || state.reason === 'debt') && <button type="button" className="v2-text-button" onClick={() => void availability.refetch()}>{copy.v2.retry}</button>}{(state.reason === 'balance' || state.reason === 'debt') && <a className="v2-text-button" href={resolveHref('/tool/balance')}>{copy.balance.go_to_points}</a>}</p>}</>}
+          {state && <>{state.credits.price && <p>{copy.balance.cost(formatPoints(state.credits.charge), formatPoints(state.credits.available))}</p>}{state.available && state.provider && <p>{text.disclosure(state.provider)}</p>}{state.reason && <p>{text.unavailable[state.reason]}{(state.reason === 'busy' || state.reason === 'pricing_changed' || state.reason === 'balance' || state.reason === 'debt') && <button type="button" className="v2-text-button" onClick={() => void availability.refetch()}>{copy.v2.retry}</button>}{(state.reason === 'balance' || state.reason === 'debt') && <a className="v2-text-button" href={resolveHref('/tool/balance')}>{copy.balance.go_to_points}</a>}</p>}</>}
         </div>
-        <button type="submit" className="v2-button v2-button-secondary" disabled={disabled || busy || !input || !state?.available || availability.isError} aria-busy={busy}>{busy ? text.asking : state && state.credits.charge !== '0.00' ? copy.balance.paid_action(fixedQuestion ? text.summarize : text.ask, state.credits.charge) : fixedQuestion ? text.summarize : text.ask}</button>
+        <button type="submit" className="v2-button v2-button-secondary" disabled={disabled || busy || !input || !state?.available || availability.isError} aria-busy={busy}>{busy ? text.asking : state && state.credits.charge !== '0.00' ? copy.balance.paid_action(fixedQuestion ? text.summarize : text.ask, formatPoints(state.credits.charge)) : fixedQuestion ? text.summarize : text.ask}</button>
       </form>
       <Notice error>{error}</Notice>
       {reply && <div className="v2-workspace-assistant-result" aria-live="polite">{renderReply(reply)}</div>}

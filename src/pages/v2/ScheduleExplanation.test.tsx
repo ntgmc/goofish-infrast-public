@@ -18,7 +18,7 @@ vi.mock('../../lib/api-client', async (original) => ({ ...await original<object>
   },
 }))
 const text = copy.scheduleExplanation
-const generateLabel = copy.balance.paid_action(text.generate, '1.50')
+const generateLabel = copy.balance.paid_action(text.generate, '1.5')
 const paragraph = (value: string) => (_text: string, element: Element | null) => element?.tagName === 'P' && element.textContent === value
 const report: OptimizeResult = { author: 'test', title: 'test', description: '', buildingType: 243, planTimes: '', plans: [], raw_results: [],
   daily_production: { trading: { LMD: 50000 }, manufacturing: { 'Battle Record': 30 } } }
@@ -71,7 +71,7 @@ it('shows the point cost before sending the accepted maximum and refreshes the w
   mounted.client.setQueryData(walletKey, { available: '5.00' })
   fireEvent.click(screen.getByRole('button', { name: text.title }))
   const button = await screen.findByRole('button', { name: generateLabel })
-  expect(screen.getByText(copy.balance.cost('1.50', '5.00'))).toBeVisible()
+  expect(screen.getByText(copy.balance.cost('1.5', '5'))).toBeVisible()
   fireEvent.click(button)
   expect(await screen.findByText(paragraph('第一段解读。'))).toBeVisible()
   expect(mocks.api).toHaveBeenCalledWith('/api/user/schedule-explanation', expect.objectContaining({ json: {
