@@ -46,9 +46,9 @@ export function BuildingRatingCard({ entry, roster, active, onOpen }: { entry: B
   const state = member ? ratingMemberStatus(member, roster) : null
   const owned = combo ? entry.variants.some((variant) => ratingVariantStatus(variant, roster, null).membersOwned) : state !== 'missing'
   return <motion.article id={`rating-${entry.id}`} className="v2-rating-card" data-owned={roster ? owned : undefined}
-    layoutId={reduced ? undefined : `rating-card-${entry.id}`} layoutDependency={active} style={{ borderRadius: 6 }} transition={motionTokens.morph}>
-    <button type="button" className="v2-rating-card-trigger" aria-haspopup="dialog" aria-label={text.openDetails(combo ? entry.title : entry.name)}
-      onClick={(event) => onOpen(event.currentTarget.parentElement!)} />
+    layoutId={reduced ? undefined : `rating-card-${entry.id}`} layoutDependency={active} style={{ borderRadius: 6 }} transition={motionTokens.morph}
+    onClick={(event) => onOpen(event.currentTarget)}>
+    <button type="button" className="v2-rating-card-trigger" aria-haspopup="dialog" aria-label={text.openDetails(combo ? entry.title : entry.name)} />
     <RatingIdentity entry={entry} />
     <div className="v2-rating-card-meta">
       {combo ? entry.variants.length > 1 && <span>{text.variants(entry.variants.length)}</span> : <span>{copy.domain.building_skills.unlock(entry.stage.elite, entry.stage.level)}</span>}
