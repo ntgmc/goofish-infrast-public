@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigationType, useSearchParams } from 'react-router'
 import { LayoutGroup } from 'motion/react'
 import { copy } from '../../../copy'
@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } 
 import { authPath } from '../../../lib/auth-navigation'
 import { BUILDING_RATING_GRADES, buildingRatingCharacter, buildingRatingCombos, buildingRatingCoverage, buildingRatingEdition, buildingRatingGrade, buildingRatingRoster, buildingRatingSkill, comboBuildingRatingRange, ratingMemberStatus, ratingVariantStatus, singleBuildingRatings, type RatingCombo, type RatingMember, type RatingVariant, type SingleBuildingRating } from '../../../lib/building-skill-ratings'
 import type { V2Session } from '../OptionsDrawer'
-import { BuildingRatingCard, BuildingRatingDialog, type BuildingRatingEntry } from '../BuildingRatingCards'
+import { BuildingRatingGrid, BuildingRatingDialog, type BuildingRatingEntry } from '../BuildingRatingCards'
 import { v2Path } from '../navigation'
 import '../building-ratings.css'
 
@@ -50,13 +50,17 @@ export default function BuildingRatings({ session }: { session: V2Session }) {
     setLimit(60)
     void setParams(next, { replace: key === 'q', state: { preservePagePosition: true } })
   }
-  const matchesVariant = (entry: RatingCombo, variant: RatingVariant) => {
+  const matchesVariant = useCallback((entry: RatingCombo, variant: RatingVariant) => {
     const match = ratingVariantStatus(variant, roster, config)
     const search = `${entry.title} ${variant.members.map((item) => buildingRatingCharacter(item.id).name).join(' ')}`.toLocaleLowerCase('zh-CN')
     return (!query || search.includes(query)) && (!grade || buildingRatingGrade(variant.score) === grade)
       && (!own || own === 'owned' && match.membersOwned === true || own === 'ready' && match.state === 'ready')
-  }
-  const entries = source.filter((entry) => {
+  }, [roster, config, query, grade, own])
+  const openDetails = useCallback((entry: BuildingRatingEntry, source: HTMLElement) => {
+    sourceCard.current = source
+    setSelected({ entry, variant: 'variants' in entry ? Math.max(0, entry.variants.findIndex((variant) => matchesVariant(entry, variant))) : 0 })
+  }, [matchesVariant])
+  const entries = useMemo(() => source.filter((entry) => {
     const entryUsage = 'stage' in entry ? entry.stage.assessment.usage : entry.usage
     if (room && entry.room !== room || usage && entryUsage !== usage) return false
     if ('variants' in entry) return entry.variants.some((variant) => matchesVariant(entry, variant))
@@ -64,12 +68,16 @@ export default function BuildingRatings({ session }: { session: V2Session }) {
     return (!query || `${entry.name} ${entry.stage.skills.map((id) => buildingRatingSkill(id).name).join(' ')}`.toLocaleLowerCase('zh-CN').includes(query))
       && (!grade || buildingRatingGrade(entry.stage.assessment.score!) === grade)
       && (!own || own === 'owned' && Boolean(roster?.get(entry.operatorId)?.own) || own === 'ready' && state === 'ready')
-  }).sort((a, b) => rooms.indexOf(a.room) - rooms.indexOf(b.room) || score(b) - score(a) || a.id.localeCompare(b.id))
-  const groups = new Map<string, (SingleBuildingRating | RatingCombo)[]>()
-  for (const entry of entries.slice(0, limit)) {
-    const key = ROOM_LABELS[entry.room] ?? entry.room
-    groups.set(key, [...groups.get(key) ?? [], entry])
-  }
+  }).sort((a, b) => rooms.indexOf(a.room) - rooms.indexOf(b.room) || score(b) - score(a) || a.id.localeCompare(b.id)), [source, room, usage, matchesVariant, roster, query, grade, own])
+  const groups = useMemo(() => {
+    const grouped = new Map<string, BuildingRatingEntry[]>()
+    for (const entry of entries.slice(0, limit)) {
+      const key = ROOM_LABELS[entry.room] ?? entry.room
+      const items = grouped.get(key)
+      if (items) items.push(entry); else grouped.set(key, [entry])
+    }
+    return grouped
+  }, [entries, limit])
   const reset = () => { setSearchText(''); const next = new URLSearchParams(); next.set('section', 'building-ratings'); if (profileId) next.set('profile_id', profileId); next.set('kind', pendingParams.current.get('kind') ?? kind); pendingParams.current = next; setLimit(60); void setParams(next, { state: { preservePagePosition: true } }) }
   return <LayoutGroup id={filterId}><div className="v2-ratings">
     <Tabs.Root value={kind} onValueChange={(value) => update('kind', value)}>
@@ -94,10 +102,7 @@ export default function BuildingRatings({ session }: { session: V2Session }) {
       {session.authStatus === 'authenticated' && !roster && <p className="v2-rating-roster-note">{text.noRoster} <Link className="v2-text-button" to={v2Path('profiles', profileId)}>{text.profileEntry}</Link></p>}
       <Tabs.Content value={kind} className="v2-rating-results">
         {!entries.length && <p className="v2-rating-empty">{text.empty}</p>}
-        {[...groups].map(([label, items]) => <section className="v2-rating-group" key={label}><h2>{label}</h2><div className="v2-rating-grid">{items.map((entry) => <BuildingRatingCard key={entry.id} entry={entry} roster={roster} active={selected?.entry.id === entry.id} onOpen={(source) => {
-          sourceCard.current = source
-          setSelected({ entry, variant: 'variants' in entry ? Math.max(0, entry.variants.findIndex((variant) => matchesVariant(entry, variant))) : 0 })
-        }} />)}</div></section>)}
+        {[...groups].map(([label, items]) => <section className="v2-rating-group" key={label}><h2>{label}</h2><BuildingRatingGrid items={items} roster={roster} activeId={selected?.entry.id} onOpen={openDetails} /></section>)}
         {entries.length > limit && <button type="button" className="v2-button v2-button-secondary v2-rating-more" onClick={() => setLimit((value) => value + 60)}>{text.more(entries.length - limit)}</button>}
       </Tabs.Content>
     </Tabs.Root>

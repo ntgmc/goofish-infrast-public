@@ -23,6 +23,8 @@
 .v2-rating-group > h2 { display: flex; align-items: center; gap: var(--space-sm); font-size: var(--text-sm); margin-bottom: var(--space-xs); color: var(--v2-secondary); }
 .v2-rating-group > h2::after { content: ''; height: 1px; flex: 1; background: var(--v2-line); }
 .v2-rating-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 6rem), 1fr)); gap: var(--space-sm) var(--space-xs); }
+.v2-rating-virtual-grid { position: relative; display: block; }
+.v2-rating-virtual-row { position: absolute; inset: 0 0 auto; padding-bottom: var(--space-sm); }
 .v2-rating-card { position: relative; display: grid; grid-template-rows: auto 1fr auto; gap: var(--space-2xs); min-width: 0; text-align: center; }
 .v2-rating-artwork:hover { outline: 2px solid var(--v2-accent); outline-offset: 2px; }
 .v2-rating-identity > strong:hover,

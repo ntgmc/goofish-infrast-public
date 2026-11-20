@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { createMemoryRouter, MemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, expect, it, vi } from 'vitest'
 import userEvent from '@testing-library/user-event'
-import { buildingRatingCharacter, buildingRatingCombos } from '../../../lib/building-skill-ratings'
+import { buildingRatingCharacter, buildingRatingCombos, singleBuildingRatings } from '../../../lib/building-skill-ratings'
 import { CONFIG_PRESETS } from '../../../lib/config'
 import RouteLifecycle from '../../../components/RouteLifecycle'
 import type { V2Session } from '../OptionsDrawer'
@@ -16,7 +16,7 @@ const session = {
   workspace: { operators, config: { ...CONFIG_PRESETS['243'], trading_station_levels: [3, 3] } },
 } as unknown as V2Session
 
-afterEach(() => { cleanup(); vi.restoreAllMocks() })
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
 it('keeps typing focused without scrolling when search updates the route', async () => {
   vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => { callback(0); return 1 })
@@ -66,6 +66,64 @@ it('renders the matched package and retains the profile on a related-combination
   render(<MemoryRouter initialEntries={['/v2?section=building-ratings&profile_id=profile&q=明椒']}><BuildingRatings session={session} /></MemoryRouter>)
   await userEvent.click(screen.getByRole('button', { name: '查看明椒的评级详情' }))
   expect(screen.getByRole('link', { name: '巫恋大单组' })).toHaveAttribute('href', expect.stringContaining('profile_id=profile'))
+})
+
+it('limits mounted rows and retains focused cards across scrolling and facility visibility changes', async () => {
+  vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
+  let visibility: IntersectionObserverCallback
+  vi.stubGlobal('IntersectionObserver', class { constructor(callback: IntersectionObserverCallback) { visibility = callback } observe() {} unobserve() {} disconnect() {} })
+  vi.stubGlobal('scrollY', 0)
+  vi.stubGlobal('innerHeight', 600)
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(400)
+  vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(240)
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    const top = this.classList.contains('v2-rating-grid') ? 200 + Number(this.dataset.index ?? 0) * 240 - window.scrollY : 0
+    return new DOMRect(0, top, 400, 240)
+  })
+  const user = userEvent.setup()
+  const page = render(<MemoryRouter initialEntries={['/v2?section=building-ratings&kind=single&room=manufacture']}><BuildingRatings session={session} /></MemoryRouter>)
+  while (page.container.querySelector('.v2-rating-more')) fireEvent.click(page.container.querySelector('.v2-rating-more')!)
+  const list = screen.getByRole('list')
+  const total = singleBuildingRatings.filter((entry) => entry.room === 'manufacture').length
+  expect(within(list).getAllByRole('listitem').length).toBeLessThan(40)
+  const first = list.querySelector('[aria-posinset="1"]')!
+  expect(first).toHaveAttribute('aria-setsize', String(total))
+  const trigger = within(first as HTMLElement).getByRole('button')
+  act(() => trigger.focus())
+  const scroll = (top: number) => { vi.stubGlobal('scrollY', top); fireEvent.scroll(window) }
+  scroll(parseFloat(list.style.height) - 300)
+  await waitFor(() => expect(list.querySelector(`[aria-posinset="${total}"]`)).toBeInTheDocument())
+  expect(trigger).toHaveFocus()
+  expect(within(list).getAllByRole('listitem').length).toBeLessThan(40)
+  await user.tab()
+  expect(within(list.querySelector('[aria-posinset="2"]') as HTMLElement).getByRole('button')).toHaveFocus()
+  act(() => (document.activeElement as HTMLElement).blur())
+  await waitFor(() => expect(list.querySelector('[aria-posinset="1"]')).not.toBeInTheDocument())
+  scroll(0)
+  await waitFor(() => expect(list.querySelector('[aria-posinset="1"]')).toBeInTheDocument())
+  act(() => visibility([{ isIntersecting: false } as IntersectionObserverEntry], {} as IntersectionObserver))
+  expect(within(list).queryAllByRole('listitem')).toHaveLength(0)
+  act(() => visibility([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver))
+  expect(list.querySelector('[aria-posinset="1"]')).toBeInTheDocument()
+})
+
+it('keeps every loaded result and restores focus when opening the last card and then another card', async () => {
+  const user = userEvent.setup()
+  const page = render(<MemoryRouter initialEntries={['/v2?section=building-ratings&kind=single']}><BuildingRatings session={session} /></MemoryRouter>)
+  while (page.container.querySelector('.v2-rating-more')) fireEvent.click(page.container.querySelector('.v2-rating-more')!)
+  const cards = page.container.querySelectorAll('.v2-rating-card')
+  expect(cards).toHaveLength(singleBuildingRatings.length)
+  for (const card of [cards[cards.length - 1], cards[0]]) {
+    const trigger = within(card as HTMLElement).getByRole('button')
+    trigger.focus()
+    await user.keyboard('{Enter}')
+    expect(screen.getByRole('dialog')).toHaveAccessibleName(card.querySelector('.v2-rating-identity > strong')!.textContent!)
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(trigger).toHaveFocus()
+    expect(page.container.querySelectorAll('.v2-rating-card')).toHaveLength(singleBuildingRatings.length)
+    expect(card).not.toHaveAttribute('data-shared-card-open')
+  }
 })
 
 it('opens the matching variant and releases the modal before another card is opened', async () => {
