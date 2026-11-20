@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import CultivationProjectImport from '../../components/CultivationProjectImport'
 import { copy } from '../../copy'
+import { ConfigIcon } from '../../components/icons'
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger, DialogClose } from '../../components/ui/dialog'
 import { matchesSearch } from '../../lib/search'
 import { useSiteFeatures } from '../../lib/site-feature-context'
 import type { CultivationProject } from '../../lib/cultivation-projects'
@@ -33,20 +35,36 @@ function Advisor({ scope, rows, title = text.cultivation, description = text.cul
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<string[]>(() => rows.slice(0, 3).map((row) => row.id))
   const chosen = rows.filter((row) => selected.includes(row.id)).slice(0, 8).map((row, index) => ({ ...row, key: `candidate-${index + 1}` }))
-  const visible = rows.filter((row) => matchesSearch(row.title, search) || selected.includes(row.id)).slice(0, Math.max(12, selected.length))
+  const visible = rows.filter((row) => matchesSearch(row.title, search))
   const signature = JSON.stringify(chosen.map(({ id, title, facts }) => [id, title, facts]))
   if (!rows.length) return null
   return <WorkspaceAssistant task="cultivation" revision={signature} title={title} userId={scope.userId} profileId={scope.profileId} description={description} example={text.cultivationExample} disabled={!chosen.length}
-      renderControls={(busy) => <details className="v2-disclosure"><summary>{text.cultivationCandidates} · {chosen.length}</summary>
-        <Field label={copy.tools.cultivation.search} type="search" value={search} onChange={(event) => setSearch(event.currentTarget.value)} />
-        {!visible.length && <p>{copy.tools.cultivation.noMatches}</p>}
-        <div className="v2-choice-list">{visible.map((row) => <label key={row.id}><input type="checkbox" checked={selected.includes(row.id)} disabled={busy || (chosen.length >= 8 && !selected.includes(row.id))} onChange={(event) => { const checked = event.currentTarget.checked; setSelected((previous) => checked ? [...previous, row.id] : previous.filter((id) => id !== row.id)) }} /><span>{row.title}</span></label>)}</div>
-      </details>}
+      renderControls={(busy) => <div className="v2-advisor-selection">
+        <div className="v2-advisor-selection-heading"><strong>{text.cultivationSelected(chosen.length)}</strong>
+          <Dialog onOpenChange={(open) => { if (open) setSearch('') }}>
+            <DialogTrigger className="v2-button v2-button-secondary" disabled={busy}><ConfigIcon size={15} aria-hidden="true" />{text.cultivationEdit}</DialogTrigger>
+            <DialogContent className="v2-dialog v2-advisor-picker" showCloseButton closeLabel={copy.v2.close}>
+              <DialogTitle>{text.cultivationCandidates}</DialogTitle>
+              <DialogDescription aria-live="polite">{text.cultivationSelected(chosen.length)}</DialogDescription>
+              <Field label={copy.tools.cultivation.search} type="search" value={search} onChange={(event) => setSearch(event.currentTarget.value)} />
+              <div className="v2-advisor-options">
+                {!visible.length && <p className="v2-muted">{copy.tools.cultivation.noMatches}</p>}
+                {visible.map((row) => <label key={row.id}><input type="checkbox" checked={selected.includes(row.id)} disabled={busy || (chosen.length >= 8 && !selected.includes(row.id))} onChange={(event) => {
+                  const checked = event.currentTarget.checked
+                  setSelected((previous) => checked ? [...previous, row.id] : previous.filter((id) => id !== row.id))
+                }} /><span>{row.title}</span></label>)}
+              </div>
+              <div className="v2-advisor-picker-footer"><DialogClose className="v2-button v2-button-primary">{text.cultivationDone}</DialogClose></div>
+            </DialogContent>
+          </Dialog>
+        </div>
+        {chosen.length ? <ul className="v2-advisor-selected">{chosen.map((row) => <li key={row.id}>{row.title}</li>)}</ul> : <p className="v2-muted">{text.cultivationEmpty}</p>}
+      </div>}
       buildRequest={(question) => ({ task: 'cultivation', profile_id: scope.profileId, question, candidates: chosen.map(({ key, title, facts }) => ({ key, title, facts })) })}
-      renderReply={(reply) => 'keys' in reply && reply.keys.length ? <ol>{reply.keys.map((key) => {
+      renderReply={(reply) => 'keys' in reply && reply.keys.length ? <><h3>{text.cultivationResults}</h3><ol className="v2-advisor-results">{reply.keys.map((key) => {
         const row = chosen.find((candidate) => candidate.key === key)
         if (!row) return null
         return <li key={row.id}><strong>{row.title}</strong><ul>{row.facts.map((fact) => <li key={fact}>{fact}</li>)}</ul>
           {row.projects?.length ? <CultivationProjectImport key={row.id} scope={scope} projects={row.projects} partial={row.partial} v2 /> : null}</li>
-      })}</ol> : <Notice>{text.noCandidate}</Notice>} />
+      })}</ol></> : <Notice>{text.noCandidate}</Notice>} />
 }

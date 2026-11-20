@@ -26,8 +26,7 @@ export default function ScheduleExplanation({ userId, profileId, resultId, sampl
   const pause = pauseNotices?.ai_schedule_explanation
   if (sample) return <ExplanationWindow sample>
     {pause && <p className="v2-explanation-status">{pause}</p>}
-    <div className="v2-explanation-body"><h3>{text.sampleTitle}</h3>
-      <p>{text.sample((result.daily_production?.trading?.LMD ?? 0).toLocaleString('zh-CN'),
+    <div className="v2-explanation-body"><p>{text.sample((result.daily_production?.trading?.LMD ?? 0).toLocaleString('zh-CN'),
         ((result.daily_production?.manufacturing?.['Battle Record'] ?? 0) * 1000).toLocaleString('zh-CN'))}</p></div>
     <p className="v2-explanation-note">{text.sampleAction}</p>
   </ExplanationWindow>
@@ -83,13 +82,18 @@ function PersonalExplanation({ userId, profileId, resultId, generationEnabled, p
         {query.isPending ? text.loading : pending ? draft ? text.streaming : text.pending : reason ? text.reason[reason] : ''}</p>}
       {draft && <ExplanationMarkdown revealed={revealed}>{draft}</ExplanationMarkdown>}
       {!pending && <>
-        <div className="v2-explanation-heading"><p>{text.description}</p>
-          {available && <button className="v2-explanation-generate" type="button" onClick={() => mutation.mutate()}><GenerateIcon size={16} aria-hidden="true" />{state && state.credits.charge !== '0.00' ? copy.balance.paid_action(text.generate, formatPoints(state.credits.charge)) : text.generate}</button>}
-        </div>
-        {state && <div className="v2-explanation-notes">{state.credits.price && <p>{copy.balance.cost(formatPoints(state.credits.charge), formatPoints(state.credits.available))}</p>}
-          {available && state.provider && <p>{text.disclosure(state.provider)}</p>}
-          {(reason === 'balance' || reason === 'debt' || reason === 'pricing_changed') && <button type="button" className="v2-text-button" onClick={() => void query.refetch({ cancelRefetch: false })}>{text.retry}</button>}
-          {(reason === 'balance' || reason === 'debt') && <a className="v2-text-button" href={resolveHref('/tool/balance')}>{copy.balance.go_to_points}</a>}</div>}
+        <p className="v2-explanation-intro">{text.description}</p>
+        {state && <div className="v2-explanation-controls">
+          <div className="v2-explanation-action">
+            {state.credits.price && <p>{copy.v2.workspaceAssistant.pointsAvailable(formatPoints(state.credits.available))}</p>}
+            {available && <button className="v2-explanation-generate" type="button" onClick={() => mutation.mutate()}><GenerateIcon size={16} aria-hidden="true" />{state.credits.charge !== '0.00' ? copy.balance.paid_action(text.generate, formatPoints(state.credits.charge)) : text.generate}</button>}
+          </div>
+          {available && state.provider && <p className="v2-explanation-note">{text.disclosure(state.provider)}</p>}
+          {(reason === 'balance' || reason === 'debt' || reason === 'pricing_changed') && <div className="v2-explanation-recovery">
+            <button type="button" className="v2-text-button" onClick={() => void query.refetch({ cancelRefetch: false })}>{text.retry}</button>
+            {(reason === 'balance' || reason === 'debt') && <a className="v2-text-button" href={resolveHref('/tool/balance')}>{copy.balance.go_to_points}</a>}
+          </div>}
+        </div>}
       </>}
     </>}
     {error && <div role="alert" className="v2-explanation-error"><p>{error.message}</p><button type="button" className="v2-text-button" onClick={() => { mutation.reset(); void query.refetch({ cancelRefetch: false }) }}>{text.retry}</button></div>}

@@ -71,7 +71,7 @@ it('shows the point cost before sending the accepted maximum and refreshes the w
   mounted.client.setQueryData(walletKey, { available: '5.00' })
   fireEvent.click(screen.getByRole('button', { name: text.title }))
   const button = await screen.findByRole('button', { name: generateLabel })
-  expect(screen.getByText(copy.balance.cost('1.5', '5'))).toBeVisible()
+  expect(screen.getByText(copy.v2.workspaceAssistant.pointsAvailable('5'))).toBeVisible()
   fireEvent.click(button)
   expect(await screen.findByText(paragraph('第一段解读。'))).toBeVisible()
   expect(mocks.api).toHaveBeenCalledWith('/api/user/schedule-explanation', expect.objectContaining({ json: {
@@ -246,7 +246,7 @@ it('opens the public sample in the same window without requesting an AI explanat
   expect(screen.queryByText(text.sampleAction)).not.toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: text.title }))
   expect(screen.getByRole('dialog', { name: text.title })).toBeVisible()
-  expect(screen.getByRole('heading', { name: text.sampleTitle })).toBeVisible()
+  expect(screen.getByText(text.sampleTitle, { exact: true })).toBeVisible()
   expect(mocks.api).not.toHaveBeenCalled()
 })
 

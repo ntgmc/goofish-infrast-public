@@ -30,6 +30,7 @@ export default function Skland({ session, onOpenProfile, onProfiles, onConfig }:
   const { features } = useSiteFeatures()
   const [tab, setTab] = useState('overview')
   const [binding, setBinding] = useState(false)
+  const [changesOpen, setChangesOpen] = useState(false)
   const profile = session.activeProfile
   const snapshot = useSklandSnapshot(session.user?.id, profile, true, 'live')
   const data = snapshot.data
@@ -78,8 +79,8 @@ export default function Skland({ session, onOpenProfile, onProfiles, onConfig }:
       <p className="mt-4 text-sm leading-6 text-ink-secondary">{text.snapshotHelp}</p>
       {profile?.skland_binding && <p className="mt-2 text-sm text-ink-muted">UID {profile.skland_binding.uid}</p>}
     </section>
-    {refreshed && data && profile && session.user && <details className="v2-disclosure"><summary>{copy.v2.workspaceAssistant.changes}</summary>
-      {changes ? <AccountChanges userId={session.user.id} profileId={profile.id} changes={changes}>
+    {refreshed && data && profile && session.user && <details className="v2-disclosure" onToggle={(event) => setChangesOpen(event.currentTarget.open)}><summary>{copy.v2.workspaceAssistant.changes}</summary>
+      {changes ? <AccountChanges userId={session.user.id} profileId={profile.id} changes={changes} visible={changesOpen}>
         {features.cultivation_projects && changes.length > 0 && <p className="v2-muted">{copy.v2.workspaceAssistant.gameNext} <Link className="v2-text-button" to={v2Path('cultivation-projects', profile.id)}>{copy.cultivationProjects.openProjects}</Link></p>}
       </AccountChanges> : <p className="v2-muted">{copy.v2.workspaceAssistant.changesMissing}</p>}
     </details>}
