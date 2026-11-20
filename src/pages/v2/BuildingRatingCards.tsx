@@ -51,7 +51,7 @@ export function BuildingRatingCard({ entry, roster, active, onOpen }: { entry: B
       onClick={(event) => onOpen(event.currentTarget.parentElement!)} />
     <RatingIdentity entry={entry} />
     <div className="v2-rating-card-meta">
-      <span>{combo ? text.variants(entry.variants.length) : copy.domain.building_skills.unlock(entry.stage.elite, entry.stage.level)}</span>
+      {combo ? entry.variants.length > 1 && <span>{text.variants(entry.variants.length)}</span> : <span>{copy.domain.building_skills.unlock(entry.stage.elite, entry.stage.level)}</span>}
       {roster && <span className="v2-rating-state" data-state={state ?? (owned ? 'ready' : 'missing')}>{combo ? owned ? text.membersOwned : text.membersMissing : text.memberStates[state!]}</span>}
     </div>
   </motion.article>
@@ -64,13 +64,13 @@ export function BuildingRatingDialog({ entry, initialVariant, source, roster, co
   const combo = 'variants' in entry
   return <SharedCardDialog layoutId={`rating-card-${entry.id}`} source={source} onClose={onClose} closeLabel={copy.v2.close} className="v2-rating-dialog">
     <header className="v2-rating-dialog-heading"><RatingIdentity entry={entry} detail variant={combo ? entry.variants[variantIndex] : undefined} />
-      <DialogDescription className="v2-rating-dialog-description">{ROOM_LABELS[entry.room] ?? entry.room} · {combo ? text.variants(entry.variants.length) : `${text.minimum} · ${copy.domain.building_skills.unlock(entry.stage.elite, entry.stage.level)}`}</DialogDescription>
+      <DialogDescription className="v2-rating-dialog-description">{ROOM_LABELS[entry.room] ?? entry.room}{combo ? entry.variants.length > 1 && ` · ${text.variants(entry.variants.length)}` : ` · ${text.minimum} · ${copy.domain.building_skills.unlock(entry.stage.elite, entry.stage.level)}`}</DialogDescription>
     </header>
     {combo ? <div className="v2-rating-dialog-body">
-      <label className="v2-field v2-rating-variant-picker"><span>{text.chooseVariant}</span><select className="v2-input" value={variantIndex} onChange={(event) => setVariantIndex(Number(event.target.value))}>
+      {entry.variants.length > 1 && <label className="v2-field v2-rating-variant-picker"><span>{text.chooseVariant}</span><select className="v2-input" value={variantIndex} onChange={(event) => setVariantIndex(Number(event.target.value))}>
         {entry.variants.map((variant, index) => <option key={index} value={index}>{text.variantOption(index, variant.score, variant.members.filter((member) => member.room === entry.room).map((member) => buildingRatingCharacter(member.id).name).join(' / '))}</option>)}
-      </select></label>
-      <RatingVariantDetails variant={entry.variants[variantIndex]} index={variantIndex} roster={roster} config={config} />
-    </div> : <RatingStageDetails stages={entry.stages} member={{ id: entry.operatorId, room: entry.room, elite: entry.stage.elite, level: entry.stage.level, station: 'main' }} roster={roster} profileId={profileId} />}
+      </select></label>}
+      <RatingVariantDetails variant={entry.variants[variantIndex]} index={entry.variants.length > 1 ? variantIndex : undefined} roster={roster} config={config} />
+    </div> : <RatingStageDetails stages={entry.stages} member={{ id: entry.operatorId, room: entry.room, elite: entry.stage.elite, level: entry.stage.level, station: 'main' }} profileId={profileId} />}
   </SharedCardDialog>
 }

@@ -95,7 +95,6 @@
 .v2-rating-stages, .v2-rating-scenarios { display: grid; gap: var(--space-xs); list-style: none; padding: 0; }
 .v2-rating-stages > li, .v2-rating-scenarios > li { display: grid; grid-template-columns: 1fr auto; gap: var(--space-xs); border-bottom: 1px solid var(--v2-line); padding-block: var(--space-sm); align-items: center; }
 .v2-rating-stages p, .v2-rating-scenarios p { grid-column: 1 / -1; color: var(--v2-secondary); }
-.v2-rating-cost { display: grid; gap: var(--space-2xs); border-inline-start: 2px solid var(--v2-line); padding-inline-start: var(--space-sm); }
 .v2-rating-related { display: flex; flex-wrap: wrap; gap: var(--space-xs) var(--space-md); }
 .v2-rating-related a { min-height: 44px; display: inline-flex; align-items: center; }
 .v2-rating-variant { display: grid; gap: var(--space-sm); overflow-wrap: anywhere; }

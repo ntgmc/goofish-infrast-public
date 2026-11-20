@@ -2,13 +2,12 @@ import { useId } from 'react'
 import { Link } from 'react-router'
 import { copy } from '../../copy'
 import { ROOM_LABELS } from '../../components/result-panel/labels'
-import { buildingRatingCharacter, buildingRatingGrade, buildingRatingSkill, buildingRatingTrainingCost, ratingMemberStatus, ratingVariantStatus, relatedBuildingCombos, type RatingMember, type RatingRoster, type RatingStage, type RatingVariant } from '../../lib/building-skill-ratings'
+import { buildingRatingCharacter, buildingRatingGrade, buildingRatingSkill, ratingMemberStatus, ratingVariantStatus, relatedBuildingCombos, type RatingMember, type RatingRoster, type RatingStage, type RatingVariant } from '../../lib/building-skill-ratings'
 import type { LicenseConfig } from '../../lib/types'
 import { v2Path } from './navigation'
 import { Avatar } from './ScheduleBoard'
 
 const text = copy.buildingRatings
-const number = (value: number) => value.toLocaleString('zh-CN')
 const unlock = copy.domain.building_skills.unlock
 const rankGlyphs: Record<string, string> = {
   S: 'M18 1H5L1 5V11L5 14H13V18H1V22H15L19 18V12L15 9H7V5H16Z',
@@ -39,19 +38,7 @@ export function RatingMemberView({ member, roster }: { member: RatingMember; ros
   </div></div>
 }
 
-function TrainingCost({ members, roster }: { members: RatingMember[]; roster: RatingRoster | null }) {
-  const costs = members.map((member) => buildingRatingTrainingCost(member, roster))
-  const complete = costs.every((cost) => cost !== null)
-  const lmd = costs.reduce((sum, cost) => sum + (cost?.lmd ?? 0), 0)
-  const exp = costs.reduce((sum, cost) => sum + (cost?.exp ?? 0), 0)
-  return <div className="v2-rating-cost"><strong>{text.cost}</strong>
-    {!complete ? <p>{roster && members.some((member) => ratingMemberStatus(member, roster) === 'missing') ? text.costMissing : text.costUnknown}</p>
-      : lmd || exp ? <p>{text.lmd} {number(lmd)} · {text.exp} {number(exp)}</p> : <p>{text.noCost}</p>}
-    <p className="v2-muted">{!roster && text.guestCost}{text.costScope}</p>
-  </div>
-}
-
-export function RatingStageDetails({ stages, member, roster, profileId }: { stages: RatingStage[]; member: RatingMember; roster: RatingRoster | null; profileId?: string }) {
+export function RatingStageDetails({ stages, member, profileId }: { stages: RatingStage[]; member: RatingMember; profileId?: string }) {
   const stage = stages[stages.length - 1]
   const assessment = stage.assessment
   const related = relatedBuildingCombos(member.id)
@@ -62,12 +49,11 @@ export function RatingStageDetails({ stages, member, roster, profileId }: { stag
     <RatingSkills ids={stage.skills} />
     {stages.length > 1 && <div><h3>{text.stages}</h3><ol className="v2-rating-stages">{stages.map((item) => <li key={`${item.elite}.${item.level}`}><span>{unlock(item.elite, item.level)}</span><RatingBadge score={item.assessment.score!} /><p>{item.assessment.reason}</p></li>)}</ol></div>}
     {assessment.scenarios?.length ? <div><h3>{text.scenarios}</h3><ul className="v2-rating-scenarios">{assessment.scenarios.map((scenario) => <li key={scenario.label}><span>{scenario.label}</span><RatingBadge score={scenario.score} /><p>{scenario.reason}</p></li>)}</ul></div> : null}
-    <TrainingCost members={[member]} roster={roster} />
     {related.length > 0 && <div><h3>{text.related}</h3><div className="v2-rating-related">{related.map((combo) => <Link className="v2-text-button" key={combo.id} to={`${v2Path('building-ratings', profileId)}&kind=combo&q=${encodeURIComponent(combo.title)}`}>{combo.title}</Link>)}</div></div>}
   </div>
 }
 
-export function RatingVariantDetails({ variant, index, roster, config }: { variant: RatingVariant; index: number; roster: RatingRoster | null; config: LicenseConfig | null }) {
+export function RatingVariantDetails({ variant, index, roster, config }: { variant: RatingVariant; index?: number; roster: RatingRoster | null; config: LicenseConfig | null }) {
   const match = ratingVariantStatus(variant, roster, config)
   const skillIds = variant.members.flatMap((member) => {
     const active = new Map<number, string>()
@@ -76,8 +62,8 @@ export function RatingVariantDetails({ variant, index, roster, config }: { varia
     }
     return [...active.values()].filter((id) => buildingRatingSkill(id).room === member.room)
   })
-  return <section className="v2-rating-variant" aria-label={text.variant(index)}>
-    <header><h3>{text.variant(index)}</h3><RatingBadge score={variant.score} />{variant.provisional && <span className="v2-rating-provisional">{text.provisional}</span>}</header>
+  return <section className="v2-rating-variant" aria-label={index === undefined ? undefined : text.variant(index)}>
+    {index !== undefined && <header><h3>{text.variant(index)}</h3><RatingBadge score={variant.score} />{variant.provisional && <span className="v2-rating-provisional">{text.provisional}</span>}</header>}
     <div className="v2-rating-members">{variant.members.map((member) => <RatingMemberView member={member} roster={roster} key={member.id} />)}</div>
     <p><strong>{text.reason}：</strong>{variant.reason}</p>
     {variant.conditions && <p><strong>{text.conditions}：</strong>{variant.conditions}</p>}
@@ -85,7 +71,6 @@ export function RatingVariantDetails({ variant, index, roster, config }: { varia
     {match.conditions.length > 0 && <ul className="v2-rating-conditions">{match.conditions.map((condition) => <li key={condition.key}>
       <span>{text.requirement[condition.key]}{typeof condition.required === 'number' && ` ${condition.required}`}</span><span data-state={condition.state}>{text.conditionStates[condition.state]}</span>
     </li>)}</ul>}
-    <TrainingCost members={variant.members} roster={roster} />
     <details className="v2-disclosure"><summary>{text.skills}</summary><RatingSkills ids={[...new Set(skillIds)]} /></details>
   </section>
 }

@@ -1,5 +1,5 @@
 {
-  "version": "2026-11-20.1",
+  "version": "2026-11-20.2",
   "evaluatedAt": "2026-11-20",
   "snapshot": {
     "game": "63c7cec73c3858d0ae913f85cc89af3cef4d744f",
@@ -10401,8 +10401,8 @@
       ]
     },
     {
-      "id": "lancet-support",
-      "title": "机器人充能配套",
+      "id": "robot-friston-kaltsit",
+      "title": "Friston-3与凯尔希",
       "room": "power",
       "usage": "无人机",
       "variants": [
@@ -10428,7 +10428,15 @@
           "conditions": "",
           "requirements": {},
           "provisional": true
-        },
+        }
+      ]
+    },
+    {
+      "id": "robot-phonor-logos",
+      "title": "PhonoR-0与逻各斯",
+      "room": "power",
+      "usage": "无人机",
+      "variants": [
         {
           "members": [
             {
@@ -10453,7 +10461,15 @@
             "trainingTask": true
           },
           "provisional": true
-        },
+        }
+      ]
+    },
+    {
+      "id": "robot-confess-enforcer",
+      "title": "CONFESS-47与空构",
+      "room": "power",
+      "usage": "无人机",
+      "variants": [
         {
           "members": [
             {
@@ -10478,7 +10494,15 @@
             "powerCount": 2
           },
           "provisional": true
-        },
+        }
+      ]
+    },
+    {
+      "id": "robot-gallus-lancet",
+      "title": "GALLUS²与Lancet-2",
+      "room": "power",
+      "usage": "无人机",
+      "variants": [
         {
           "members": [
             {
@@ -10503,7 +10527,15 @@
             "powerCount": 2
           },
           "provisional": true
-        },
+        }
+      ]
+    },
+    {
+      "id": "robot-aigis-makoto",
+      "title": "埃癸斯与结城理",
+      "room": "power",
+      "usage": "无人机",
+      "variants": [
         {
           "members": [
             {
@@ -12913,8 +12945,8 @@
       ]
     },
     {
-      "id": "tag-dorm",
-      "title": "小队与职业定向恢复",
+      "id": "dorm-reserve-yato",
+      "title": "隐秘队与火龙S黑角",
       "room": "dormitory",
       "usage": "定向恢复",
       "variants": [
@@ -12940,7 +12972,15 @@
           "conditions": "",
           "requirements": {},
           "provisional": true
-        },
+        }
+      ]
+    },
+    {
+      "id": "dorm-santalla-typhon",
+      "title": "寒檀与提丰",
+      "room": "dormitory",
+      "usage": "定向恢复",
+      "variants": [
         {
           "members": [
             {
@@ -12963,7 +13003,15 @@
           "conditions": "",
           "requirements": {},
           "provisional": true
-        },
+        }
+      ]
+    },
+    {
+      "id": "dorm-exusiai-mostima",
+      "title": "新约能天使与莫斯提马",
+      "room": "dormitory",
+      "usage": "定向恢复",
+      "variants": [
         {
           "members": [
             {
@@ -12986,7 +13034,15 @@
           "conditions": "",
           "requirements": {},
           "provisional": true
-        },
+        }
+      ]
+    },
+    {
+      "id": "dorm-eyja-medics",
+      "title": "纯烬艾雅法拉医疗恢复组",
+      "room": "dormitory",
+      "usage": "定向恢复",
+      "variants": [
         {
           "members": [
             {
@@ -13023,7 +13079,15 @@
           "conditions": "",
           "requirements": {},
           "provisional": true
-        },
+        }
+      ]
+    },
+    {
+      "id": "dorm-yu-sui",
+      "title": "余的岁干员恢复组",
+      "room": "dormitory",
+      "usage": "定向恢复",
+      "variants": [
         {
           "members": [
             {
@@ -13064,8 +13128,8 @@
       ]
     },
     {
-      "id": "meeting-pairs",
-      "title": "指定搭档线索组",
+      "id": "meeting-linshi-typhon",
+      "title": "凛视与提丰",
       "room": "meeting",
       "usage": "线索搜集",
       "variants": [
@@ -13095,6 +13159,37 @@
         {
           "members": [
             {
+              "id": "char_4102_threye",
+              "room": "meeting",
+              "elite": 0,
+              "level": 1,
+              "station": "main"
+            },
+            {
+              "id": "char_2012_typhon",
+              "room": "meeting",
+              "elite": 0,
+              "level": 1,
+              "station": "main"
+            }
+          ],
+          "score": 68,
+          "reason": "初始凛视与提丰同室达到25%速度，但额外消耗较高且尚无强化的补缺倾向。",
+          "conditions": "",
+          "requirements": {},
+          "provisional": true
+        }
+      ]
+    },
+    {
+      "id": "meeting-rendong-suzuran",
+      "title": "忍冬与铃兰",
+      "room": "meeting",
+      "usage": "线索搜集",
+      "variants": [
+        {
+          "members": [
+            {
               "id": "char_4026_vulpis",
               "room": "meeting",
               "elite": 2,
@@ -13114,7 +13209,15 @@
           "conditions": "忍冬在铃兰同室时获得额外30%。",
           "requirements": {},
           "provisional": true
-        },
+        }
+      ]
+    },
+    {
+      "id": "meeting-xunlan-franka",
+      "title": "寻澜与芙兰卡",
+      "room": "meeting",
+      "usage": "线索搜集",
+      "variants": [
         {
           "members": [
             {
@@ -13141,6 +13244,37 @@
         {
           "members": [
             {
+              "id": "char_4052_surfer",
+              "room": "meeting",
+              "elite": 0,
+              "level": 1,
+              "station": "main"
+            },
+            {
+              "id": "char_106_franka",
+              "room": "meeting",
+              "elite": 2,
+              "level": 1,
+              "station": "main"
+            }
+          ],
+          "score": 67,
+          "reason": "初始寻澜与黑钢同室达到25%速度，但有0.5额外心情消耗，低于强化30%且无额外消耗。",
+          "conditions": "",
+          "requirements": {},
+          "provisional": true
+        }
+      ]
+    },
+    {
+      "id": "meeting-olga-istina",
+      "title": "奥尔佳与真理",
+      "room": "meeting",
+      "usage": "线索搜集",
+      "variants": [
+        {
+          "members": [
+            {
               "id": "char_4245_alga",
               "room": "meeting",
               "elite": 2,
@@ -13160,7 +13294,15 @@
           "conditions": "奥尔佳需要另一名乌萨斯学生成员。",
           "requirements": {},
           "provisional": true
-        },
+        }
+      ]
+    },
+    {
+      "id": "meeting-aigis-koromaru",
+      "title": "埃癸斯与虎狼丸",
+      "room": "meeting",
+      "usage": "线索搜集",
+      "variants": [
         {
           "members": [
             {
@@ -13185,7 +13327,15 @@
             "clueExchange": true
           },
           "provisional": true
-        },
+        }
+      ]
+    },
+    {
+      "id": "meeting-reserve-cantabile",
+      "title": "罗德岛隐秘队与晓歌",
+      "room": "meeting",
+      "usage": "线索搜集",
+      "variants": [
         {
           "members": [
             {
@@ -13215,7 +13365,15 @@
           "conditions": "额外10%来自焰狐龙梓兰中枢。",
           "requirements": {},
           "provisional": true
-        },
+        }
+      ]
+    },
+    {
+      "id": "meeting-harold-kjera",
+      "title": "哈洛德与耶拉",
+      "room": "meeting",
+      "usage": "线索搜集",
+      "variants": [
         {
           "members": [
             {
@@ -13238,7 +13396,15 @@
           "conditions": "哈洛德加强另一成员的派系线索倾向。",
           "requirements": {},
           "provisional": true
-        },
+        }
+      ]
+    },
+    {
+      "id": "meeting-faithmixer-cantabile",
+      "title": "信仰搅拌机与晓歌",
+      "room": "meeting",
+      "usage": "线索搜集",
+      "variants": [
         {
           "members": [
             {
@@ -13266,52 +13432,6 @@
           "score": 82,
           "reason": "同室或跨设施指定搭档触发额外线索效果，按两名成员及配套位置整体评价。",
           "conditions": "菲亚梅塔处于宿舍，兼顾她的心情支援。",
-          "requirements": {},
-          "provisional": true
-        },
-        {
-          "members": [
-            {
-              "id": "char_4102_threye",
-              "room": "meeting",
-              "elite": 0,
-              "level": 1,
-              "station": "main"
-            },
-            {
-              "id": "char_2012_typhon",
-              "room": "meeting",
-              "elite": 0,
-              "level": 1,
-              "station": "main"
-            }
-          ],
-          "score": 68,
-          "reason": "初始凛视与提丰同室达到25%速度，但额外消耗较高且尚无强化的补缺倾向。",
-          "conditions": "",
-          "requirements": {},
-          "provisional": true
-        },
-        {
-          "members": [
-            {
-              "id": "char_4052_surfer",
-              "room": "meeting",
-              "elite": 0,
-              "level": 1,
-              "station": "main"
-            },
-            {
-              "id": "char_106_franka",
-              "room": "meeting",
-              "elite": 2,
-              "level": 1,
-              "station": "main"
-            }
-          ],
-          "score": 67,
-          "reason": "初始寻澜与黑钢同室达到25%速度，但有0.5额外心情消耗，低于强化30%且无额外消耗。",
-          "conditions": "",
           "requirements": {},
           "provisional": true
         }
@@ -13516,8 +13636,8 @@
       ]
     },
     {
-      "id": "rainbow-training",
-      "title": "彩虹攻防训练",
+      "id": "rainbow-training-attack",
+      "title": "彩虹进攻训练组",
       "room": "training",
       "usage": "通用专精",
       "variants": [
@@ -13598,7 +13718,15 @@
             "trainingTask": true
           },
           "provisional": true
-        },
+        }
+      ]
+    },
+    {
+      "id": "rainbow-training-defense",
+      "title": "彩虹防守训练组",
+      "room": "training",
+      "usage": "通用专精",
+      "variants": [
         {
           "members": [
             {
@@ -13680,8 +13808,8 @@
       ]
     },
     {
-      "id": "faction-training",
-      "title": "派系训练支援",
+      "id": "training-santalla",
+      "title": "寒檀萨米训练组",
       "room": "training",
       "usage": "派系专精",
       "variants": [
@@ -13716,7 +13844,15 @@
             "trainingTask": true
           },
           "provisional": true
-        },
+        }
+      ]
+    },
+    {
+      "id": "training-ulpianus",
+      "title": "乌尔比安深海猎人训练组",
+      "room": "training",
+      "usage": "派系专精",
+      "variants": [
         {
           "members": [
             {
@@ -13762,7 +13898,15 @@
             "trainingTask": true
           },
           "provisional": true
-        },
+        }
+      ]
+    },
+    {
+      "id": "training-lappland",
+      "title": "荒芜拉普兰德叙拉古训练组",
+      "room": "training",
+      "usage": "派系专精",
+      "variants": [
         {
           "members": [
             {
@@ -13822,7 +13966,15 @@
             "trainingTask": true
           },
           "provisional": true
-        },
+        }
+      ]
+    },
+    {
+      "id": "training-nearl",
+      "title": "耀骑士临光骑士训练组",
+      "room": "training",
+      "usage": "派系专精",
+      "variants": [
         {
           "members": [
             {

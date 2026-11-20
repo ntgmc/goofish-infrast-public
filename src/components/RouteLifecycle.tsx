@@ -31,7 +31,7 @@ export default function RouteLifecycle() {
       }
       return true
     }
-    const frame = window.requestAnimationFrame(() => {
+    const frame = navigationType !== 'POP' && location.state?.preservePagePosition === true ? null : window.requestAnimationFrame(() => {
       if (restore()) return
       focusObserver = new MutationObserver(() => {
         if (!restore()) return
@@ -44,11 +44,11 @@ export default function RouteLifecycle() {
     })
 
     return () => {
-      window.cancelAnimationFrame(frame)
+      if (frame !== null) window.cancelAnimationFrame(frame)
       focusObserver?.disconnect()
       rememberScrollPosition(positionsRef.current, currentKey, { x: window.scrollX, y: window.scrollY })
     }
-  }, [location.key, navigationType])
+  }, [location.key, location.state, navigationType])
 
   return null
 }

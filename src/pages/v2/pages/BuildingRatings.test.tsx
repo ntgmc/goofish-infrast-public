@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
-import { MemoryRouter } from 'react-router'
-import { afterEach, expect, it } from 'vitest'
+import { createMemoryRouter, MemoryRouter, RouterProvider } from 'react-router'
+import { afterEach, expect, it, vi } from 'vitest'
 import userEvent from '@testing-library/user-event'
 import { buildingRatingCharacter, buildingRatingCombos } from '../../../lib/building-skill-ratings'
 import { CONFIG_PRESETS } from '../../../lib/config'
+import RouteLifecycle from '../../../components/RouteLifecycle'
 import type { V2Session } from '../OptionsDrawer'
 import BuildingRatings from './BuildingRatings'
 
@@ -15,7 +16,27 @@ const session = {
   workspace: { operators, config: { ...CONFIG_PRESETS['243'], trading_station_levels: [3, 3] } },
 } as unknown as V2Session
 
-afterEach(cleanup)
+afterEach(() => { cleanup(); vi.restoreAllMocks() })
+
+it('keeps typing focused without scrolling when search updates the route', async () => {
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => { callback(0); return 1 })
+  const scroll = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined)
+  const user = userEvent.setup()
+  const router = createMemoryRouter([{ path: '/v2', element: <><RouteLifecycle /><main tabIndex={-1} data-route-focus><BuildingRatings session={session} /></main></> }], { initialEntries: ['/v2?section=building-ratings'] })
+  render(<RouterProvider router={router} />)
+  scroll.mockClear()
+  const search = screen.getByRole('searchbox', { name: '搜索干员或组合' })
+  await user.type(search, '明椒')
+  expect(search).toHaveValue('明椒')
+  expect(search).toHaveFocus()
+  expect(scroll).not.toHaveBeenCalled()
+  await act(async () => router.navigate('/v2?section=building-ratings&kind=combo&q=凛视'))
+  expect(search).toHaveValue('凛视')
+  await act(async () => router.navigate(-1))
+  expect(search).toHaveValue('明椒')
+  await act(async () => router.navigate(1))
+  expect(search).toHaveValue('凛视')
+})
 
 it('keeps filters cleared when another edit arrives before the route transition has rendered', async () => {
   render(<MemoryRouter initialEntries={['/v2?section=building-ratings&kind=single&room=power&grade=S']}><BuildingRatings session={session} /></MemoryRouter>)

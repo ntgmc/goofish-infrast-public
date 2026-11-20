@@ -67,6 +67,16 @@ describe('published building skill ratings', () => {
     }
   })
 
+  it('keeps unrelated teams separate while retaining unlock phases of the same pairing', () => {
+    expect(new Set(buildingRatingCombos.map((combo) => combo.id)).size).toBe(buildingRatingCombos.length)
+    for (const combo of buildingRatingCombos) {
+      const core = combo.variants[0].members.filter((member) => combo.variants.every((variant) => variant.members.some((candidate) => candidate.id === member.id)))
+      expect(core.length, combo.id).toBeGreaterThan(0)
+    }
+    const pair = buildingRatingCombos.find((combo) => combo.title === '凛视与提丰')!
+    expect(pair.variants.map((variant) => variant.score)).toEqual([78, 68])
+  })
+
   it('keeps the four required tailor variants together and preserves Peper in control as an independent use', () => {
     expect(shamare.variants.slice(0, 4).map((variant) => variant.members.map((member) => characters[member.id].name))).toEqual([
       ['巫恋', '龙舌兰', '柏喙'], ['巫恋', '龙舌兰', '卡夫卡'], ['巫恋', '龙舌兰', '折光'], ['巫恋', '龙舌兰', '明椒'],

@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import { Link, useSearchParams } from 'react-router'
+import { Link, useLocation, useNavigationType, useSearchParams } from 'react-router'
 import { LayoutGroup } from 'motion/react'
 import { copy } from '../../../copy'
 import { ROOM_LABELS } from '../../../components/result-panel/labels'
@@ -19,14 +19,21 @@ const member = (entry: SingleBuildingRating): RatingMember => ({ id: entry.opera
 
 export default function BuildingRatings({ session }: { session: V2Session }) {
   const [params, setParams] = useSearchParams()
+  const location = useLocation()
+  const navigationType = useNavigationType()
+  const [searchText, setSearchText] = useState(params.get('q') ?? '')
   const pendingParams = useRef(params)
   useEffect(() => { pendingParams.current = params }, [params])
   const [limit, setLimit] = useState(60)
   const filterId = useId()
   const [selected, setSelected] = useState<{ entry: BuildingRatingEntry; variant: number } | null>(null)
   const sourceCard = useRef<HTMLElement | null>(null)
-  useEffect(() => { setSelected(null) }, [params])
-  const query = (params.get('q') ?? '').trim().toLocaleLowerCase('zh-CN')
+  useEffect(() => {
+    if (navigationType !== 'POP' && location.state?.preservePagePosition === true) return
+    setSearchText(params.get('q') ?? '')
+    setSelected(null)
+  }, [params, location.state, navigationType])
+  const query = searchText.trim().toLocaleLowerCase('zh-CN')
   const kind = params.get('kind') === 'combo' || !params.has('kind') && query && !singleBuildingRatings.some((entry) => entry.name.toLocaleLowerCase('zh-CN').includes(query)) ? 'combo' : 'single'
   const room = params.get('room') ?? '', usage = params.get('usage') ?? '', grade = params.get('grade') ?? '', own = params.get('owned') ?? ''
   const profileId = session.activeProfile?.id
@@ -41,7 +48,7 @@ export default function BuildingRatings({ session }: { session: V2Session }) {
     if (key === 'room' || key === 'kind') next.delete('usage')
     pendingParams.current = next
     setLimit(60)
-    void setParams(next, { replace: key === 'q' })
+    void setParams(next, { replace: key === 'q', state: { preservePagePosition: true } })
   }
   const matchesVariant = (entry: RatingCombo, variant: RatingVariant) => {
     const match = ratingVariantStatus(variant, roster, config)
@@ -63,7 +70,7 @@ export default function BuildingRatings({ session }: { session: V2Session }) {
     const key = ROOM_LABELS[entry.room] ?? entry.room
     groups.set(key, [...groups.get(key) ?? [], entry])
   }
-  const reset = () => { const next = new URLSearchParams(); next.set('section', 'building-ratings'); if (profileId) next.set('profile_id', profileId); next.set('kind', pendingParams.current.get('kind') ?? kind); pendingParams.current = next; setLimit(60); void setParams(next) }
+  const reset = () => { setSearchText(''); const next = new URLSearchParams(); next.set('section', 'building-ratings'); if (profileId) next.set('profile_id', profileId); next.set('kind', pendingParams.current.get('kind') ?? kind); pendingParams.current = next; setLimit(60); void setParams(next, { state: { preservePagePosition: true } }) }
   return <LayoutGroup id={filterId}><div className="v2-ratings">
     <Tabs.Root value={kind} onValueChange={(value) => update('kind', value)}>
       <div className="v2-rating-toolbar"><Tabs.List className="v2-rating-tabs" aria-label={text.tabs}><Tabs.Trigger value="single">{text.single}</Tabs.Trigger><Tabs.Trigger value="combo">{text.combo}</Tabs.Trigger></Tabs.List>
@@ -75,7 +82,7 @@ export default function BuildingRatings({ session }: { session: V2Session }) {
         </Dialog>
       </div>
       <form className="v2-rating-filters" onSubmit={(event) => event.preventDefault()} aria-label={text.search}>
-        <label className="v2-field v2-rating-search"><span>{text.search}</span><input className="v2-input" type="search" placeholder={text.searchPlaceholder} value={params.get('q') ?? ''} onChange={(event) => update('q', event.target.value)} /></label>
+        <label className="v2-field v2-rating-search"><span>{text.search}</span><input className="v2-input" type="search" placeholder={text.searchPlaceholder} value={searchText} onChange={(event) => { setSearchText(event.target.value); update('q', event.target.value) }} /></label>
         <label className="v2-field"><span id={`${filterId}-room`}>{text.room}</span><select aria-labelledby={`${filterId}-room`} className="v2-input" value={room} onChange={(event) => update('room', event.target.value)}><option value="">{text.all}</option>{rooms.map((value) => <option key={value} value={value}>{ROOM_LABELS[value] ?? value}</option>)}</select></label>
         <label className="v2-field"><span id={`${filterId}-usage`}>{text.usage}</span><select aria-labelledby={`${filterId}-usage`} className="v2-input" value={usage} onChange={(event) => update('usage', event.target.value)}><option value="">{text.all}</option>{usages.map((value) => <option key={value}>{value}</option>)}</select></label>
         <label className="v2-field"><span id={`${filterId}-grade`}>{text.grade}</span><select aria-labelledby={`${filterId}-grade`} className="v2-input" value={grade} onChange={(event) => update('grade', event.target.value)}><option value="">{text.all}</option>{BUILDING_RATING_GRADES.map((value) => <option key={value}>{value}</option>)}</select></label>

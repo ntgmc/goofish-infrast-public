@@ -54,6 +54,25 @@ describe('RouteLifecycle', () => {
     expect(screen.getByRole('main')).toHaveTextContent('/second')
   })
 
+  it('keeps in-page controls focused and still restores their history entry on return', async () => {
+    const router = createMemoryRouter([{ path: '*', element: <><LifecycleHarness /><input aria-label="筛选" /></> }], { initialEntries: ['/first'] })
+    render(<RouterProvider router={router} />)
+    const search = screen.getByRole('textbox', { name: '筛选' })
+    search.focus()
+    window.scrollY = 340
+    scrollToMock.mockClear()
+    await act(async () => router.navigate('/first?q=test', { state: { preservePagePosition: true } }))
+    expect(search).toHaveFocus()
+    expect(scrollToMock).not.toHaveBeenCalled()
+    window.scrollY = 480
+    await act(async () => router.navigate('/second'))
+    expect(screen.getByRole('main')).toHaveFocus()
+    expect(scrollToMock).toHaveBeenLastCalledWith(0, 0)
+    await act(async () => router.navigate(-1))
+    expect(screen.getByRole('main')).toHaveFocus()
+    expect(scrollToMock).toHaveBeenLastCalledWith(0, 480)
+  })
+
   it('focuses a route target that mounts after the route lifecycle effect', async () => {
     const user = userEvent.setup()
     const router = createMemoryRouter([
