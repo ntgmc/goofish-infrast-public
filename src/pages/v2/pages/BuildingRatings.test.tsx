@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, expect, it } from 'vitest'
+import userEvent from '@testing-library/user-event'
 import { buildingRatingCharacter, buildingRatingCombos } from '../../../lib/building-skill-ratings'
 import { CONFIG_PRESETS } from '../../../lib/config'
 import type { V2Session } from '../OptionsDrawer'
@@ -37,10 +38,33 @@ it('requires grade and readiness to match the same variant instead of combining 
   expect(screen.getByRole('combobox', { name: '档案对照' })).toBeEnabled()
 })
 
-it('renders the matched package and retains the profile on a related-combination link', () => {
+it('renders the matched package and retains the profile on a related-combination link', async () => {
   const page = render(<MemoryRouter initialEntries={['/v2?section=building-ratings&kind=combo&q=巫恋&grade=SSS&owned=ready']}><BuildingRatings session={session} /></MemoryRouter>)
   expect(page.container.querySelector('#rating-shamare')).toBeInTheDocument()
   page.unmount()
   render(<MemoryRouter initialEntries={['/v2?section=building-ratings&profile_id=profile&q=明椒']}><BuildingRatings session={session} /></MemoryRouter>)
+  await userEvent.click(screen.getByRole('button', { name: '查看明椒的评级详情' }))
   expect(screen.getByRole('link', { name: '巫恋大单组' })).toHaveAttribute('href', expect.stringContaining('profile_id=profile'))
+})
+
+it('opens the matching variant and releases the modal before another card is opened', async () => {
+  const user = userEvent.setup()
+  render(<MemoryRouter initialEntries={['/v2?section=building-ratings&kind=combo&q=巫恋&grade=SSS&owned=ready']}><BuildingRatings session={session} /></MemoryRouter>)
+  const card = screen.getByRole('button', { name: '查看巫恋大单组的评级详情' })
+  await user.click(card)
+  expect(screen.getByRole('dialog', { name: '巫恋大单组' })).toBeInTheDocument()
+  expect(screen.getByRole('combobox', { name: '组合变体' })).toHaveValue('0')
+  expect(screen.getAllByRole('region', { name: /变体/ })).toHaveLength(1)
+  await user.selectOptions(screen.getByRole('combobox', { name: '组合变体' }), '3')
+  expect(screen.getByRole('region', { name: '变体 4' })).toHaveTextContent('明椒')
+  const heading = screen.getByRole('dialog').querySelector('header')!
+  expect(within(heading).getByAltText('明椒')).toBeInTheDocument()
+  await user.selectOptions(screen.getByRole('combobox', { name: '组合变体' }), '10')
+  expect(within(heading).getByText('87 分')).toBeInTheDocument()
+  expect(within(heading).queryByText('98 分')).not.toBeInTheDocument()
+  await user.keyboard('{Escape}')
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(card).toHaveFocus()
+  await user.click(card)
+  expect(screen.getByRole('combobox', { name: '组合变体' })).toHaveValue('0')
 })

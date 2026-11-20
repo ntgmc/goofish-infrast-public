@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import { Link } from 'react-router'
 import { copy } from '../../copy'
 import { ROOM_LABELS } from '../../components/result-panel/labels'
@@ -9,10 +10,24 @@ import { Avatar } from './ScheduleBoard'
 const text = copy.buildingRatings
 const number = (value: number) => value.toLocaleString('zh-CN')
 const unlock = copy.domain.building_skills.unlock
-export function RatingBadge({ score, low }: { score: number; low?: number }) {
+const rankGlyphs: Record<string, string> = {
+  S: 'M18 1H5L1 5V11L5 14H13V18H1V22H15L19 18V12L15 9H7V5H16Z',
+  A: 'M6 1H16L21 22H15L14 17H7L5 22H0ZM9 6 7 13H13L12 6Z',
+  B: 'M2 1H15L20 5V9L17 12 20 15V18L16 22H0ZM7 5 6 10H13L15 8V6L13 5ZM6 14 5 18H13L15 16 13 14Z',
+  C: 'M19 1H6L1 6V18L5 22H18L20 17H8L6 15V8L8 6H17Z',
+  D: 'M2 1H14L20 7V16L14 22H0ZM7 6 6 17H11L15 13V9L12 6Z',
+}
+
+export function RatingBadge({ score, low, emblem = false }: { score: number; low?: number; emblem?: boolean }) {
+  const gradientId = useId()
   const grade = buildingRatingGrade(score)
-  const lowGrade = low === undefined ? grade : buildingRatingGrade(low)
-  return <span className="v2-rating-score" data-grade={grade}><strong>{lowGrade === grade ? grade : `${lowGrade}–${grade}`}</strong><span>{low === undefined || low === score ? text.scores(score) : text.scoreRange(low, score)}</span></span>
+  return <span className={`v2-rating-score${emblem ? ' v2-rating-emblem' : ''}`} data-grade={grade}>
+    <strong>{emblem ? <><span className="sr-only">{grade}</span><svg aria-hidden="true" className="v2-rating-rank-art" viewBox={`-2 -3 ${grade.length * 23 + 4} 30`}>
+      <defs><linearGradient id={gradientId} x2="0" y2="1"><stop stopColor="var(--color-rating-glint)" /><stop offset=".35" stopColor="var(--rating-hue)" /><stop offset=".52" stopColor="var(--rating-hue)" /><stop offset=".54" stopColor="var(--rating-facet)" /><stop offset="1" stopColor="var(--rating-hue)" /></linearGradient></defs>
+      {[...grade].map((letter, index) => <path key={index} d={rankGlyphs[letter]} transform={`translate(${index * 23} 0) skewX(-7)`} fill={`url(#${gradientId})`} fillRule="evenodd" />)}
+    </svg></> : grade}</strong>
+    <span>{low === undefined || low === score ? text.scores(score) : text.scoreRange(low, score)}</span>
+  </span>
 }
 
 export function RatingMemberView({ member, roster }: { member: RatingMember; roster: RatingRoster | null }) {
