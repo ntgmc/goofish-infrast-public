@@ -28,6 +28,7 @@ Use an existing document that owns the topic before creating another one:
 
 | Topic | Canonical location |
 | --- | --- |
+| Topic navigation | [Documentation index](README.md); keep the root README focused on onboarding |
 | Feature behavior and limitations | The relevant feature document under `docs/` |
 | Environment variables, external services, deployment, and troubleshooting | The relevant configuration, integration, or operations document under `docs/` |
 | Release artifacts and production release confirmation | [release-artifacts.md](release-artifacts.md) |
@@ -51,6 +52,13 @@ read the document for that kind of work; keep detailed rules in the topic file.
 - Verify technology versions and runtime requirements against `package.json`
   and `pnpm-lock.yaml`; verify commands and local URLs against scripts and
   implementation. Document current behavior without proposed or guessed settings.
+- Keep current behavior, required conditions, maintenance commands and actionable
+  troubleshooting. Use Git history for delivery reports, closed review findings
+  and old test counts; retain unresolved coverage limits without presenting them
+  as confirmed bugs. Reference code/configuration for exact values instead of
+  maintaining copied token or command inventories.
+- Update the documentation index and incoming links when merging or removing a
+  topic. Preserve generated documents, licenses and frozen published evidence.
 - Check links, headings, code fences, and the full diff for duplicated or misplaced
   content. Follow [agent-validation.md](agent-validation.md), including
   `git diff --check`, `pnpm run check:architecture`, and `pnpm run check:dead-code`.

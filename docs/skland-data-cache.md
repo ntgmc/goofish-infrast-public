@@ -5,6 +5,15 @@
 缓存归属于网站用户和明日方舟 UID；每次读取仍通过当前档案校验归属、绑定、授权和可用状态。
 同一用户的同 UID 档案共享数据，排班配置、手动覆盖、养成目标和计算结果仍各自保存。
 
+## 绑定角色解析
+
+`GET /api/v1/game/player/binding` 的解析由
+`server/handlers/skland-client.ts` 的 `getArknightsBindings()` 负责：只读取
+`appCode === "arknights"` 的 `bindingList`，列出有效 UID 并去重；默认角色排在前面。
+`defaultUid` 为空时仍使用各绑定记录的 UID，只有一条绑定且其 UID 缺失时才回退到
+`defaultUid`。昵称和渠道来自对应记录，不使用 `endfield` 的角色补齐。
+多角色交给现有账号选择与确认流程，不因缺少默认 UID 判定为未绑定。
+
 ## 读取和刷新
 
 - 首次使用自动读取角色数据及养成库存。
