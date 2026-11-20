@@ -32,6 +32,7 @@ export function CdkTable({ records, selected, filters, search, pagination, loadi
   const busy = loading || Boolean(busyAction)
   const selectedRecords = records.filter((record) => selected.includes(record.code_hash))
   const allSelected = records.length > 0 && records.every((record) => selected.includes(record.code_hash))
+  const advancedCount = Number(filters.risk !== 'all') + Number(filters.generated !== 'all')
   return (
     <section className="tool-panel">
       <div className="tool-panel-header flex flex-col gap-3 p-4 lg:flex-row lg:items-center lg:justify-between">
@@ -49,9 +50,10 @@ export function CdkTable({ records, selected, filters, search, pagination, loadi
             </button>
           ))}
         </div>
-        <span className="text-sm text-ink-secondary">当前页已选 {selectedRecords.length} 个 CDK</span>
+        <span className="text-sm text-ink-secondary">共 {pagination.total} 个 CDK</span>
       </div>
-      <div hidden={!selectedRecords.length} className="flex flex-wrap items-end gap-2 border-b border-surface-3 p-4">
+      <div hidden={!selectedRecords.length} className="admin-batch-actions flex flex-wrap items-end gap-2 border-b border-surface-3 p-4">
+        <span className="w-full text-sm text-ink-secondary">当前页已选 {selectedRecords.length} 个 CDK</span>
         <label><span className="mb-1.5 block text-xs font-medium text-ink-muted">批量升级到</span>
           <select className="tool-field" value={bulkPermission} disabled={busy} onChange={(event) => setBulkPermission(event.currentTarget.value as GeneratedPermission)}>
             {cdkProductPermissions.map((permission) => <option key={permission} value={permission}>{permissionLabels[permission]}</option>)}
@@ -67,8 +69,8 @@ export function CdkTable({ records, selected, filters, search, pagination, loadi
         <button type="button" className="tool-secondary-action text-sm" disabled={busy || !selectedRecords.length} onClick={() => void onBulk('update_note', undefined, bulkNote)}>批量改备注</button>
         <button type="button" className="tool-secondary-action text-sm" disabled={busy || !selected.length} onClick={() => onSelect([])}>取消选择</button>
       </div>
-      <fieldset disabled={Boolean(busyAction)} className="grid gap-3 border-b border-surface-3 p-4 md:grid-cols-4">
-        <label className="block md:col-span-4">
+      <fieldset disabled={Boolean(busyAction)} className="admin-record-filters border-b border-surface-3 p-4">
+        <label className="admin-record-search">
           <span className="mb-1.5 block text-xs font-medium text-ink-muted">搜索</span>
           <div className="flex gap-2">
             <input type="search" value={search} onChange={(event) => onSearchChange(event.currentTarget.value)} placeholder="搜索 CDK 标识、订单标识或备注" className="tool-field" />
@@ -91,15 +93,17 @@ export function CdkTable({ records, selected, filters, search, pagination, loadi
             {cdkProductPermissions.map((item) => <option key={item} value={item}>{permissionLabels[item]}</option>)}
           </select>
         </label>
-        <BinaryFilterSelect label="风险事件" value={filters.risk} onChange={(value) => onFilterChange({ risk: value })} />
-        <BinaryFilterSelect label="生成过排班" value={filters.generated} onChange={(value) => onFilterChange({ generated: value })} />
+        <details className="admin-advanced-filters"><summary>高级筛选{advancedCount > 0 && <span className="admin-filter-count">{advancedCount} 项已启用</span>}</summary><div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <BinaryFilterSelect label="风险事件" value={filters.risk} onChange={(value) => onFilterChange({ risk: value })} />
+          <BinaryFilterSelect label="生成过排班" value={filters.generated} onChange={(value) => onFilterChange({ generated: value })} />
+        </div></details>
       </fieldset>
-        <div className="overflow-x-auto" aria-busy={loading}>
+        <div className="admin-records-region" aria-busy={loading}>
           {loading && <div className="border-b border-surface-3 px-4 py-2 text-sm text-ink-muted" role="status">正在加载…</div>}
-          <table className="w-full min-w-[960px] text-left text-sm">
-            <thead className="bg-surface-2 text-xs uppercase tracking-wide text-ink-muted">
-              <tr>
-                <th className="w-12 px-4 py-3"><input className="h-4 w-4 accent-brand-500" type="checkbox" disabled={busy} aria-label="选择当前页全部 CDK" checked={allSelected} onChange={(event) => onSelect(event.currentTarget.checked ? records.map((record) => record.code_hash) : [])} /></th>
+          <table className="admin-records-table admin-cdk-table w-full text-left text-sm" aria-label="CDK 记录" role="table">
+            <thead className="bg-surface-2 text-xs text-ink-muted" role="rowgroup">
+              <tr role="row">
+                <th scope="col" className="w-12 px-4 py-3"><label className="admin-record-check"><input className="h-4 w-4 accent-brand-500" type="checkbox" disabled={busy} aria-label="选择当前页全部 CDK" checked={allSelected} onChange={(event) => onSelect(event.currentTarget.checked ? records.map((record) => record.code_hash) : [])} /></label></th>
                 <th className="w-36 px-4 py-3">CDK</th>
                 <th className="w-32 px-4 py-3">状态</th>
                 <th className="w-56 px-4 py-3">数据</th>
@@ -108,23 +112,23 @@ export function CdkTable({ records, selected, filters, search, pagination, loadi
                 <th className="w-44 px-4 py-3">操作</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-surface-3">
+            <tbody className="divide-y divide-surface-3" role="rowgroup">
             {records.length === 0 ? (
               <tr><td colSpan={7} className="px-4 py-10 text-center text-ink-muted">{search ? '没有匹配的 CDK，请调整搜索条件。' : '当前筛选没有记录。'}</td></tr>
             ) : records.map((record) => {
               const nextPermission = record.cdk_type === 'profile' ? getNextProductPermission(record.permission) : null
               return (
-                <tr key={record.code_hash} className="hover:bg-surface-2/50">
-                    <td className="px-4 py-4 align-top"><input className="h-4 w-4 accent-brand-500" type="checkbox" disabled={busy} aria-label={`选择 CDK ${record.cdk_id}`} checked={selected.includes(record.code_hash)} onChange={(event) => onSelect(event.currentTarget.checked ? [...selected, record.code_hash] : selected.filter((hash) => hash !== record.code_hash))} /></td>
-                    <td className="px-4 py-4 align-top font-mono text-ink-primary">{record.cdk_id}</td>
-                    <td className="px-4 py-4 align-top"><StatusPill status={record.status} /><div className="mt-1 text-xs text-ink-muted">{record.cdk_type === 'balance' ? copy.balance.cdk_value(formatPoints(record.amount!)) : record.cdk_type === 'item' ? itemCdkLabel(record) : profileCdkLabel(record)}</div></td>
-                    <td className="px-4 py-4 align-top text-ink-secondary">
+                <tr key={record.code_hash} role="row" aria-selected={selected.includes(record.code_hash)} className="hover:bg-surface-2/50">
+                    <td role="cell" className="admin-record-select px-4 py-4 align-top"><label className="admin-record-check"><input className="h-4 w-4 accent-brand-500" type="checkbox" disabled={busy} aria-label={`选择 CDK ${record.cdk_id}`} checked={selected.includes(record.code_hash)} onChange={(event) => onSelect(event.currentTarget.checked ? [...selected, record.code_hash] : selected.filter((hash) => hash !== record.code_hash))} /></label></td>
+                    <td role="cell" className="admin-record-identity px-4 py-4 align-top font-mono text-ink-primary">{record.cdk_id}</td>
+                    <td role="cell" className="px-4 py-4 align-top"><StatusPill status={record.status} /><div className="mt-1 text-xs text-ink-muted">{record.cdk_type === 'balance' ? copy.balance.cdk_value(formatPoints(record.amount!)) : record.cdk_type === 'item' ? itemCdkLabel(record) : profileCdkLabel(record)}</div></td>
+                    <td role="cell" data-label="数据" className="px-4 py-4 align-top text-ink-secondary">
                       <div>{record.operator_count ?? '-'} 干员 / 生成 {record.schedule_generate_count ?? 0}</div>
                       <div className="mt-1 text-xs text-ink-muted">风险 {record.risk_event_count ?? 0}</div>
                     </td>
-                    <td className="px-4 py-4 align-top text-xs text-ink-secondary"><div>创建 {formatDate(record.created_at)}</div><div className="mt-1">使用 {formatDate(record.used_at)}</div></td>
-                    <td className="px-4 py-4 align-top text-ink-secondary"><div className="truncate" title={record.order_note || undefined}>{record.order_note || '-'}</div></td>
-                    <td className="px-4 py-4 align-top">
+                    <td role="cell" className="admin-record-wide px-4 py-4 align-top text-xs text-ink-secondary"><div>创建 {formatDate(record.created_at)}</div><div className="mt-1">使用 {formatDate(record.used_at)}</div></td>
+                    <td role="cell" data-label="备注" className="admin-record-wide px-4 py-4 align-top text-ink-secondary"><div>{record.order_note || '-'}</div></td>
+                    <td role="cell" className="admin-record-actions px-4 py-4 align-top">
                       <div className="flex min-w-0 flex-wrap gap-2">
                       <SmallButton onClick={() => void onOpenDetail(record)} loading={busy}>详情</SmallButton>
                       {nextPermission && record.status !== 'frozen' && record.status !== 'revoked' && <SmallButton onClick={() => onPatch(record, 'upgrade', nextPermission)} loading={busy}>升级</SmallButton>}

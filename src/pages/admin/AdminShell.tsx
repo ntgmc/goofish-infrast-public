@@ -16,6 +16,14 @@ const groups: Array<{ label: string; sections: AdminSection[] }> = [
 const icons = { overview: AdminOverviewIcon, users: AdminUsersIcon, cdk: RedemptionIcon, items: ItemManagementIcon, invitation: InvitationIcon, queue: QueueIcon,
   audit: ResultHistoryIcon, risk: RiskIcon, features: SiteFeaturesIcon, ai: ContentManagementIcon, registration: RegistrationIcon, announcement: AnnouncementIcon, content: ContentManagementIcon, feedback: FeedbackIcon }
 
+const descriptions: Record<AdminSection, string> = {
+  overview: '查看使用趋势、待办与服务表现。', users: '查找用户，维护档案与账号权益。', feedback: '认领反馈，回复用户并跟进处理进展。',
+  cdk: '检索兑换记录，生成和维护 CDK。', items: '配置道具、礼包与发放活动。', invitation: '配置邀请奖励，查看发放记录。',
+  queue: '查看排班任务进度与服务运行情况。', risk: '查看风险记录，核对证据并处理复核。', audit: '检索管理操作，核对变更原因与记录。',
+  features: '管理站点功能的开放与暂停状态。', ai: '查看 AI 调用与费用，配置模型服务。', registration: '管理注册条件与邀请资格。',
+  announcement: '编辑和发布公告，查看阅读情况。', content: '维护公开页面、购买信息与展示内容。',
+}
+
 export function canAccessAdminSection(section: AdminSection, capabilities: AdminCapability[]): boolean {
   if (section === 'overview') return capabilities.includes('usage_view')
   if (section === 'risk') return capabilities.includes('risk_view')
@@ -64,8 +72,8 @@ export default function AdminShell({ section, username, capabilities, syncStatus
         <div className="admin-header-actions"><ThemeSwitcher iconOnly /><span className="admin-header-user">{username}</span></div>
       </header>
       <div className="admin-main">
-        <div className="admin-page-heading"><div><h1>{sectionLabels[section]}</h1><p role="status">{syncStatus}</p></div>
-          {onRefresh && <button type="button" className="tool-secondary-action" disabled={refreshing} onClick={onRefresh}>{refreshing ? '刷新中…' : '刷新当前页'}</button>}</div>
+        <div className="admin-page-heading"><div><h1>{sectionLabels[section]}</h1><p>{descriptions[section]}</p></div>
+          {onRefresh && <div className="admin-page-refresh"><p role="status">{syncStatus}</p><button type="button" className="tool-secondary-action" disabled={refreshing} onClick={onRefresh}>{refreshing ? '刷新中…' : '刷新当前页'}</button></div>}</div>
         {children}
       </div>
     </main>

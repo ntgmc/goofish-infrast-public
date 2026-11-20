@@ -35,11 +35,12 @@ export function UserTable(props: Props) {
   const allSelected = users.length > 0 && selectedUsers.length === users.length
   const canManage = capabilities.includes('user_manage')
   const filter = (key: keyof AdminUserFilters, value: string) => props.onFilters({ ...filters, [key]: value })
-  return <section className="tool-panel overflow-hidden">
+  const advancedCount = (Object.keys(filters) as Array<keyof AdminUserFilters>).filter((key) => key !== 'status' && key !== 'permission' && filters[key] !== DEFAULT_ADMIN_USER_FILTERS[key]).length
+  return <section className="tool-panel admin-user-records">
     <div className="border-b border-surface-3 p-4">
-      <h2 className="text-lg font-semibold text-ink-primary">注册用户</h2>
-      <fieldset disabled={Boolean(busyAction)} className="admin-user-filters mt-3 grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <label className="col-span-2 xl:col-span-4">
+      <h2 className="text-base font-semibold text-ink-primary">注册用户</h2>
+      <fieldset disabled={Boolean(busyAction)} className="admin-user-filters admin-record-filters mt-3">
+        <label className="admin-record-search">
           <span className="mb-1.5 block text-xs font-medium text-ink-muted">搜索</span>
           <input type="search" value={props.search} onChange={(event) => props.onSearch(event.currentTarget.value)} placeholder="搜索邮箱、用户 ID、档案或订单标识" className="tool-field" />
         </label>
@@ -55,7 +56,7 @@ export function UserTable(props: Props) {
             {cdkProductPermissions.map((permission) => <option key={permission} value={permission}>{permissionLabels[permission]}</option>)}
           </select>
         </label>
-        <details className="self-end"><summary className="min-h-11 cursor-pointer py-2 text-sm text-ink-secondary">高级筛选</summary><div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <details className="admin-advanced-filters"><summary>高级筛选{advancedCount > 0 && <span className="admin-filter-count">{advancedCount} 项已启用</span>}</summary><div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <label><span className="mb-1.5 block text-xs font-medium text-ink-muted">档案类型</span>
           <select className="tool-field" value={filters.profile_kind} onChange={(event) => filter('profile_kind', event.currentTarget.value)}>
             <option value="all">全部类型</option><option value="cdk">卡授权档案</option><option value="free_preview">免费预览</option>
@@ -91,7 +92,7 @@ export function UserTable(props: Props) {
         <button type="button" className="tool-secondary-action self-end text-sm" onClick={() => { props.onSearch(''); props.onFilters(DEFAULT_ADMIN_USER_FILTERS) }}>重置筛选</button>
       </fieldset>
     </div>
-    <div hidden={!selectedUsers.length} className="flex flex-wrap items-center gap-2 border-b border-surface-3 p-4">
+    <div hidden={!selectedUsers.length} className="admin-batch-actions flex flex-wrap items-center gap-2 border-b border-surface-3 p-4">
       <span className="text-sm text-ink-secondary">当前页已选 {selectedUsers.length} 个用户</span>
       <button type="button" className="tool-secondary-action text-sm" disabled={busy || !selectedUsers.length} onClick={() => void props.onCopy('id')}>复制用户 ID</button>
       <button type="button" className="tool-secondary-action text-sm" disabled={busy || !selectedUsers.length} onClick={() => void props.onCopy('email')}>复制邮箱</button>
@@ -102,27 +103,27 @@ export function UserTable(props: Props) {
       </>}
       <button type="button" className="tool-secondary-action text-sm" disabled={busy || !selected.length} onClick={() => props.onSelect([])}>取消选择</button>
     </div>
-    <div className="overflow-x-auto" aria-busy={loading}>
+    <div className="admin-records-region" aria-busy={loading}>
       {loading && <div className="border-b border-surface-3 px-4 py-2 text-sm text-ink-muted" role="status">正在加载…</div>}
-      <table className="w-full min-w-[56rem] text-left text-sm">
-        <thead className="bg-surface-2 text-xs uppercase tracking-wide text-ink-muted"><tr>
-          <th className="px-4 py-3"><input className="h-4 w-4 accent-brand-500" type="checkbox" aria-label="选择当前页全部用户" disabled={busy} checked={allSelected} onChange={(event) => props.onSelect(event.currentTarget.checked ? users.map((user) => user.id) : [])} /></th>
-          <th className="px-4 py-3">邮箱／用户 ID</th><th className="px-4 py-3">状态</th><th className="px-4 py-3">权限</th><th className="px-4 py-3">档案</th><th className="px-4 py-3">时间</th><th className="px-4 py-3">操作</th>
+      <table className="admin-records-table admin-users-table w-full text-left text-sm" aria-label="注册用户" role="table">
+        <thead className="bg-surface-2 text-xs text-ink-muted" role="rowgroup"><tr role="row">
+          <th scope="col" className="px-4 py-3"><label className="admin-record-check"><input className="h-4 w-4 accent-brand-500" type="checkbox" aria-label="选择当前页全部用户" disabled={busy} checked={allSelected} onChange={(event) => props.onSelect(event.currentTarget.checked ? users.map((user) => user.id) : [])} /></label></th>
+          <th scope="col" className="px-4 py-3">邮箱／用户 ID</th><th scope="col" className="px-4 py-3">状态</th><th scope="col" className="px-4 py-3">权限</th><th scope="col" className="px-4 py-3">档案</th><th scope="col" className="px-4 py-3">时间</th><th scope="col" className="px-4 py-3">操作</th>
         </tr></thead>
-        <tbody className="divide-y divide-surface-3">
-          {!users.length ? <tr><td colSpan={7} className="px-4 py-10 text-center text-ink-muted">没有匹配的用户，请调整筛选条件。</td></tr> : users.map((user) => <tr key={user.id} className="hover:bg-surface-2/50">
-            <td className="px-4 py-4"><input className="h-4 w-4 accent-brand-500" type="checkbox" aria-label={`选择用户 ${user.email}`} disabled={busy} checked={selected.includes(user.id)} onChange={(event) => props.onSelect(event.currentTarget.checked ? [...selected, user.id] : selected.filter((id) => id !== user.id))} /></td>
-            <td className="px-4 py-4 font-medium text-ink-primary">{user.email}<div className="mt-1 break-all font-mono text-xs text-ink-muted">{user.id}</div>
+        <tbody className="divide-y divide-surface-3" role="rowgroup">
+          {!users.length ? <tr><td colSpan={7} className="px-4 py-10 text-center text-ink-muted">没有匹配的用户，请调整筛选条件。</td></tr> : users.map((user) => <tr key={user.id} role="row" aria-selected={selected.includes(user.id)} className="hover:bg-surface-2/50">
+            <td role="cell" className="admin-record-select px-4 py-4"><label className="admin-record-check"><input className="h-4 w-4 accent-brand-500" type="checkbox" aria-label={`选择用户 ${user.email}`} disabled={busy} checked={selected.includes(user.id)} onChange={(event) => props.onSelect(event.currentTarget.checked ? [...selected, user.id] : selected.filter((id) => id !== user.id))} /></label></td>
+            <td role="cell" className="admin-record-identity px-4 py-4 font-medium text-ink-primary"><span>{user.email}</span><div className="mt-1 break-all font-mono text-xs text-ink-muted">{user.id}</div>
               {user.operations_progress && <div className="mt-2 text-xs text-ink-secondary">
                 <p>{({ no_profile: '7 天内未添加账号', no_generation: '已添加账号，7 天内未完成首次排班', activated: '7 天内已完成首次排班', observing: '首次排班仍在观察期内', used: '已有排班记录' })[user.operations_progress.stage]}</p>
                 {user.operations_progress.failure_reason && <p className="mt-1 text-error">最近失败：{operationsFailureLabels[user.operations_progress.failure_reason] ?? '其他生成问题'}{user.operations_progress.failure_at && ` · ${formatDate(user.operations_progress.failure_at)}`}</p>}
               </div>}
             </td>
-            <td className="px-4 py-4"><UserStatusPill status={user.status} emailVerifiedAt={user.email_verified_at} /></td>
-            <td className="px-4 py-4 text-ink-secondary">{formatAdminProfileAccess(user.profile_access)}</td>
-            <td className="px-4 py-4 text-ink-secondary">{user.profile_count}</td>
-            <td className="whitespace-nowrap px-4 py-4 text-xs text-ink-muted"><div>注册 {formatDate(user.created_at)}</div><div className="mt-1">上线 {user.last_seen_at ? formatDate(user.last_seen_at) : '暂无记录'}</div></td>
-            <td className="px-4 py-4"><div className="flex flex-wrap gap-2">
+            <td role="cell" className="px-4 py-4"><UserStatusPill status={user.status} emailVerifiedAt={user.email_verified_at} /></td>
+            <td role="cell" data-label="权限" className="px-4 py-4 text-ink-secondary">{formatAdminProfileAccess(user.profile_access)}</td>
+            <td role="cell" data-label="档案" className="admin-record-wide px-4 py-4 text-ink-secondary">{user.profile_count}</td>
+            <td role="cell" className="admin-record-wide px-4 py-4 text-xs text-ink-muted"><div>注册 {formatDate(user.created_at)}</div><div className="mt-1">上线 {user.last_seen_at ? formatDate(user.last_seen_at) : '暂无记录'}</div></td>
+            <td role="cell" className="admin-record-actions px-4 py-4"><div className="flex flex-wrap gap-2">
               {capabilities.includes('sensitive_data_view') && <SmallButton onClick={() => void props.onDetail(user)} loading={busy}>详情</SmallButton>}
               {canManage && user.status === 'active' && <SmallButton onClick={() => void props.onFreeze(user)} loading={busy}>冻结</SmallButton>}
               {canManage && user.status === 'frozen' && <SmallButton onClick={() => void props.onUnfreeze(user)} loading={busy} tone="success">解冻</SmallButton>}
