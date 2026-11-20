@@ -180,7 +180,7 @@ function OperatorDetails({ operator, decorative = false }: { operator: LicenseOp
         {decorative ? <p data-slot="dialog-description">{description}</p> : <DialogDescription>{description}</DialogDescription>}</div>
     </header>
     <motion.div initial={{ opacity: reduced || decorative ? 1 : 0 }} animate={{ opacity: 1 }} transition={{ duration: reduced ? 0 : 0.18 }}>
-      {skills.length ? <BuildingSkillList skills={skills} /> : <p className="v2-muted">{copy.v2.skillsUnavailable}</p>}
+      {skills.length ? <BuildingSkillList skills={skills} operatorName={operator.name} /> : <p className="v2-muted">{copy.v2.skillsUnavailable}</p>}
     </motion.div>
   </>
 }

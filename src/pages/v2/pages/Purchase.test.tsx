@@ -81,7 +81,7 @@ it('copies the selected link and provides manual copying when clipboard access f
   mount('&offer=single_account_monthly')
   await user.click(screen.getByRole('button', { name: text.copy }))
   expect(write).toHaveBeenCalledWith('https://example.com/monthly')
-  expect(screen.getByRole('status')).toHaveTextContent(text.copied)
+  expect(screen.getByText(text.copied)).toHaveAttribute('role', 'status')
   write.mockRejectedValueOnce(new Error('denied'))
   await user.click(screen.getByRole('button', { name: text.copy }))
   expect(screen.getByRole('alert')).toHaveTextContent(text.copy_failed)

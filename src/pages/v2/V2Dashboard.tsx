@@ -228,6 +228,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
       ? { id: workflow.progress?.historyResultId ?? workflow.progress?.jobId ?? workflow.latestWorkspaceResult!.id, config } : undefined
   useEffect(() => { setShift(0); setManualOpened(false); setManualDirty(false) }, [manualKey])
   useEffect(() => { if (!showManual && view === 'manual') setView('schedule') }, [showManual, view])
+  useEffect(() => { setPanel(null) }, [section])
   useEffect(() => {
     const requested = params.get('panel')
     if (requested === 'operators' || requested === 'config') setPanel(requested)

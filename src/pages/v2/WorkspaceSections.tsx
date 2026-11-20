@@ -27,6 +27,7 @@ const Commercial = lazy(() => import('./pages/Billing').then((module) => ({ defa
 const Tools = lazy(() => import('./pages/Tools'))
 const ManualTool = lazy(() => import('./pages/Tools').then((module) => ({ default: module.ManualTool })))
 const ScheduleComparison = lazy(() => import('./pages/ScheduleComparison'))
+const BuildingRatings = lazy(() => import('./pages/BuildingRatings'))
 const Cultivation = lazy(() => import('./pages/Cultivation'))
 const ThanksRecruitment = lazy(() => import('../ThanksRecruitmentPage'))
 const CultivationProjects = lazy(() => import('./pages/CultivationProjects'))
@@ -91,7 +92,7 @@ export default function WorkspaceSections({ section, session, workflow, generati
   const step = !signedIn ? 0 : !workflow || !operatorsReady ? 1 : !configConfirmed ? 2 : 3
   return <section hidden={section === 'overview'} className={`v2-feature-content v2-page-section${guided ? ' v2-first-schedule-layout' : ''}`} data-v2-section={section} aria-label={guided ? copy.v2.firstSchedule.title : title}>
     <div className="v2-section-heading"><div><h1>{guided ? copy.v2.firstSchedule.title : title}</h1>{guided ? <p>{copy.v2.firstSchedule.description}</p> : !upgrading && descriptions[section] && <p>{descriptions[section]}</p>}</div>
-      {['manual-tool', 'schedule-comparison', 'cultivation', 'thanks-recruitment', 'cultivation-projects', 'training-ratio', 'material-demand', 'depot'].includes(section) && <Link className="v2-button v2-button-secondary" to={v2Path('tools', session.activeProfile?.id)}><ArrowLeft size={16} />{copy.v2.backToTools}</Link>}
+      {['manual-tool', 'schedule-comparison', 'building-ratings', 'cultivation', 'thanks-recruitment', 'cultivation-projects', 'training-ratio', 'material-demand', 'depot'].includes(section) && <Link className="v2-button v2-button-secondary" to={v2Path('tools', session.activeProfile?.id)}><ArrowLeft size={16} />{copy.v2.backToTools}</Link>}
       {guided && <Link className="v2-button v2-button-secondary" to={v2Path('overview', session.activeProfile?.id)}><ArrowLeft size={16} />{copy.v2.firstSchedule.backToExample}</Link>}
       {section === 'profiles' && <div className="v2-actions">
         {signedIn && <Link className="v2-button v2-button-secondary" to={v2Path('balance', session.activeProfile?.id)}><BalanceIcon size={18} aria-hidden="true" />{copy.balance.nav}<ArrowRight size={16} aria-hidden="true" /></Link>}
@@ -125,6 +126,7 @@ export default function WorkspaceSections({ section, session, workflow, generati
                 {section === 'balance' && <Balance userId={session.user!.id} activeProfileId={session.activeProfile?.id ?? null} redemptionEnabled={features.cdk_redemption} />}
                 {section === 'commercial' && <Commercial userId={session.user!.id} activeProfileId={session.activeProfile?.id ?? null} onOpen={onOpenProfile} />}
                 {section === 'tools' && <Tools profileId={session.activeProfile?.id} />}
+                {section === 'building-ratings' && <BuildingRatings session={session} />}
                 {(['help', 'terms', 'privacy', 'disclaimer', 'support'] as V2Section[]).includes(section) && <PublicInfo page={section === 'help' ? 'faq' : section as 'terms' | 'privacy' | 'disclaimer' | 'support'} />}
                 {section === 'pricing' && <Pricing session={session} />}
                 {section === 'purchase' && <Purchase profile={session.authStatus === 'authenticated' ? session.activeProfile : null} />}

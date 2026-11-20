@@ -1,4 +1,5 @@
-import { memo, useId, useRef, useState, type KeyboardEvent, type ComponentType } from 'react'
+import { memo, useEffect, useId, useRef, useState, type KeyboardEvent, type ComponentType } from 'react'
+import { useLocation } from 'react-router'
 import { AnimatePresence, LayoutGroup, motion, useIsPresent } from 'motion/react'
 import { OpenDetailsIcon as ArrowUpRight, DormitoryIcon as BedDouble, ControlRoomIcon as Building2, DroneIcon as Drone, ManufactureIcon as Factory, TrainingRoomIcon as GraduationCap, GridViewIcon as LayoutGrid, ListViewIcon as List, RecruitmentIcon as UserRoundSearch, MeetingRoomIcon, OperatorsIcon as Users, ProcessingRoomIcon as Wrench, PowerPlantIcon as Zap, RecyclingStationIcon, UnknownFacilityIcon, FiammettaIcon } from '../../components/icons'
 import { copy } from '../../copy'
@@ -57,6 +58,8 @@ export default memo(function ScheduleBoard({ result, prepared, expanded, onExpan
   const source = useRef<HTMLButtonElement | null>(null)
   const reduced = useAppReducedMotion()
   const [roomKey, setRoomKey] = useState<string | null>(null)
+  const { pathname, search } = useLocation()
+  useEffect(() => { setRoomKey(null) }, [pathname, search])
   const [frontRoomKey, setFrontRoomKey] = useState<string | null>(null)
   const selected = Math.min(shift, Math.max(result.plans.length - 1, 0))
   const [transition, setTransition] = useState({ shift: selected, direction: 0 })

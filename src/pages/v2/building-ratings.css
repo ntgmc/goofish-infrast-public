@@ -1,0 +1,67 @@
+.v2-ratings { display: grid; gap: var(--space-md); min-width: 0; }
+.v2-rating-intro { display: grid; gap: var(--space-xs); }
+.v2-rating-intro > .v2-disclosure { margin-top: 0; padding-block: 0; border: 0; }
+.v2-rating-method { display: grid; gap: var(--space-xs); padding-block: var(--space-sm); color: var(--v2-secondary); }
+.v2-rating-method ul { padding-inline-start: var(--space-md); }
+.v2-rating-method a { color: var(--v2-accent); text-decoration: underline; text-underline-offset: 3px; }
+.v2-rating-account { border-inline-start: 2px solid var(--v2-accent); padding-inline-start: var(--space-sm); color: var(--v2-secondary); }
+.v2-rating-tabs { display: flex; gap: var(--space-sm); border-block-end: 1px solid var(--v2-line); margin-block-end: var(--space-sm); }
+.v2-rating-tabs button { min-height: 44px; padding: var(--space-xs) var(--space-md); border-block-end: 2px solid transparent; color: var(--v2-secondary); }
+.v2-rating-tabs button[data-state="active"] { border-color: var(--v2-accent); color: var(--v2-accent); font-weight: 600; }
+.v2-rating-filters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-sm); margin-block: var(--space-md); }
+.v2-rating-filters .v2-field { margin-block: 0; }
+.v2-rating-search { grid-column: 1 / -1; }
+.v2-rating-filters :is(input, select) { width: 100%; min-width: 0; min-height: 44px; }
+.v2-rating-result-count { display: flex; align-items: center; justify-content: space-between; gap: var(--space-xs); color: var(--v2-secondary); }
+.v2-rating-result-count button { min-height: 44px; }
+.v2-rating-results { display: grid; gap: var(--space-lg); }
+.v2-rating-group > h2 { font-size: var(--text-base); margin-block-end: var(--space-xs); }
+.v2-rating-group > div { border-block-start: 1px solid var(--v2-line); }
+.v2-rating-row { border-block-end: 1px solid var(--v2-line); }
+.v2-rating-row > summary { display: flex; align-items: center; gap: var(--space-sm); min-height: 80px; padding: var(--space-sm); list-style: none; cursor: pointer; }
+.v2-rating-row > summary::-webkit-details-marker { display: none; }
+.v2-rating-row > summary::marker { content: ''; }
+.v2-rating-row > summary:hover, .v2-rating-row[open] > summary { background: var(--v2-accent-soft); }
+.v2-rating-identity { flex: 1; min-width: 0; display: grid; gap: var(--space-2xs); }
+.v2-rating-identity > strong { overflow-wrap: anywhere; }
+.v2-rating-identity > span { color: var(--v2-secondary); font-size: var(--text-xs); }
+.v2-rating-score { display: grid; justify-items: end; flex: none; font-variant-numeric: tabular-nums; line-height: 1.3; }
+.v2-rating-score strong { font-size: var(--text-lg); letter-spacing: 0.02em; }
+.v2-rating-score > span { color: var(--v2-secondary); font-size: var(--text-xs); margin-block-start: var(--space-2xs); }
+.v2-rating-score[data-grade="SSS"] strong, .v2-rating-score[data-grade="S"] strong { color: var(--v2-accent); }
+.v2-rating-chevron { flex: none; color: var(--v2-secondary); }
+.v2-rating-row[open] > summary .v2-rating-chevron { rotate: 180deg; }
+.v2-rating-provisional { display: inline-block; margin-inline-start: var(--space-xs); padding-inline: var(--space-xs); border: 1px solid var(--v2-line); border-radius: var(--radius-sm); color: var(--v2-secondary); font-size: var(--text-xs); font-weight: 400; vertical-align: middle; }
+.v2-rating-details { display: grid; gap: var(--space-md); padding: var(--space-md) var(--space-sm); overflow-wrap: anywhere; }
+.v2-rating-details h3 { margin-block-end: var(--space-xs); font-size: var(--text-sm); }
+.v2-rating-skills { display: grid; gap: var(--space-sm); padding: 0; list-style: none; }
+.v2-rating-skills > li { display: flex; gap: var(--space-sm); align-items: start; }
+.v2-rating-skills img { flex: none; }
+.v2-rating-skills p { color: var(--v2-secondary); }
+.v2-rating-stages, .v2-rating-scenarios { display: grid; gap: var(--space-xs); list-style: none; padding: 0; }
+.v2-rating-stages > li, .v2-rating-scenarios > li { display: grid; grid-template-columns: 1fr auto; gap: var(--space-xs); border-block-end: 1px solid var(--v2-line); padding-block: var(--space-sm); align-items: center; }
+.v2-rating-stages p, .v2-rating-scenarios p { grid-column: 1 / -1; color: var(--v2-secondary); }
+.v2-rating-cost { display: grid; gap: var(--space-2xs); border-inline-start: 2px solid var(--v2-line); padding-inline-start: var(--space-sm); }
+.v2-rating-related { display: flex; flex-wrap: wrap; gap: var(--space-xs) var(--space-md); }
+.v2-rating-related a { min-height: 44px; display: inline-flex; align-items: center; }
+.v2-rating-variant { display: grid; gap: var(--space-sm); padding-block: var(--space-sm) var(--space-lg); border-block-end: 1px solid var(--v2-line); }
+.v2-rating-variant:last-child { border-block-end: 0; padding-block-end: 0; }
+.v2-rating-variant > header { display: flex; gap: var(--space-xs); align-items: center; }
+.v2-rating-variant > header h3 { flex: 1; margin: 0; }
+.v2-rating-members { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-sm); }
+.v2-rating-member { display: flex; gap: var(--space-xs); min-width: 0; align-items: center; }
+.v2-rating-member > div { min-width: 0; }
+.v2-rating-member p { color: var(--v2-secondary); font-size: var(--text-xs); }
+.v2-rating-state { font-size: var(--text-xs); color: var(--v2-secondary); }
+.v2-rating-state[data-state="ready"], .v2-rating-conditions [data-state="ready"] { color: var(--color-positive); }
+.v2-rating-conditions { display: grid; gap: var(--space-2xs); padding: 0; list-style: none; font-size: var(--text-xs); color: var(--v2-secondary); }
+.v2-rating-conditions li { display: flex; justify-content: space-between; gap: var(--space-sm); }
+.v2-rating-conditions li > span:last-child { flex: none; }
+.v2-rating-empty { padding-block: var(--space-lg); color: var(--v2-secondary); }
+.v2-rating-more { justify-self: center; }
+@media (max-width: 600px) {
+  .v2-rating-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .v2-rating-row > summary { padding-inline: var(--space-xs); gap: var(--space-xs); }
+  .v2-rating-members { grid-template-columns: minmax(0, 1fr); }
+  .v2-rating-details { padding-inline: var(--space-xs); }
+}

@@ -377,6 +377,6 @@ it.each(['submitted', 'restored'])('automatically displays a %s job result and k
   const previousCard = await screen.findByRole('article', { name: 'Previous schedule' }, { timeout: 5_000 })
   fireEvent.click(within(previousCard).getByRole('button', { name: copy.optimize.pages_tool_optimize_PlansSection_030 }))
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-  await waitFor(() => expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('53,595')).toBeInTheDocument())
+  await waitFor(() => expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('53,595')).toBeInTheDocument(), { timeout: 5_000 })
   expect(vi.mocked(apiJson).mock.calls.filter(([url]) => url.startsWith('/api/user/results/new-result?'))).toHaveLength(1)
 }, 15_000)

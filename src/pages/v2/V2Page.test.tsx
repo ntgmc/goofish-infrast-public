@@ -1066,6 +1066,10 @@ describe('V2 results-first workspace', () => {
     expect(skills).toHaveAttribute('aria-expanded', 'false')
     expect(skillPanel).toHaveAttribute('aria-hidden', 'true')
     expect(skillPanel).toHaveAttribute('inert')
+    await user.click(skills)
+    await user.click(within(skillPanel).getByRole('link', { name: copy.buildingRatings.detailsLink }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(await screen.findByRole('searchbox', { name: copy.buildingRatings.search })).toBeVisible()
     expect(workflow.handleGenerate).not.toHaveBeenCalled()
   })
 
@@ -1090,6 +1094,20 @@ describe('V2 results-first workspace', () => {
     await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: copy.v2.account })).toBeVisible())
     expect(screen.getByTestId('route-location')).toHaveTextContent('?section=profiles&profile_id=profile-1')
     expect(screen.getByTestId('route-location')).not.toHaveTextContent('panel=')
+  })
+
+  it('closes both operator dialogs when a skill link opens the public ratings section', async () => {
+    connect()
+    const user = userEvent.setup()
+    mount('/v2?profile_id=profile-1&panel=operators')
+    const drawer = within(await screen.findByRole('dialog'))
+    await user.type(drawer.getByRole('textbox', { name: copy.v2.searchOperators }), '但书')
+    await user.click(drawer.getByRole('button', { name: copy.v2.operatorManagement.skills('但书') }))
+    const details = within(await screen.findByRole('dialog', { name: '但书' }))
+    await user.click(details.getByRole('link', { name: copy.buildingRatings.detailsLink }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(await screen.findByRole('searchbox', { name: copy.buildingRatings.search })).toBeVisible()
+    expect(screen.getByTestId('route-location')).toHaveTextContent('section=building-ratings&profile_id=profile-1')
   })
 
   it.each(['operators', 'config'] as const)('dismisses the %s drawer through the overlay despite its input controls', async (panel) => {

@@ -14,7 +14,7 @@ const utilityEntries = ['cultivation-projects', 'tools'] as const
 const supportEntries = ['help', 'support'] as const
 const productEntries = ['announcements', 'updates', 'benchmarks', 'pricing'] as const
 const moreEntries = [...supportEntries, ...productEntries, 'status'] as const
-const toolSections: V2Section[] = ['tools', 'manual-tool', 'schedule-comparison', 'cultivation', 'thanks-recruitment', 'training-ratio', 'material-demand', 'depot']
+const toolSections: V2Section[] = ['tools', 'manual-tool', 'schedule-comparison', 'building-ratings', 'cultivation', 'thanks-recruitment', 'training-ratio', 'material-demand', 'depot']
 const icons = {
   overview: OverviewIcon, generation: GenerateIcon, plans: ResultHistoryIcon, lab: ComparisonIcon, 'cultivation-projects': ProjectsIcon, tools: ToolsIcon,
   announcements: AnnouncementIcon, pricing: PricingIcon, help: HelpIcon, support: SupportIcon, status: ServiceStatusIcon, updates: ReleasesIcon, benchmarks: SiteBenchmarkIcon,

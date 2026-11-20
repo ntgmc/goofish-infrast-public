@@ -1,9 +1,14 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render as renderComponent, waitFor, within } from '@testing-library/react'
+import type { ReactNode } from 'react'
+import { MemoryRouter } from 'react-router'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import OperatorRows from './OperatorRows'
 import { SAMPLE_OPERATORS } from './test-fixtures/sample-252'
+
+function TestRouter({ children }: { children: ReactNode }) { return <MemoryRouter initialEntries={['/v2?profile_id=first']}>{children}</MemoryRouter> }
+function render(ui: ReactNode) { return renderComponent(ui, { wrapper: TestRouter }) }
 
 const observers = new Set<TestResizeObserver>()
 let containerWidth = 400
@@ -45,6 +50,7 @@ it('releases modal interaction immediately on close so another card can open dur
   for (const index of [0, 1, 0]) {
     fireEvent.click(triggers[index])
     expect(page.getByRole('dialog')).toHaveTextContent(SAMPLE_OPERATORS[index].name)
+    expect(within(page.getByRole('dialog')).getByRole('link', { name: '查看技能评级与组合' })).toHaveAttribute('href', expect.stringContaining('section=building-ratings&profile_id=first'))
     expect(page.container.querySelectorAll('[data-shared-card-open]')).toHaveLength(1)
     expect(triggers[index].parentElement).toHaveAttribute('data-shared-card-open')
     expect(document.querySelector('.v2-operator-return')).not.toBeInTheDocument()

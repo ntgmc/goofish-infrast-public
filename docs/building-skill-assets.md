@@ -9,6 +9,9 @@
 - 职业图标保存在 `public/operator-professions`，来自 ZOOT-Plus/zoot-plus-frontend 提交 `130a0ce499da611fd49f4c2a03a2fe0b61684a8f` 的 `public/assets/prof-icons`，同步脚本固定该版本。
 - 图标保存在 `public/building-skills`。游戏数据、名称与美术资源归各自权利人所有；arkntools 的 MIT 许可保存在 `public/building-skills/LICENSE.txt`。
 
+基建技能强度和联动组合使用独立发布的评级数据，评价口径及同步后的复评流程见
+[基建技能评级](building-skill-ratings.md)。
+
 更新及校验：
 
 ```sh
