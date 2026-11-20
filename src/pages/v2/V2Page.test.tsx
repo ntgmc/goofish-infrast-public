@@ -246,6 +246,7 @@ it.each([false, true])('keeps personal navigation in the account drawer and resp
   expect(dialog.queryByRole('button', { name: copy.inventory.nav })).not.toBeInTheDocument()
   expect(dialog.queryByRole('button', { name: copy.skland.title })).not.toBeInTheDocument()
   expect(dialog.getByRole('button', { name: copy.v2.settings })).toBeVisible()
+  expect(dialog.getByRole('button', { name: copy.balance.nav })).toBeVisible()
   await dismissDrawer(user)
   await waitFor(() => expect(opener).toHaveFocus())
   await user.click(opener)
@@ -253,6 +254,7 @@ it.each([false, true])('keeps personal navigation in the account drawer and resp
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   await waitFor(() => expect(screen.getByTestId('route-location')).toHaveTextContent('section=profiles&profile_id=profile-1'))
   expect(opener).toHaveAttribute('aria-expanded', 'false')
+  expect(screen.getByRole('link', { name: copy.balance.nav })).toHaveAttribute('href', '/v2?section=balance&profile_id=profile-1')
   const location = within(screen.getByRole('navigation', { name: copy.v2.topbar.location }))
   expect(location.getByText(sectionLabels.profiles)).toHaveAttribute('aria-current', 'page')
   await user.click(location.getByRole('link', { name: copy.v2.workspace }))
@@ -269,6 +271,13 @@ it.each([false, true])('keeps personal navigation in the account drawer and resp
     await waitFor(() => expect(screen.getByRole('button', { name: copy.v2.topbar.more })).toHaveFocus())
     expect(screen.queryByRole('dialog', { name: copy.v2.topbar.actions })).not.toBeInTheDocument()
   }
+  const fetch = vi.spyOn(globalThis, 'fetch')
+  await user.click(opener)
+  await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: copy.balance.nav }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  expect(screen.getByTestId('route-location')).toHaveTextContent('section=balance&profile_id=profile-1')
+  expect(await screen.findByText(copy.balance.unavailable)).toBeVisible()
+  expect(fetch.mock.calls.some(([url]) => String(url).startsWith('/api/user/balance'))).toBe(false)
 })
 
 it('closes mobile navigation with Escape and restores the menu trigger', async () => {

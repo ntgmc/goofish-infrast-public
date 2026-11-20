@@ -6,6 +6,7 @@ export const balanceCopy = {
   ai_prices: 'AI 服务积分价格',
   ai_price: (amount: string) => `${amount} 积分 / 次`,
   unpriced: '暂未开放积分消费',
+  unavailable: 'AI 积分服务暂未开放。',
   free_help: '查看已有解读、公开示例和页面使用帮助免费。',
   cost: (amount: string, available: string) => `本次 ${amount} 积分 · 可用 ${available} 积分`,
   paid_action: (action: string, amount: string) => `${action} · ${amount} 积分`,

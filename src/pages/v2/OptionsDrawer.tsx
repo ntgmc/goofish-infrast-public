@@ -27,7 +27,7 @@ export type V2Session = ReturnType<typeof useToolSession>
 const accountEntries = [
   { section: 'skland', icon: SklandIcon },
   { section: 'inventory', icon: InventoryIcon }, { section: 'settings', icon: SettingsIcon },
-  { section: 'commercial', icon: BillingIcon }, { section: 'balance', icon: BalanceIcon },
+  { section: 'commercial', icon: BillingIcon },
 ] as const
 
 const titles: Record<OptionPanel, string> = {
@@ -114,6 +114,7 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
               <>
                 <div className="v2-account-card"><span className="v2-account-avatar"><UserRound size={22} aria-hidden="true" /></span>
                   <div><span>{text.accountDrawer.signedIn}</span><strong>{session.user.email}</strong></div>
+                  <button type="button" className="v2-button v2-button-secondary" onClick={() => onNavigate('balance')}><BalanceIcon size={18} aria-hidden="true" />{copy.balance.nav}<ArrowRight size={16} aria-hidden="true" /></button>
                 </div>
                 <section className="v2-account-profiles" aria-label={text.profiles}>
                   <div className="v2-operator-section-heading"><h3>{text.accountDrawer.switchProfile}</h3>

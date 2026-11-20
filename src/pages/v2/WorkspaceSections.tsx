@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
 import { Navigate, useLocation, useSearchParams } from 'react-router'
-import { BackIcon as ArrowLeft, NextIcon as ArrowRight } from '../../components/icons'
+import { BackIcon as ArrowLeft, NextIcon as ArrowRight, BalanceIcon } from '../../components/icons'
 import { Link } from 'react-router'
 import GuestAccountLink from '../../components/GuestAccountLink'
 import { authPath } from '../../lib/auth-navigation'
@@ -93,13 +93,16 @@ export default function WorkspaceSections({ section, session, workflow, generati
     <div className="v2-section-heading"><div><h1>{guided ? copy.v2.firstSchedule.title : title}</h1>{guided ? <p>{copy.v2.firstSchedule.description}</p> : !upgrading && descriptions[section] && <p>{descriptions[section]}</p>}</div>
       {['manual-tool', 'schedule-comparison', 'cultivation', 'thanks-recruitment', 'cultivation-projects', 'training-ratio', 'material-demand', 'depot'].includes(section) && <Link className="v2-button v2-button-secondary" to={v2Path('tools', session.activeProfile?.id)}><ArrowLeft size={16} />{copy.v2.backToTools}</Link>}
       {guided && <Link className="v2-button v2-button-secondary" to={v2Path('overview', session.activeProfile?.id)}><ArrowLeft size={16} />{copy.v2.firstSchedule.backToExample}</Link>}
-      {section === 'profiles' && v2SectionAvailable('add-account', features) && <button type="button" className="v2-button v2-button-primary" onClick={() => onNavigate('add-account')}>{copy.v2.addAccount}<ArrowRight size={16} /></button>}
+      {section === 'profiles' && <div className="v2-actions">
+        {signedIn && <Link className="v2-button v2-button-secondary" to={v2Path('balance', session.activeProfile?.id)}><BalanceIcon size={18} aria-hidden="true" />{copy.balance.nav}<ArrowRight size={16} aria-hidden="true" /></Link>}
+        {v2SectionAvailable('add-account', features) && <button type="button" className="v2-button v2-button-primary" onClick={() => onNavigate('add-account')}>{copy.v2.addAccount}<ArrowRight size={16} /></button>}
+      </div>}
     </div>
     {guided && <FirstScheduleGuide step={step} />}
     <div className="v2-section-body">
       <Suspense fallback={<V2SectionLoading label={section === 'inventory' ? copy.inventory.loading : undefined} />}>
         {section === 'overview' ? null : pause ? <div className="v2-panel v2-section-loading v2-feature-pause-notice" role="status"><h2>{copy.features.paused_title}</h2><p>{pause}</p></div>
-          : !available ? <p className="v2-panel v2-section-loading" role="status">{copy.v2.featureUnavailable}</p>
+          : !available ? <p className="v2-panel v2-section-loading" role="status">{section === 'balance' ? copy.balance.unavailable : copy.v2.featureUnavailable}</p>
           : section === 'generation' && !signedIn ? <div className="v2-first-schedule-task">
             <GuestAccountLink label={features.registration ? copy.v2.guestAccount.firstSchedule : copy.auth.components_AuthForm_008} description={copy.v2.guestAccount.firstScheduleHelp} />
           </div>

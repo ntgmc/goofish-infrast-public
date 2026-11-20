@@ -2170,7 +2170,8 @@ html:has(.v2-page-transition[data-page-entering="native"]) {
 
 .v2-account-content { gap: var(--space-md); }
 .v2-account-card { display: flex; min-width: 0; align-items: center; gap: var(--space-xs); padding-bottom: var(--space-sm); border-bottom: 1px solid var(--v2-line); }
-.v2-account-card > div { display: grid; min-width: 0; gap: var(--space-3xs); }
+.v2-account-card > div { display: grid; min-width: 0; flex: 1; gap: var(--space-3xs); }
+.v2-account-card > button { flex: none; }
 .v2-account-card > div > span { color: var(--v2-muted); font-size: var(--text-xs); }
 .v2-account-card strong { overflow-wrap: anywhere; color: var(--v2-ink); font-size: var(--text-sm); }
 .v2-account-avatar { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: var(--radius-pill); background: var(--v2-accent-soft); color: var(--v2-accent); font-size: var(--text-sm); }
