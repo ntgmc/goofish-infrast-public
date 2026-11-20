@@ -15,7 +15,8 @@ import { getSku } from '../../lib/product-catalog'
 import { PublicContentProvider } from '../../lib/public-content-context'
 import type { OptimizeResult, UserGameAccount, WorkspaceResultHistorySummary } from '../../lib/types'
 import type { V2Session } from './OptionsDrawer'
-import { SAMPLE_CONFIG, SAMPLE_OPERATORS, SAMPLE_RESULT } from './sample-result'
+import { SAMPLE_CONFIG, SAMPLE_OPERATORS, SAMPLE_RESULT } from './test-fixtures/sample-252'
+import { SAMPLE_CONFIG as DEMO_CONFIG, SAMPLE_OPERATORS as DEMO_OPERATORS } from './sample-result'
 import { sectionLabels } from './navigation'
 import { SANITY_PER_LMD, SANITY_PER_PURE_GOLD } from '../../lib/orundum-economy'
 import { ApiError } from '../../lib/api-client'
@@ -466,7 +467,7 @@ describe('V2 results-first workspace', () => {
     await screen.findByText(copy.v2.generationImport)
     await user.click(screen.getByRole('button', { name: copy.public.pages_LandingPage_001 }))
     await user.upload(screen.getByLabelText(copy.v2.uploadMaa, { selector: 'input' }), new File([JSON.stringify(SAMPLE_OPERATORS)], 'operators.json', { type: 'application/json' }))
-    await waitFor(() => expect(session.persistWorkspacePatch).toHaveBeenCalledWith(expect.objectContaining({ operators: SAMPLE_OPERATORS, config: expect.objectContaining({ layout: SAMPLE_CONFIG.layout }) })))
+    await waitFor(() => expect(session.persistWorkspacePatch).toHaveBeenCalledWith(expect.objectContaining({ operators: SAMPLE_OPERATORS, config: expect.objectContaining({ layout: DEMO_CONFIG.layout }) })))
     page.rerender(<MemoryRouter initialEntries={['/']}><V2Page /><RouteLocation /></MemoryRouter>)
     await screen.findByText(copy.v2.firstSchedule.configTitle, {}, { timeout: 5_000 })
     expect(guide().querySelector('[aria-current="step"]')).toHaveTextContent(copy.v2.firstSchedule.config)
@@ -592,7 +593,7 @@ describe('V2 results-first workspace', () => {
     expect(navigation.getAllByRole('link').slice(0, 4).map((link) => link.textContent)).toEqual([
       copy.v2.guestNavigation.example, copy.v2.generateMine, copy.v2.tools, copy.v2.guestNavigation.pricing,
     ])
-    const count = SAMPLE_OPERATORS.filter((operator) => operator.own).length
+    const count = DEMO_OPERATORS.filter((operator) => operator.own).length
     expect(navigation.getByRole('button', { name: copy.v2.sidebar.editOperators }).querySelector('small')).toHaveTextContent(copy.v2.guestNavigation.operatorSample)
     expect(screen.getByText(copy.v2.contextDetails, { selector: 'summary > span' }).closest('details')).not.toHaveAttribute('open')
     await userEvent.click(screen.getByText(copy.v2.contextDetails, { selector: 'summary > span' }))
@@ -1130,6 +1131,7 @@ describe('V2 results-first workspace', () => {
   })
 
   it('switches teams by mouse and keyboard and exposes room details on demand', async () => {
+    connect()
     const user = userEvent.setup()
     mount()
     const originalRoom = within(screen.getByRole('tabpanel')).getByRole('button', { name: /贸易站.*推进之王/ })
@@ -1211,6 +1213,7 @@ describe('V2 results-first workspace', () => {
   })
 
   it('exposes only the current team during rapid shift changes and keeps keyboard focus on the selected tab', async () => {
+    connect()
     const user = userEvent.setup()
     mount()
     await user.click(screen.getByRole('tab', { name: /第2班/ }))
@@ -1225,6 +1228,7 @@ describe('V2 results-first workspace', () => {
   })
 
   it('keeps occupants in their slots and exposes only the latest team while animations overlap', async () => {
+    connect()
     vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(0)
     const user = userEvent.setup()
     render(<MotionPreferenceProvider><MemoryRouter initialEntries={['/v2']}><V2Page /></MemoryRouter></MotionPreferenceProvider>)
@@ -1296,6 +1300,7 @@ describe('V2 results-first workspace', () => {
   })
 
   it('marks the correct drone target using one-based result indices in each shift', async () => {
+    connect()
     const user = userEvent.setup()
     mount()
     expect(within(screen.getByRole('button', { name: /制造站.*温蒂/ })).getByTitle(copy.v2.drones)).toBeInTheDocument()
@@ -1509,7 +1514,8 @@ describe('V2 results-first workspace', () => {
     Object.defineProperty(file, 'text', { value: async () => JSON.stringify([{ ...SAMPLE_OPERATORS[0], name: 123 }]) })
     await user.upload(input, file)
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(copy.v2.uploadFailed)
-    expect(within(dialog).getByText(SAMPLE_OPERATORS[0].name)).toBeInTheDocument()
+    await user.type(within(dialog).getByRole('textbox', { name: copy.v2.searchOperators }), '但书')
+    expect(within(dialog).getByText('但书')).toBeInTheDocument()
     expect(session.persistWorkspacePatch).not.toHaveBeenCalled()
     expect(mocks.workflow).not.toHaveBeenCalled()
   })
@@ -1532,6 +1538,32 @@ describe('V2 results-first workspace', () => {
     expect(screen.getByRole('status')).toHaveTextContent(copy.v2.demoConfigChanged)
   })
 
+  it('lets guests browse all three advanced result views without starting tasks or editing data', async () => {
+    const user = userEvent.setup()
+    mount()
+    await user.click(screen.getByRole('button', { name: copy.v2.analysisTab }))
+    expect(screen.getByText(copy.v2.advancedSample.readonly)).toBeVisible()
+    expect(screen.getByRole('region', { name: copy.v2.stationOutput })).toBeVisible()
+    expect(screen.getByRole('region', { name: copy.v2.sanityCalculation })).toBeVisible()
+
+    await user.click(screen.getByRole('button', { name: copy.v2.manualTab }))
+    const board = within(await screen.findByRole('region', { name: copy.domain.result_board_v2.tab }))
+    const shifts = board.getAllByRole('tab')
+    await user.click(shifts[1])
+    expect(shifts[1]).toHaveAttribute('aria-selected', 'true')
+    expect(board.queryByRole('button', { name: /编辑|调整/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: copy.domain.manual_schedule.simulate })).not.toBeInTheDocument()
+    expect(mocks.manual).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: copy.v2.trainingTab }))
+    const single = await screen.findByRole('checkbox', { name: copy.optimize.components_UpgradeSuggestions_007 })
+    await user.click(single)
+    expect(screen.getAllByRole('article').length).toBeGreaterThan(0)
+    expect(screen.queryByRole('button', { name: /加入培养/ })).not.toBeInTheDocument()
+    expect(session.persistWorkspacePatch).not.toHaveBeenCalled()
+    expect(mocks.workflow).not.toHaveBeenCalled()
+  })
+
   it('keeps sample operator data read-only when searching and leaves the result unchanged', async () => {
     const user = userEvent.setup()
     mount()
@@ -1543,15 +1575,15 @@ describe('V2 results-first workspace', () => {
     expect(within(dialog).getByText('但书')).toBeInTheDocument()
     expect(within(dialog).queryByText('推进之王')).not.toBeInTheDocument()
     expect(within(dialog).getByText(copy.v2.ownedLabel)).toBeInTheDocument()
-    expect(within(dialog).getByText(copy.v2.elite(2))).toBeInTheDocument()
-    expect(within(dialog).getByText(copy.v2.operatorLevel())).toBeInTheDocument()
+    expect(within(dialog).getByText(copy.v2.elite(0))).toBeInTheDocument()
+    expect(within(dialog).getByText(copy.v2.operatorLevel(1))).toBeInTheDocument()
     expect(within(dialog).queryByRole('checkbox')).not.toBeInTheDocument()
     expect(within(dialog).queryByRole('combobox')).not.toBeInTheDocument()
     await user.tab()
     expect(within(dialog).getByRole('button', { name: copy.v2.operatorManagement.skills('但书') })).toHaveFocus()
     await dismissDrawer(user)
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
-    expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('53,595')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('51,745')).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /第1班/ })).toBeInTheDocument()
     expect(session.persistWorkspacePatch).not.toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: copy.v2.generateMine }))
@@ -1826,6 +1858,7 @@ describe('V2 results-first workspace', () => {
     workflow.permission = 'growth'
     workflow.userCanEditConfig = false
     workflow.userCanViewFullData = false
+    workflow.userCanUseUpgradeFeatures = false
     const user = userEvent.setup()
     mount()
     await user.click(screen.getByRole('button', { name: copy.v2.sidebar.editConfig }))
@@ -1836,8 +1869,18 @@ describe('V2 results-first workspace', () => {
     await dismissDrawer(user)
     expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('53,595')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: copy.v2.analysisTab }))
-    expect(await screen.findByText(copy.v2.previewAnalysis)).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: copy.v2.previewAnalysisTitle })).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: copy.v2.sanityCalculation })).not.toBeInTheDocument()
+    for (const [tab, title] of [
+      [copy.v2.analysisTab, copy.v2.previewAnalysisTitle],
+      [copy.v2.manualTab, copy.optimize.paid_preview.manual_title],
+      [copy.v2.trainingTab, copy.optimize.pages_tool_optimize_ResultSection_016],
+    ]) {
+      await user.click(screen.getByRole('button', { name: tab }))
+      expect(screen.getByRole('heading', { name: title })).toBeVisible()
+      expect(screen.getByText(copy.optimize.pages_tool_optimize_ResultSection_015)).toBeVisible()
+      expect(screen.getByRole('link', { name: copy.optimize.pages_tool_optimize_ResultSection_019 })).toBeVisible()
+    }
   })
 
   it.each([false, true])('uses effective trial access in the fallback workspace (trial: %s)', async (trial) => {
@@ -1861,8 +1904,8 @@ describe('V2 results-first workspace', () => {
     expect(session.persistWorkspacePatch).not.toHaveBeenCalled()
     await dismissDrawer(user)
     await user.click(screen.getByRole('button', { name: copy.v2.analysisTab }))
-    if (trial) expect(screen.getByRole('region', { name: copy.v2.sanityCalculation })).toBeInTheDocument()
-    else expect(screen.queryByRole('region', { name: copy.v2.sanityCalculation })).not.toBeInTheDocument()
+    expect(screen.getByText(copy.v2.advancedSample.readonly)).toBeVisible()
+    expect(screen.getByRole('region', { name: copy.v2.sanityCalculation })).toBeInTheDocument()
     expect(mocks.workflow).not.toHaveBeenCalled()
   })
 

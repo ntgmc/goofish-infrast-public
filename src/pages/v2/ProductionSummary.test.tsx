@@ -7,7 +7,7 @@ import { copy } from '../../copy'
 import { prepareResult } from '../../components/result-panel/formatters'
 import type { OrundumEconomy, WorkspaceResultHistorySummary } from '../../lib/types'
 import { CONFIG_PRESETS } from '../../lib/config'
-import { SAMPLE_CONFIG, SAMPLE_OPERATORS, SAMPLE_RESULT } from './sample-result'
+import { SAMPLE_CONFIG, SAMPLE_OPERATORS, SAMPLE_RESULT } from './test-fixtures/sample-252'
 import ProductionSummary from './ProductionSummary'
 import IncomeAnalysis from './IncomeAnalysis'
 

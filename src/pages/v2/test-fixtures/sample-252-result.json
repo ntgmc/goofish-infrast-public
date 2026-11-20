@@ -1,0 +1,5984 @@
+{
+  "facility_layout": [
+    "trading_1",
+    "trading_2",
+    "manufacture_1",
+    "manufacture_2",
+    "manufacture_3",
+    "manufacture_4",
+    "manufacture_5",
+    "power_1",
+    "power_2"
+  ],
+  "author": "一只摆烂的42的自动基建排班生成器",
+  "title": "MaaTool · 252基建 · 3班",
+  "description": "按班次顺序换班。班次时长：8h / 8h / 8h，请按对应时长设置换班时间。宿舍：排班表固定。基建：右满252（赤金多）。基于当前练度。",
+  "buildingType": 252,
+  "planTimes": "3班 · 8h-8h-8h",
+  "plans": [
+    {
+      "name": "第1班",
+      "description": "",
+      "schedule_mode": "maa",
+      "shift_hours": 8,
+      "rooms": {
+        "hire": [
+          {
+            "operators": [
+              "斥罪"
+            ],
+            "efficiency": 60,
+            "mood": {
+              "斥罪": {
+                "end": 14,
+                "start": 24,
+                "consumed": 10,
+                "red_face": false,
+                "cost_per_hour": 1.25,
+                "controlled_zero_mood": false
+              }
+            },
+            "autofill": false,
+            "facility_level": 3,
+            "dynamic_resources": {
+              "passion": 10
+            },
+            "operator_efficiency": 50,
+            "mood_consumption_delta": {
+              "斥罪": 0.5
+            },
+            "cross_station_operators": [],
+            "control_center_efficiency": 10,
+            "mood_consumption_override": {},
+            "effective_power_station_count": 3
+          }
+        ],
+        "power": [
+          {
+            "operators": [
+              "缪尔赛思"
+            ],
+            "efficiency": 25,
+            "mood": {
+              "缪尔赛思": {
+                "end": 18,
+                "start": 24,
+                "consumed": 6,
+                "red_face": false,
+                "cost_per_hour": 0.75,
+                "controlled_zero_mood": false
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "autofill": false,
+            "facility_level": 3,
+            "dynamic_resources": {
+              "passion": 10
+            },
+            "operator_efficiency": 25,
+            "mood_consumption_delta": {},
+            "cross_station_operators": [
+              "缪尔赛思"
+            ],
+            "mood_consumption_override": {},
+            "effective_power_station_count": 3
+          },
+          {
+            "operators": [
+              "承曦格雷伊"
+            ],
+            "efficiency": 23,
+            "mood": {
+              "承曦格雷伊": {
+                "end": 12,
+                "start": 18,
+                "consumed": 6,
+                "red_face": false,
+                "cost_per_hour": 0.75,
+                "controlled_zero_mood": false
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "autofill": false,
+            "facility_level": 3,
+            "dynamic_resources": {
+              "passion": 10
+            },
+            "operator_efficiency": 23,
+            "mood_consumption_delta": {},
+            "cross_station_operators": [],
+            "mood_consumption_override": {},
+            "effective_power_station_count": 3
+          }
+        ],
+        "control": [
+          {
+            "operators": [
+              "八幡海铃",
+              "Mon3tr",
+              "阿米娅",
+              "老鲤",
+              "戴菲恩"
+            ],
+            "efficiency": {
+              "hire": 10,
+              "meeting": 25,
+              "trading": 7,
+              "manufacturing": 2,
+              "mood_recovery": 0.05,
+              "hire_mood_recovery": 0,
+              "power_mood_recovery": 0,
+              "meeting_mood_recovery": 0,
+              "trading_mood_recovery": 0,
+              "manufacture_mood_recovery": 0
+            },
+            "mood": {
+              "Mon3tr": {
+                "end": 18.4,
+                "start": 24,
+                "consumed": 5.6,
+                "red_face": false,
+                "cost_per_hour": 0.7,
+                "controlled_zero_mood": false
+              },
+              "老鲤": {
+                "end": 12.4,
+                "start": 18,
+                "consumed": 5.6,
+                "red_face": false,
+                "cost_per_hour": 0.7,
+                "controlled_zero_mood": false
+              },
+              "戴菲恩": {
+                "end": 18.4,
+                "start": 24,
+                "consumed": 5.6,
+                "red_face": false,
+                "cost_per_hour": 0.7,
+                "controlled_zero_mood": false
+              },
+              "阿米娅": {
+                "end": 18.4,
+                "start": 24,
+                "consumed": 5.6,
+                "red_face": false,
+                "cost_per_hour": 0.7,
+                "controlled_zero_mood": false
+              },
+              "八幡海铃": {
+                "end": 18.4,
+                "start": 24,
+                "consumed": 5.6,
+                "red_face": false,
+                "cost_per_hour": 0.7,
+                "controlled_zero_mood": false
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "facility_level": 5,
+            "cross_station_operators": []
+          }
+        ],
+        "meeting": [
+          {
+            "operators": [
+              "信仰搅拌机",
+              "见行者"
+            ],
+            "efficiency": 144,
+            "final_efficiency": 169,
+            "mood": {
+              "见行者": {
+                "end": 2.4,
+                "start": 24,
+                "consumed": 21.6,
+                "red_face": false,
+                "cost_per_hour": 2.7,
+                "controlled_zero_mood": false
+              },
+              "信仰搅拌机": {
+                "end": 18.4,
+                "start": 24,
+                "consumed": 5.6,
+                "red_face": false,
+                "cost_per_hour": 0.7,
+                "controlled_zero_mood": false
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "autofill": false,
+            "facility_level": 3,
+            "dynamic_resources": {
+              "passion": 10
+            },
+            "control_efficiency": 25,
+            "operator_efficiency": 144,
+            "mood_consumption_delta": {
+              "见行者": 2
+            },
+            "cross_station_operators": [
+              "信仰搅拌机"
+            ],
+            "mood_consumption_override": {},
+            "effective_power_station_count": 3
+          }
+        ],
+        "trading": [
+          {
+            "operators": [
+              "但书",
+              "推进之王",
+              "摩根"
+            ],
+            "product": "LMD",
+            "efficiency": 195,
+            "final_efficiency": 202,
+            "mood": {
+              "但书": {
+                "end": 18.8,
+                "start": 24,
+                "consumed": 5.2,
+                "red_face": false,
+                "cost_per_hour": 0.65,
+                "controlled_zero_mood": false
+              },
+              "摩根": {
+                "end": 18.8,
+                "start": 24,
+                "consumed": 5.2,
+                "red_face": false,
+                "cost_per_hour": 0.65,
+                "controlled_zero_mood": false
+              },
+              "推进之王": {
+                "end": 18.8,
+                "start": 24,
+                "consumed": 5.2,
+                "red_face": false,
+                "cost_per_hour": 0.65,
+                "controlled_zero_mood": false
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "level": 3,
+            "autofill": false,
+            "overflow": {
+              "time": "16:32:12",
+              "type": "order",
+              "limit": 10,
+              "seconds": 59531.71,
+              "strategy": "normal",
+              "idle_time": "0:00:00",
+              "base_limit": 10,
+              "equivalent": {
+                "type": "bibeak_breach_order",
+                "reward_ratio": 1.5517,
+                "base_efficiency": 202,
+                "breach_probability": 0.8,
+                "extra_lmd_per_order": 800,
+                "extra_gold_per_order": 1.6,
+                "equivalent_efficiency": 315.1,
+                "expected_gold_per_order": 2.9,
+                "equivalent_efficiency_delta": 113.1
+              },
+              "global_buff": 7,
+              "limit_delta": 0,
+              "shift_hours": 8,
+              "idle_seconds": 0,
+              "current_count": 10,
+              "active_fraction": 1,
+              "full_efficiency": null,
+              "raw_limit_delta": 0,
+              "capacity_limited": false,
+              "speed_efficiency": 202,
+              "display_efficiency": 202,
+              "initial_efficiency": null,
+              "expected_order_time": "1:39:13",
+              "order_limit_penalty": 0,
+              "effective_efficiency": 202,
+              "has_high_quality_buff": false,
+              "production_multiplier": 2.05,
+              "has_special_order_buff": false,
+              "expected_gold_per_order": 2.9,
+              "speed_efficiency_reason": "",
+              "trading_order_efficiency": null,
+              "speed_efficiency_adjusted": false,
+              "expected_seconds_per_order": 12204,
+              "expected_tequila_lmd_bonus_per_order": 0
+            },
+            "facility_level": 3,
+            "dynamic_resources": {
+              "passion": 10
+            },
+            "order_limit_delta": 0,
+            "operator_efficiency": 95,
+            "mood_consumption_delta": {},
+            "cross_station_operators": [],
+            "mood_consumption_override": {},
+            "stable_position_operators": [],
+            "effective_order_limit_delta": 0,
+            "effective_power_station_count": 3
+          },
+          {
+            "operators": [
+              "可露希尔",
+              "伺夜"
+            ],
+            "product": "LMD",
+            "efficiency": 155,
+            "final_efficiency": 162,
+            "mood": {
+              "伺夜": {
+                "end": 18.4,
+                "start": 24,
+                "consumed": 5.6,
+                "red_face": false,
+                "cost_per_hour": 0.7,
+                "controlled_zero_mood": false
+              },
+              "可露希尔": {
+                "end": 18.4,
+                "start": 24,
+                "consumed": 5.6,
+                "red_face": false,
+                "cost_per_hour": 0.7,
+                "controlled_zero_mood": false
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "level": 2,
+            "autofill": false,
+            "overflow": {
+              "time": "11:42:26",
+              "type": "order",
+              "limit": 8,
+              "seconds": 42146.34,
+              "strategy": "special",
+              "idle_time": "0:00:00",
+              "base_limit": 8,
+              "equivalent": {
+                "order_lmd": 1200,
+                "normal_lmd": 1000,
+                "base_efficiency": 162,
+                "bonus_lmd_per_order": 200,
+                "saved_gold_per_hour": 0.2733,
+                "saved_gold_per_order": 0.4,
+                "equivalent_efficiency": 194.8,
+                "manufacturing_equivalent_efficiency": 32.8
+              },
+              "global_buff": 7,
+              "limit_delta": 0,
+              "shift_hours": 8,
+              "idle_seconds": 0,
+              "current_count": 8,
+              "active_fraction": 1,
+              "full_efficiency": null,
+              "raw_limit_delta": 0,
+              "capacity_limited": false,
+              "speed_efficiency": 162,
+              "display_efficiency": 162,
+              "initial_efficiency": null,
+              "expected_order_time": "1:27:48",
+              "order_limit_penalty": 0,
+              "effective_efficiency": 162,
+              "has_high_quality_buff": false,
+              "production_multiplier": 1.64,
+              "has_special_order_buff": true,
+              "expected_gold_per_order": 2,
+              "speed_efficiency_reason": "",
+              "trading_order_efficiency": null,
+              "speed_efficiency_adjusted": false,
+              "expected_seconds_per_order": 8640,
+              "expected_tequila_lmd_bonus_per_order": 0
+            },
+            "facility_level": 2,
+            "dynamic_resources": {
+              "passion": 10
+            },
+            "order_limit_delta": 0,
+            "operator_efficiency": 55,
+            "mood_consumption_delta": {},
+            "cross_station_operators": [],
+            "mood_consumption_override": {},
+            "stable_position_operators": [],
+            "effective_order_limit_delta": 0,
+            "effective_power_station_count": 3
+          }
+        ],
+        "dormitory": [
+          {
+            "operators": [
+              "菲亚梅塔",
+              "白面鸮",
+              "多萝西",
+              "赫默",
+              "麦哲伦"
+            ],
+            "mood": {
+              "赫默": {
+                "end": 24,
+                "start": 24
+              },
+              "多萝西": {
+                "end": 24,
+                "start": 24
+              },
+              "白面鸮": {
+                "end": 24,
+                "start": 24
+              },
+              "麦哲伦": {
+                "end": 24,
+                "start": 24
+              },
+              "菲亚梅塔": {
+                "end": 24,
+                "start": 8
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "autofill": true,
+            "facility_level": 1,
+            "cross_station_operators": [
+              "菲亚梅塔",
+              "白面鸮",
+              "多萝西",
+              "赫默",
+              "麦哲伦"
+            ]
+          },
+          {
+            "operators": [
+              "梅尔",
+              "艾雅法拉",
+              "格雷伊",
+              "丰川祥子",
+              "伊内丝"
+            ],
+            "mood": {
+              "梅尔": {
+                "end": 24,
+                "start": 24
+              },
+              "伊内丝": {
+                "end": 24,
+                "start": 12.8
+              },
+              "格雷伊": {
+                "end": 24,
+                "start": 12
+              },
+              "丰川祥子": {
+                "end": 24,
+                "start": 12.4
+              },
+              "艾雅法拉": {
+                "end": 24,
+                "start": 12
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "autofill": true,
+            "facility_level": 1,
+            "cross_station_operators": [
+              "梅尔"
+            ]
+          },
+          {
+            "operators": [
+              "红豆",
+              "霜叶",
+              "火神",
+              "泡泡",
+              "凯尔希"
+            ],
+            "mood": {
+              "泡泡": {
+                "end": 24,
+                "start": 16.8
+              },
+              "火神": {
+                "end": 24,
+                "start": 16.8
+              },
+              "红豆": {
+                "end": 24,
+                "start": 13.2
+              },
+              "霜叶": {
+                "end": 24,
+                "start": 13.2
+              },
+              "凯尔希": {
+                "end": 24,
+                "start": 18
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "autofill": true,
+            "facility_level": 1,
+            "cross_station_operators": []
+          },
+          {
+            "operators": [
+              "诗怀雅",
+              "焰狐龙梓兰",
+              "陈",
+              "石英",
+              "卡夫卡"
+            ],
+            "mood": {
+              "陈": {
+                "end": 24,
+                "start": 18.4
+              },
+              "石英": {
+                "end": 24,
+                "start": 18.4
+              },
+              "卡夫卡": {
+                "end": 24,
+                "start": 20.8
+              },
+              "诗怀雅": {
+                "end": 24,
+                "start": 18
+              },
+              "焰狐龙梓兰": {
+                "end": 24,
+                "start": 18
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "autofill": true,
+            "facility_level": 1,
+            "cross_station_operators": []
+          }
+        ],
+        "processing": [
+          {
+            "operators": [],
+            "skip": false,
+            "sort": true,
+            "facility_level": 3,
+            "cross_station_operators": []
+          }
+        ],
+        "manufacture": [
+          {
+            "operators": [
+              "温蒂",
+              "清流",
+              "冬时"
+            ],
+            "product": "Pure Gold",
+            "efficiency": 215,
+            "final_efficiency": 217,
+            "mood": {
+              "冬时": {
+                "end": 13.6,
+                "start": 18.8,
+                "consumed": 5.2,
+                "red_face": false,
+                "cost_per_hour": 0.65,
+                "controlled_zero_mood": false
+              },
+              "清流": {
+                "end": 13.6,
+                "start": 18.8,
+                "consumed": 5.2,
+                "red_face": false,
+                "cost_per_hour": 0.65,
+                "controlled_zero_mood": false
+              },
+              "温蒂": {
+                "end": 13.6,
+                "start": 18.8,
+                "consumed": 5.2,
+                "red_face": false,
+                "cost_per_hour": 0.65,
+                "controlled_zero_mood": false
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "level": 3,
+            "autofill": false,
+            "overflow": {
+              "time": "15:49:05",
+              "seconds": 56945.45,
+              "capacity": 59,
+              "idle_time": "0:00:00",
+              "craft_time": "1:12:00",
+              "global_buff": 2,
+              "shift_hours": 8,
+              "idle_seconds": 0,
+              "base_capacity": 54,
+              "craft_seconds": 4320,
+              "capacity_delta": 5,
+              "current_volume": 58,
+              "product_volume": 2,
+              "storable_count": 29,
+              "active_fraction": 1,
+              "base_efficiency": 215,
+              "capacity_limited": false,
+              "final_efficiency": 217,
+              "next_product_time": "16:21:49",
+              "effective_efficiency": 217,
+              "next_product_seconds": 58909.09,
+              "production_multiplier": 2.2
+            },
+            "facility_level": 3,
+            "dynamic_resources": {
+              "passion": 10
+            },
+            "operator_efficiency": 115,
+            "mood_consumption_delta": {},
+            "storage_capacity_delta": 5,
+            "cross_station_operators": [],
+            "special_stacking_cleared": false,
+            "mood_consumption_override": {},
+            "stable_position_operators": [],
+            "special_replaced_efficiency": 0,
+            "effective_power_station_count": 3,
+            "control_center_special_efficiency": 0
+          },
+          {
+            "operators": [
+              "槐琥",
+              "阿罗玛"
+            ],
+            "product": "Pure Gold",
+            "efficiency": 185,
+            "final_efficiency": 187,
+            "mood": {
+              "槐琥": {
+                "end": 12.8,
+                "start": 18.4,
+                "consumed": 5.6,
+                "red_face": false,
+                "cost_per_hour": 0.7,
+                "controlled_zero_mood": false
+              },
+              "阿罗玛": {
+                "end": 12.8,
+                "start": 18.4,
+                "consumed": 5.6,
+                "red_face": false,
+                "cost_per_hour": 0.7,
+                "controlled_zero_mood": false
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "level": 2,
+            "autofill": false,
+            "overflow": {
+              "time": "11:25:43",
+              "seconds": 41142.86,
+              "capacity": 36,
+              "idle_time": "0:00:00",
+              "craft_time": "1:12:00",
+              "global_buff": 2,
+              "shift_hours": 8,
+              "idle_seconds": 0,
+              "base_capacity": 36,
+              "craft_seconds": 4320,
+              "capacity_delta": 0,
+              "current_volume": 36,
+              "product_volume": 2,
+              "storable_count": 18,
+              "active_fraction": 1,
+              "base_efficiency": 185,
+              "capacity_limited": false,
+              "final_efficiency": 187,
+              "next_product_time": "12:03:49",
+              "effective_efficiency": 187,
+              "next_product_seconds": 43428.57,
+              "production_multiplier": 1.89
+            },
+            "facility_level": 2,
+            "dynamic_resources": {
+              "passion": 10
+            },
+            "operator_efficiency": 85,
+            "mood_consumption_delta": {
+              "槐琥": 0,
+              "阿罗玛": 0
+            },
+            "storage_capacity_delta": 0,
+            "cross_station_operators": [],
+            "special_stacking_cleared": false,
+            "mood_consumption_override": {},
+            "stable_position_operators": [
+              "阿罗玛"
+            ],
+            "special_replaced_efficiency": 0,
+            "effective_power_station_count": 3,
+            "control_center_special_efficiency": 0
+          },
+          {
+            "operators": [
+              "断罪者",
+              "怒潮凛冬",
+              "白雪"
+            ],
+            "product": "Battle Record",
+            "efficiency": 195,
+            "final_efficiency": 197,
+            "mood": {
+              "白雪": {
+                "end": 13.6,
+                "start": 18.8,
+                "consumed": 5.2,
+                "red_face": false,
+                "cost_per_hour": 0.65,
+                "controlled_zero_mood": false
+              },
+              "断罪者": {
+                "end": 13.6,
+                "start": 18.8,
+                "consumed": 5.2,
+                "red_face": false,
+                "cost_per_hour": 0.65,
+                "controlled_zero_mood": false
+              },
+              "怒潮凛冬": {
+                "end": 13.6,
+                "start": 18.8,
+                "consumed": 5.2,
+                "red_face": false,
+                "cost_per_hour": 0.65,
+                "controlled_zero_mood": false
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "level": 3,
+            "autofill": false,
+            "overflow": {
+              "time": "15:00:00",
+              "seconds": 54000,
+              "capacity": 54,
+              "idle_time": "0:00:00",
+              "craft_time": "3:00:00",
+              "global_buff": 2,
+              "shift_hours": 8,
+              "idle_seconds": 0,
+              "base_capacity": 54,
+              "craft_seconds": 10800,
+              "capacity_delta": 0,
+              "current_volume": 50,
+              "product_volume": 5,
+              "storable_count": 10,
+              "active_fraction": 1,
+              "base_efficiency": 195,
+              "capacity_limited": false,
+              "final_efficiency": 197,
+              "next_product_time": "16:30:00",
+              "effective_efficiency": 197,
+              "next_product_seconds": 59400,
+              "production_multiplier": 2
+            },
+            "facility_level": 3,
+            "dynamic_resources": {
+              "passion": 10
+            },
+            "operator_efficiency": 95,
+            "mood_consumption_delta": {},
+            "storage_capacity_delta": 0,
+            "cross_station_operators": [],
+            "special_stacking_cleared": false,
+            "mood_consumption_override": {},
+            "stable_position_operators": [],
+            "special_replaced_efficiency": 0,
+            "effective_power_station_count": 3,
+            "control_center_special_efficiency": 0
+          },
+          {
+            "operators": [
+              "红云",
+              "稀音"
+            ],
+            "product": "Battle Record",
+            "efficiency": 165,
+            "final_efficiency": 167,
+            "mood": {
+              "稀音": {
+                "end": 18.4,
+                "start": 24,
+                "consumed": 5.6,
+                "red_face": false,
+                "cost_per_hour": 0.7,
+                "controlled_zero_mood": false
+              },
+              "红云": {
+                "end": 20.4,
+                "start": 24,
+                "consumed": 3.6,
+                "red_face": false,
+                "cost_per_hour": 0.45,
+                "controlled_zero_mood": false
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "level": 2,
+            "autofill": false,
+            "overflow": {
+              "time": "19:31:36",
+              "seconds": 70295.86,
+              "capacity": 56,
+              "idle_time": "0:00:00",
+              "craft_time": "3:00:00",
+              "global_buff": 2,
+              "shift_hours": 8,
+              "idle_seconds": 0,
+              "base_capacity": 36,
+              "craft_seconds": 10800,
+              "capacity_delta": 20,
+              "current_volume": 55,
+              "product_volume": 5,
+              "storable_count": 11,
+              "active_fraction": 1,
+              "base_efficiency": 165,
+              "capacity_limited": false,
+              "final_efficiency": 167,
+              "next_product_time": "21:18:06",
+              "effective_efficiency": 167,
+              "next_product_seconds": 76686.39,
+              "production_multiplier": 1.69
+            },
+            "facility_level": 2,
+            "dynamic_resources": {
+              "passion": 10
+            },
+            "operator_efficiency": 65,
+            "mood_consumption_delta": {
+              "红云": -0.25
+            },
+            "storage_capacity_delta": 20,
+            "cross_station_operators": [],
+            "special_stacking_cleared": false,
+            "mood_consumption_override": {},
+            "stable_position_operators": [
+              "稀音"
+            ],
+            "special_replaced_efficiency": 0,
+            "effective_power_station_count": 3,
+            "control_center_special_efficiency": 0
+          },
+          {
+            "operators": [
+              "淬羽赫默",
+              "铅踝"
+            ],
+            "product": "Battle Record",
+            "efficiency": 160,
+            "final_efficiency": 162,
+            "mood": {
+              "铅踝": {
+                "end": 18.4,
+                "start": 24,
+                "consumed": 5.6,
+                "red_face": false,
+                "cost_per_hour": 0.7,
+                "controlled_zero_mood": false
+              },
+              "淬羽赫默": {
+                "end": 18.4,
+                "start": 24,
+                "consumed": 5.6,
+                "red_face": false,
+                "cost_per_hour": 0.7,
+                "controlled_zero_mood": false
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "level": 2,
+            "autofill": false,
+            "overflow": {
+              "time": "12:48:18",
+              "seconds": 46097.56,
+              "capacity": 36,
+              "idle_time": "0:00:00",
+              "craft_time": "3:00:00",
+              "global_buff": 2,
+              "shift_hours": 8,
+              "idle_seconds": 0,
+              "base_capacity": 36,
+              "craft_seconds": 10800,
+              "capacity_delta": 0,
+              "current_volume": 35,
+              "product_volume": 5,
+              "storable_count": 7,
+              "active_fraction": 1,
+              "base_efficiency": 160,
+              "capacity_limited": false,
+              "final_efficiency": 162,
+              "next_product_time": "14:38:03",
+              "effective_efficiency": 162,
+              "next_product_seconds": 52682.93,
+              "production_multiplier": 1.64
+            },
+            "facility_level": 2,
+            "dynamic_resources": {
+              "passion": 10
+            },
+            "operator_efficiency": 60,
+            "mood_consumption_delta": {},
+            "storage_capacity_delta": 0,
+            "cross_station_operators": [],
+            "special_stacking_cleared": false,
+            "mood_consumption_override": {},
+            "stable_position_operators": [],
+            "special_replaced_efficiency": 0,
+            "effective_power_station_count": 3,
+            "control_center_special_efficiency": 0
+          }
+        ]
+      },
+      "drones": {
+        "room": "manufacture",
+        "index": 1,
+        "order": "pre",
+        "enable": true,
+        "reason": "库存平衡优先",
+        "product": "Pure Gold",
+        "efficiency": 217,
+        "candidate_count": 7,
+        "display_efficiency": 217
+      },
+      "Fiammetta": {
+        "order": "pre",
+        "enable": true,
+        "reason": "",
+        "status": "enabled",
+        "target": "但书",
+        "available": true,
+        "requested": true,
+        "target_slot": true,
+        "mood_recovery": {
+          "mode": "full_mood_swap",
+          "target": "但书",
+          "target_recovered": 16,
+          "fiammetta_recovered": -16,
+          "target_full_recovered": true,
+          "target_start_after_recovery": 24,
+          "target_start_before_recovery": 8,
+          "fiammetta_start_after_recovery": 8,
+          "fiammetta_start_before_recovery": 24
+        }
+      },
+      "mood_valid": true,
+      "binding_valid": true,
+      "mood_assumptions": {
+        "max_mood": 24,
+        "shift_hours": 8,
+        "cyclic_mood_simulation": true,
+        "dormitory_default_level": 1,
+        "dormitory_default_ambience": 1000,
+        "cyclic_mood_simulation_delta": 0,
+        "dormitory_recovery_calculated": true,
+        "fiammetta_target_recovers_full": true,
+        "resting_operator_recovers_full": false,
+        "cyclic_mood_simulation_iterations": 2
+      },
+      "dynamic_resources": {
+        "passion": 10
+      },
+      "facility_count_details": [
+        {
+          "type": "conditional_power_station_count_bonus",
+          "amount": 1,
+          "detail": "晨曦：其他发电站没有仍有心情的作业平台时，有效发电站数+1。",
+          "source": "单人 - 承曦格雷伊",
+          "active_fraction": 1
+        }
+      ],
+      "dynamic_resource_details": [
+        {
+          "rule": "进驻控制中枢时，热情值+10；人脉资源的联络速度+10%（同种效果取最高）",
+          "type": "dynamic_resource_contribution",
+          "amount": 10,
+          "detail": "可靠伙伴：八幡海铃进驻控制中枢时热情值+10。",
+          "resource": "passion",
+          "resources": {
+            "passion": 10
+          }
+        }
+      ],
+      "required_power_operators": [],
+      "fixed_dormitory_operators": [
+        "菲亚梅塔"
+      ],
+      "required_control_operators": [],
+      "physical_power_station_count": 2,
+      "effective_power_station_count": 3,
+      "facility_dependency_operators": [
+        "白面鸮",
+        "多萝西",
+        "赫默",
+        "麦哲伦",
+        "梅尔"
+      ]
+    },
+    {
+      "name": "第2班",
+      "description": "",
+      "schedule_mode": "maa",
+      "shift_hours": 8,
+      "rooms": {
+        "hire": [
+          {
+            "operators": [
+              "艾雅法拉"
+            ],
+            "efficiency": 55,
+            "mood": {
+              "艾雅法拉": {
+                "end": 18,
+                "start": 24,
+                "consumed": 6,
+                "red_face": false,
+                "cost_per_hour": 0.75,
+                "controlled_zero_mood": false
+              }
+            },
+            "autofill": false,
+            "facility_level": 3,
+            "dynamic_resources": {
+              "passion": 10
+            },
+            "operator_efficiency": 45,
+            "mood_consumption_delta": {},
+            "cross_station_operators": [],
+            "control_center_efficiency": 10,
+            "mood_consumption_override": {},
+            "effective_power_station_count": 2
+          }
+        ],
+        "power": [
+          {
+            "operators": [
+              "缪尔赛思"
+            ],
+            "efficiency": 25,
+            "mood": {
+              "缪尔赛思": {
+                "end": 12,
+                "start": 18,
+                "consumed": 6,
+                "red_face": false,
+                "cost_per_hour": 0.75,
+                "controlled_zero_mood": false
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "autofill": false,
+            "facility_level": 3,
+            "dynamic_resources": {
+              "passion": 10
+            },
+            "operator_efficiency": 25,
+            "mood_consumption_delta": {},
+            "cross_station_operators": [
+              "缪尔赛思"
+            ],
+            "mood_consumption_override": {},
+            "effective_power_station_count": 2
+          },
+          {
+            "operators": [
+              "格雷伊"
+            ],
+            "efficiency": 20,
+            "mood": {
+              "格雷伊": {
+                "end": 18,
+                "start": 24,
+                "consumed": 6,
+                "red_face": false,
+                "cost_per_hour": 0.75,
+                "controlled_zero_mood": false
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "autofill": false,
+            "facility_level": 3,
+            "dynamic_resources": {
+              "passion": 10
+            },
+            "operator_efficiency": 20,
+            "mood_consumption_delta": {},
+            "cross_station_operators": [],
+            "mood_consumption_override": {},
+            "effective_power_station_count": 2
+          }
+        ],
+        "control": [
+          {
+            "operators": [
+              "八幡海铃",
+              "Mon3tr",
+              "阿米娅",
+              "丰川祥子",
+              "戴菲恩"
+            ],
+            "efficiency": {
+              "hire": 10,
+              "meeting": 0,
+              "trading": 7,
+              "manufacturing": 2,
+              "mood_recovery": 0.05,
+              "hire_mood_recovery": 0,
+              "power_mood_recovery": 0,
+              "meeting_mood_recovery": 0,
+              "trading_mood_recovery": 0,
+              "manufacturing_pure_gold": 1,
+              "manufacture_mood_recovery": 0
+            },
+            "mood": {
+              "Mon3tr": {
+                "end": 12.8,
+                "start": 18.4,
+                "consumed": 5.6,
+                "red_face": false,
+                "cost_per_hour": 0.7,
+                "controlled_zero_mood": false
+              },
+              "戴菲恩": {
+                "end": 12.8,
+                "start": 18.4,
+                "consumed": 5.6,
+                "red_face": false,
+                "cost_per_hour": 0.7,
+                "controlled_zero_mood": false
+              },
+              "阿米娅": {
+                "end": 12.8,
+                "start": 18.4,
+                "consumed": 5.6,
+                "red_face": false,
+                "cost_per_hour": 0.7,
+                "controlled_zero_mood": false
+              },
+              "丰川祥子": {
+                "end": 18.4,
+                "start": 24,
+                "consumed": 5.6,
+                "red_face": false,
+                "cost_per_hour": 0.7,
+                "controlled_zero_mood": false
+              },
+              "八幡海铃": {
+                "end": 12.8,
+                "start": 18.4,
+                "consumed": 5.6,
+                "red_face": false,
+                "cost_per_hour": 0.7,
+                "controlled_zero_mood": false
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "facility_level": 5,
+            "cross_station_operators": []
+          }
+        ],
+        "meeting": [
+          {
+            "operators": [
+              "伊内丝",
+              "信仰搅拌机"
+            ],
+            "efficiency": 140,
+            "final_efficiency": 140,
+            "mood": {
+              "伊内丝": {
+                "end": 18.4,
+                "start": 24,
+                "consumed": 5.6,
+                "red_face": false,
+                "cost_per_hour": 0.7,
+                "controlled_zero_mood": false
+              },
+              "信仰搅拌机": {
+                "end": 12.8,
+                "start": 18.4,
+                "consumed": 5.6,
+                "red_face": false,
+                "cost_per_hour": 0.7,
+                "controlled_zero_mood": false
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "autofill": false,
+            "facility_level": 3,
+            "dynamic_resources": {
+              "passion": 10
+            },
+            "control_efficiency": 0,
+            "operator_efficiency": 140,
+            "mood_consumption_delta": {},
+            "cross_station_operators": [
+              "信仰搅拌机"
+            ],
+            "mood_consumption_override": {},
+            "effective_power_station_count": 2
+          }
+        ],
+        "trading": [
+          {
+            "operators": [
+              "但书",
+              "推进之王",
+              "摩根"
+            ],
+            "product": "LMD",
+            "efficiency": 195,
+            "final_efficiency": 202,
+            "mood": {
+              "但书": {
+                "end": 13.6,
+                "start": 18.8,
+                "consumed": 5.2,
+                "red_face": false,
+                "cost_per_hour": 0.65,
+                "controlled_zero_mood": false
+              },
+              "摩根": {
+                "end": 13.6,
+                "start": 18.8,
+                "consumed": 5.2,
+                "red_face": false,
+                "cost_per_hour": 0.65,
+                "controlled_zero_mood": false
+              },
+              "推进之王": {
+                "end": 13.6,
+                "start": 18.8,
+                "consumed": 5.2,
+                "red_face": false,
+                "cost_per_hour": 0.65,
+                "controlled_zero_mood": false
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "level": 3,
+            "autofill": false,
+            "overflow": {
+              "time": "16:32:12",
+              "type": "order",
+              "limit": 10,
+              "seconds": 59531.71,
+              "strategy": "normal",
+              "idle_time": "0:00:00",
+              "base_limit": 10,
+              "equivalent": {
+                "type": "bibeak_breach_order",
+                "reward_ratio": 1.5517,
+                "base_efficiency": 202,
+                "breach_probability": 0.8,
+                "extra_lmd_per_order": 800,
+                "extra_gold_per_order": 1.6,
+                "equivalent_efficiency": 315.1,
+                "expected_gold_per_order": 2.9,
+                "equivalent_efficiency_delta": 113.1
+              },
+              "global_buff": 7,
+              "limit_delta": 0,
+              "shift_hours": 8,
+              "idle_seconds": 0,
+              "current_count": 10,
+              "active_fraction": 1,
+              "full_efficiency": null,
+              "raw_limit_delta": 0,
+              "capacity_limited": false,
+              "speed_efficiency": 202,
+              "display_efficiency": 202,
+              "initial_efficiency": null,
+              "expected_order_time": "1:39:13",
+              "order_limit_penalty": 0,
+              "effective_efficiency": 202,
+              "has_high_quality_buff": false,
+              "production_multiplier": 2.05,
+              "has_special_order_buff": false,
+              "expected_gold_per_order": 2.9,
+              "speed_efficiency_reason": "",
+              "trading_order_efficiency": null,
+              "speed_efficiency_adjusted": false,
+              "expected_seconds_per_order": 12204,
+              "expected_tequila_lmd_bonus_per_order": 0
+            },
+            "facility_level": 3,
+            "dynamic_resources": {
+              "passion": 10
+            },
+            "order_limit_delta": 0,
+            "operator_efficiency": 95,
+            "mood_consumption_delta": {},
+            "cross_station_operators": [],
+            "mood_consumption_override": {},
+            "stable_position_operators": [],
+            "effective_order_limit_delta": 0,
+            "effective_power_station_count": 2
+          },
+          {
+            "operators": [
+              "可露希尔",
+              "伺夜"
+            ],
+            "product": "LMD",
+            "efficiency": 155,
+            "final_efficiency": 162,
+            "mood": {
+              "伺夜": {
+                "end": 12.8,
+                "start": 18.4,
+                "consumed": 5.6,
+                "red_face": false,
+                "cost_per_hour": 0.7,
+                "controlled_zero_mood": false
+              },
+              "可露希尔": {
+                "end": 12.8,
+                "start": 18.4,
+                "consumed": 5.6,
+                "red_face": false,
+                "cost_per_hour": 0.7,
+                "controlled_zero_mood": false
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "level": 2,
+            "autofill": false,
+            "overflow": {
+              "time": "11:42:26",
+              "type": "order",
+              "limit": 8,
+              "seconds": 42146.34,
+              "strategy": "special",
+              "idle_time": "0:00:00",
+              "base_limit": 8,
+              "equivalent": {
+                "order_lmd": 1200,
+                "normal_lmd": 1000,
+                "base_efficiency": 162,
+                "bonus_lmd_per_order": 200,
+                "saved_gold_per_hour": 0.2733,
+                "saved_gold_per_order": 0.4,
+                "equivalent_efficiency": 194.8,
+                "manufacturing_equivalent_efficiency": 32.8
+              },
+              "global_buff": 7,
+              "limit_delta": 0,
+              "shift_hours": 8,
+              "idle_seconds": 0,
+              "current_count": 8,
+              "active_fraction": 1,
+              "full_efficiency": null,
+              "raw_limit_delta": 0,
+              "capacity_limited": false,
+              "speed_efficiency": 162,
+              "display_efficiency": 162,
+              "initial_efficiency": null,
+              "expected_order_time": "1:27:48",
+              "order_limit_penalty": 0,
+              "effective_efficiency": 162,
+              "has_high_quality_buff": false,
+              "production_multiplier": 1.64,
+              "has_special_order_buff": true,
+              "expected_gold_per_order": 2,
+              "speed_efficiency_reason": "",
+              "trading_order_efficiency": null,
+              "speed_efficiency_adjusted": false,
+              "expected_seconds_per_order": 8640,
+              "expected_tequila_lmd_bonus_per_order": 0
+            },
+            "facility_level": 2,
+            "dynamic_resources": {
+              "passion": 10
+            },
+            "order_limit_delta": 0,
+            "operator_efficiency": 55,
+            "mood_consumption_delta": {},
+            "cross_station_operators": [],
+            "mood_consumption_override": {},
+            "stable_position_operators": [],
+            "effective_order_limit_delta": 0,
+            "effective_power_station_count": 2
+          }
+        ],
+        "dormitory": [
+          {
+            "operators": [
+              "菲亚梅塔",
+              "白面鸮",
+              "多萝西",
+              "赫默",
+              "麦哲伦"
+            ],
+            "mood": {
+              "赫默": {
+                "end": 24,
+                "start": 24
+              },
+              "多萝西": {
+                "end": 24,
+                "start": 24
+              },
+              "白面鸮": {
+                "end": 24,
+                "start": 24
+              },
+              "麦哲伦": {
+                "end": 24,
+                "start": 24
+              },
+              "菲亚梅塔": {
+                "end": 24,
+                "start": 24
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "autofill": true,
+            "facility_level": 1,
+            "cross_station_operators": [
+              "菲亚梅塔",
+              "白面鸮",
+              "多萝西",
+              "赫默",
+              "麦哲伦"
+            ]
+          },
+          {
+            "operators": [
+              "梅尔",
+              "承曦格雷伊",
+              "老鲤",
+              "阿罗玛",
+              "槐琥"
+            ],
+            "mood": {
+              "梅尔": {
+                "end": 24,
+                "start": 24
+              },
+              "槐琥": {
+                "end": 24,
+                "start": 12.8
+              },
+              "老鲤": {
+                "end": 24,
+                "start": 12.4
+              },
+              "阿罗玛": {
+                "end": 24,
+                "start": 12.8
+              },
+              "承曦格雷伊": {
+                "end": 24,
+                "start": 12
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "autofill": true,
+            "facility_level": 1,
+            "cross_station_operators": [
+              "梅尔"
+            ]
+          },
+          {
+            "operators": [
+              "白雪",
+              "冬时",
+              "断罪者",
+              "怒潮凛冬",
+              "清流"
+            ],
+            "mood": {
+              "冬时": {
+                "end": 24,
+                "start": 13.6
+              },
+              "清流": {
+                "end": 24,
+                "start": 13.6
+              },
+              "白雪": {
+                "end": 24,
+                "start": 13.6
+              },
+              "断罪者": {
+                "end": 24,
+                "start": 13.6
+              },
+              "怒潮凛冬": {
+                "end": 24,
+                "start": 13.6
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "autofill": true,
+            "facility_level": 1,
+            "cross_station_operators": []
+          },
+          {
+            "operators": [
+              "温蒂",
+              "龙舌兰",
+              "巫恋",
+              "见行者",
+              "斥罪"
+            ],
+            "mood": {
+              "巫恋": {
+                "end": 24,
+                "start": 20.8
+              },
+              "斥罪": {
+                "end": 24,
+                "start": 14
+              },
+              "温蒂": {
+                "end": 24,
+                "start": 13.6
+              },
+              "见行者": {
+                "end": 19.6,
+                "start": 2.4
+              },
+              "龙舌兰": {
+                "end": 24,
+                "start": 20.8
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "autofill": true,
+            "facility_level": 1,
+            "cross_station_operators": []
+          }
+        ],
+        "processing": [
+          {
+            "operators": [],
+            "skip": false,
+            "sort": true,
+            "facility_level": 3,
+            "cross_station_operators": []
+          }
+        ],
+        "manufacture": [
+          {
+            "operators": [
+              "夜烟",
+              "水月",
+              "海沫"
+            ],
+            "product": "Pure Gold",
+            "efficiency": 185,
+            "final_efficiency": 188,
+            "mood": {
+              "夜烟": {
+                "end": 18.8,
+                "start": 24,
+                "consumed": 5.2,
+                "red_face": false,
+                "cost_per_hour": 0.65,
+                "controlled_zero_mood": false
+              },
+              "水月": {
+                "end": 18.8,
+                "start": 24,
+                "consumed": 5.2,
+                "red_face": false,
+                "cost_per_hour": 0.65,
+                "controlled_zero_mood": false
+              },
+              "海沫": {
+                "end": 18.8,
+                "start": 24,
+                "consumed": 5.2,
+                "red_face": false,
+                "cost_per_hour": 0.65,
+                "controlled_zero_mood": false
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "level": 3,
+            "autofill": false,
+            "overflow": {
+              "time": "16:57:48",
+              "seconds": 61068.06,
+              "capacity": 54,
+              "idle_time": "0:00:00",
+              "craft_time": "1:12:00",
+              "global_buff": 3,
+              "shift_hours": 8,
+              "idle_seconds": 0,
+              "base_capacity": 54,
+              "craft_seconds": 4320,
+              "capacity_delta": 0,
+              "current_volume": 54,
+              "product_volume": 2,
+              "storable_count": 27,
+              "active_fraction": 1,
+              "base_efficiency": 185,
+              "capacity_limited": false,
+              "final_efficiency": 188,
+              "next_product_time": "17:35:30",
+              "effective_efficiency": 188,
+              "next_product_seconds": 63329.84,
+              "production_multiplier": 1.91
+            },
+            "facility_level": 3,
+            "dynamic_resources": {
+              "passion": 10
+            },
+            "operator_efficiency": 85,
+            "mood_consumption_delta": {},
+            "storage_capacity_delta": 0,
+            "cross_station_operators": [],
+            "special_stacking_cleared": false,
+            "mood_consumption_override": {},
+            "stable_position_operators": [],
+            "special_replaced_efficiency": 0,
+            "effective_power_station_count": 2,
+            "control_center_special_efficiency": 0
+          },
+          {
+            "operators": [
+              "泡泡",
+              "火神"
+            ],
+            "product": "Pure Gold",
+            "efficiency": 162,
+            "final_efficiency": 165,
+            "mood": {
+              "泡泡": {
+                "end": 20.4,
+                "start": 24,
+                "consumed": 3.6,
+                "red_face": false,
+                "cost_per_hour": 0.45,
+                "controlled_zero_mood": false
+              },
+              "火神": {
+                "end": 20.4,
+                "start": 24,
+                "consumed": 3.6,
+                "red_face": false,
+                "cost_per_hour": 0.45,
+                "controlled_zero_mood": false
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "level": 2,
+            "autofill": false,
+            "overflow": {
+              "time": "22:59:38",
+              "seconds": 82778.44,
+              "capacity": 65,
+              "idle_time": "0:00:00",
+              "craft_time": "1:12:00",
+              "global_buff": 3,
+              "shift_hours": 8,
+              "idle_seconds": 0,
+              "base_capacity": 36,
+              "craft_seconds": 4320,
+              "capacity_delta": 29,
+              "current_volume": 64,
+              "product_volume": 2,
+              "storable_count": 32,
+              "active_fraction": 1,
+              "base_efficiency": 162,
+              "capacity_limited": false,
+              "final_efficiency": 165,
+              "next_product_time": "23:42:45",
+              "effective_efficiency": 165,
+              "next_product_seconds": 85365.27,
+              "production_multiplier": 1.67
+            },
+            "facility_level": 2,
+            "dynamic_resources": {
+              "passion": 10
+            },
+            "operator_efficiency": 62,
+            "mood_consumption_delta": {
+              "泡泡": -0.25,
+              "火神": -0.25
+            },
+            "storage_capacity_delta": 29,
+            "cross_station_operators": [],
+            "special_stacking_cleared": false,
+            "mood_consumption_override": {},
+            "stable_position_operators": [],
+            "special_replaced_efficiency": 0,
+            "effective_power_station_count": 2,
+            "control_center_special_efficiency": 0
+          },
+          {
+            "operators": [
+              "红豆",
+              "霜叶",
+              "食铁兽"
+            ],
+            "product": "Battle Record",
+            "efficiency": 190,
+            "final_efficiency": 192,
+            "mood": {
+              "红豆": {
+                "end": 18.8,
+                "start": 24,
+                "consumed": 5.2,
+                "red_face": false,
+                "cost_per_hour": 0.65,
+                "controlled_zero_mood": false
+              },
+              "霜叶": {
+                "end": 18.8,
+                "start": 24,
+                "consumed": 5.2,
+                "red_face": false,
+                "cost_per_hour": 0.65,
+                "controlled_zero_mood": false
+              },
+              "食铁兽": {
+                "end": 18.8,
+                "start": 24,
+                "consumed": 5.2,
+                "red_face": false,
+                "cost_per_hour": 0.65,
+                "controlled_zero_mood": false
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "level": 3,
+            "autofill": false,
+            "overflow": {
+              "time": "15:23:05",
+              "seconds": 55384.62,
+              "capacity": 54,
+              "idle_time": "0:00:00",
+              "craft_time": "3:00:00",
+              "global_buff": 2,
+              "shift_hours": 8,
+              "idle_seconds": 0,
+              "base_capacity": 54,
+              "craft_seconds": 10800,
+              "capacity_delta": 0,
+              "current_volume": 50,
+              "product_volume": 5,
+              "storable_count": 10,
+              "active_fraction": 1,
+              "base_efficiency": 190,
+              "capacity_limited": false,
+              "final_efficiency": 192,
+              "next_product_time": "16:55:23",
+              "effective_efficiency": 192,
+              "next_product_seconds": 60923.08,
+              "production_multiplier": 1.95
+            },
+            "facility_level": 3,
+            "dynamic_resources": {
+              "passion": 10
+            },
+            "operator_efficiency": 90,
+            "mood_consumption_delta": {},
+            "storage_capacity_delta": 0,
+            "cross_station_operators": [],
+            "special_stacking_cleared": false,
+            "mood_consumption_override": {},
+            "stable_position_operators": [],
+            "special_replaced_efficiency": 0,
+            "effective_power_station_count": 2,
+            "control_center_special_efficiency": 0
+          },
+          {
+            "operators": [
+              "红云",
+              "稀音"
+            ],
+            "product": "Battle Record",
+            "efficiency": 165,
+            "final_efficiency": 167,
+            "mood": {
+              "稀音": {
+                "end": 12.8,
+                "start": 18.4,
+                "consumed": 5.6,
+                "red_face": false,
+                "cost_per_hour": 0.7,
+                "controlled_zero_mood": false
+              },
+              "红云": {
+                "end": 16.8,
+                "start": 20.4,
+                "consumed": 3.6,
+                "red_face": false,
+                "cost_per_hour": 0.45,
+                "controlled_zero_mood": false
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "level": 2,
+            "autofill": false,
+            "overflow": {
+              "time": "19:31:36",
+              "seconds": 70295.86,
+              "capacity": 56,
+              "idle_time": "0:00:00",
+              "craft_time": "3:00:00",
+              "global_buff": 2,
+              "shift_hours": 8,
+              "idle_seconds": 0,
+              "base_capacity": 36,
+              "craft_seconds": 10800,
+              "capacity_delta": 20,
+              "current_volume": 55,
+              "product_volume": 5,
+              "storable_count": 11,
+              "active_fraction": 1,
+              "base_efficiency": 165,
+              "capacity_limited": false,
+              "final_efficiency": 167,
+              "next_product_time": "21:18:06",
+              "effective_efficiency": 167,
+              "next_product_seconds": 76686.39,
+              "production_multiplier": 1.69
+            },
+            "facility_level": 2,
+            "dynamic_resources": {
+              "passion": 10
+            },
+            "operator_efficiency": 65,
+            "mood_consumption_delta": {
+              "红云": -0.25
+            },
+            "storage_capacity_delta": 20,
+            "cross_station_operators": [],
+            "special_stacking_cleared": false,
+            "mood_consumption_override": {},
+            "stable_position_operators": [
+              "稀音"
+            ],
+            "special_replaced_efficiency": 0,
+            "effective_power_station_count": 2,
+            "control_center_special_efficiency": 0
+          },
+          {
+            "operators": [
+              "淬羽赫默",
+              "铅踝"
+            ],
+            "product": "Battle Record",
+            "efficiency": 160,
+            "final_efficiency": 162,
+            "mood": {
+              "铅踝": {
+                "end": 12.8,
+                "start": 18.4,
+                "consumed": 5.6,
+                "red_face": false,
+                "cost_per_hour": 0.7,
+                "controlled_zero_mood": false
+              },
+              "淬羽赫默": {
+                "end": 12.8,
+                "start": 18.4,
+                "consumed": 5.6,
+                "red_face": false,
+                "cost_per_hour": 0.7,
+                "controlled_zero_mood": false
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "level": 2,
+            "autofill": false,
+            "overflow": {
+              "time": "12:48:18",
+              "seconds": 46097.56,
+              "capacity": 36,
+              "idle_time": "0:00:00",
+              "craft_time": "3:00:00",
+              "global_buff": 2,
+              "shift_hours": 8,
+              "idle_seconds": 0,
+              "base_capacity": 36,
+              "craft_seconds": 10800,
+              "capacity_delta": 0,
+              "current_volume": 35,
+              "product_volume": 5,
+              "storable_count": 7,
+              "active_fraction": 1,
+              "base_efficiency": 160,
+              "capacity_limited": false,
+              "final_efficiency": 162,
+              "next_product_time": "14:38:03",
+              "effective_efficiency": 162,
+              "next_product_seconds": 52682.93,
+              "production_multiplier": 1.64
+            },
+            "facility_level": 2,
+            "dynamic_resources": {
+              "passion": 10
+            },
+            "operator_efficiency": 60,
+            "mood_consumption_delta": {},
+            "storage_capacity_delta": 0,
+            "cross_station_operators": [],
+            "special_stacking_cleared": false,
+            "mood_consumption_override": {},
+            "stable_position_operators": [],
+            "special_replaced_efficiency": 0,
+            "effective_power_station_count": 2,
+            "control_center_special_efficiency": 0
+          }
+        ]
+      },
+      "drones": {
+        "room": "manufacture",
+        "index": 1,
+        "order": "pre",
+        "enable": true,
+        "reason": "库存平衡优先",
+        "product": "Pure Gold",
+        "efficiency": 188,
+        "candidate_count": 7,
+        "display_efficiency": 188
+      },
+      "Fiammetta": {
+        "order": "pre",
+        "enable": true,
+        "reason": "",
+        "status": "enabled",
+        "target": "",
+        "available": true,
+        "requested": true,
+        "target_slot": false
+      },
+      "mood_valid": true,
+      "binding_valid": true,
+      "mood_assumptions": {
+        "max_mood": 24,
+        "shift_hours": 8,
+        "cyclic_mood_simulation": true,
+        "dormitory_default_level": 1,
+        "dormitory_default_ambience": 1000,
+        "cyclic_mood_simulation_delta": 0,
+        "dormitory_recovery_calculated": true,
+        "fiammetta_target_recovers_full": false,
+        "resting_operator_recovers_full": false,
+        "cyclic_mood_simulation_iterations": 2
+      },
+      "dynamic_resources": {
+        "passion": 10
+      },
+      "facility_count_details": [],
+      "dynamic_resource_details": [
+        {
+          "rule": "进驻控制中枢时，热情值+10；人脉资源的联络速度+10%（同种效果取最高）",
+          "type": "dynamic_resource_contribution",
+          "amount": 10,
+          "detail": "可靠伙伴：八幡海铃进驻控制中枢时热情值+10。",
+          "resource": "passion",
+          "resources": {
+            "passion": 10
+          }
+        }
+      ],
+      "required_power_operators": [],
+      "fixed_dormitory_operators": [
+        "菲亚梅塔"
+      ],
+      "required_control_operators": [],
+      "physical_power_station_count": 2,
+      "effective_power_station_count": 2,
+      "facility_dependency_operators": [
+        "白面鸮",
+        "多萝西",
+        "赫默",
+        "麦哲伦",
+        "梅尔"
+      ]
+    },
+    {
+      "name": "第3班",
+      "description": "",
+      "schedule_mode": "maa",
+      "shift_hours": 8,
+      "rooms": {
+        "hire": [
+          {
+            "operators": [
+              "艾雅法拉"
+            ],
+            "efficiency": 55,
+            "mood": {
+              "艾雅法拉": {
+                "end": 12,
+                "start": 18,
+                "consumed": 6,
+                "red_face": false,
+                "cost_per_hour": 0.75,
+                "controlled_zero_mood": false
+              }
+            },
+            "autofill": false,
+            "facility_level": 3,
+            "dynamic_resources": {},
+            "operator_efficiency": 45,
+            "mood_consumption_delta": {},
+            "cross_station_operators": [],
+            "control_center_efficiency": 10,
+            "mood_consumption_override": {},
+            "effective_power_station_count": 3
+          }
+        ],
+        "power": [
+          {
+            "operators": [
+              "格雷伊"
+            ],
+            "efficiency": 20,
+            "mood": {
+              "格雷伊": {
+                "end": 12,
+                "start": 18,
+                "consumed": 6,
+                "red_face": false,
+                "cost_per_hour": 0.75,
+                "controlled_zero_mood": false
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "autofill": false,
+            "facility_level": 3,
+            "dynamic_resources": {},
+            "operator_efficiency": 20,
+            "mood_consumption_delta": {},
+            "cross_station_operators": [],
+            "mood_consumption_override": {},
+            "effective_power_station_count": 3
+          },
+          {
+            "operators": [
+              "承曦格雷伊"
+            ],
+            "efficiency": 23,
+            "mood": {
+              "承曦格雷伊": {
+                "end": 18,
+                "start": 24,
+                "consumed": 6,
+                "red_face": false,
+                "cost_per_hour": 0.75,
+                "controlled_zero_mood": false
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "autofill": false,
+            "facility_level": 3,
+            "dynamic_resources": {},
+            "operator_efficiency": 23,
+            "mood_consumption_delta": {},
+            "cross_station_operators": [],
+            "mood_consumption_override": {},
+            "effective_power_station_count": 3
+          }
+        ],
+        "control": [
+          {
+            "operators": [
+              "焰狐龙梓兰",
+              "诗怀雅",
+              "凯尔希",
+              "丰川祥子",
+              "老鲤"
+            ],
+            "efficiency": {
+              "hire": 10,
+              "meeting": 25,
+              "trading": 7,
+              "manufacturing": 2,
+              "mood_recovery": 0,
+              "hire_mood_recovery": 0,
+              "power_mood_recovery": 0,
+              "meeting_mood_recovery": 0,
+              "trading_mood_recovery": 0,
+              "manufacturing_pure_gold": 1,
+              "manufacture_mood_recovery": 0
+            },
+            "mood": {
+              "老鲤": {
+                "end": 18,
+                "start": 24,
+                "consumed": 6,
+                "red_face": false,
+                "cost_per_hour": 0.75,
+                "controlled_zero_mood": false
+              },
+              "凯尔希": {
+                "end": 18,
+                "start": 24,
+                "consumed": 6,
+                "red_face": false,
+                "cost_per_hour": 0.75,
+                "controlled_zero_mood": false
+              },
+              "诗怀雅": {
+                "end": 18,
+                "start": 24,
+                "consumed": 6,
+                "red_face": false,
+                "cost_per_hour": 0.75,
+                "controlled_zero_mood": false
+              },
+              "丰川祥子": {
+                "end": 12.4,
+                "start": 18.4,
+                "consumed": 6,
+                "red_face": false,
+                "cost_per_hour": 0.75,
+                "controlled_zero_mood": false
+              },
+              "焰狐龙梓兰": {
+                "end": 18,
+                "start": 24,
+                "consumed": 6,
+                "red_face": false,
+                "cost_per_hour": 0.75,
+                "controlled_zero_mood": false
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "facility_level": 5,
+            "cross_station_operators": []
+          }
+        ],
+        "meeting": [
+          {
+            "operators": [
+              "伊内丝",
+              "陈"
+            ],
+            "efficiency": 135,
+            "final_efficiency": 160,
+            "mood": {
+              "陈": {
+                "end": 18.4,
+                "start": 24,
+                "consumed": 5.6,
+                "red_face": false,
+                "cost_per_hour": 0.7,
+                "controlled_zero_mood": false
+              },
+              "伊内丝": {
+                "end": 12.8,
+                "start": 18.4,
+                "consumed": 5.6,
+                "red_face": false,
+                "cost_per_hour": 0.7,
+                "controlled_zero_mood": false
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "autofill": false,
+            "facility_level": 3,
+            "dynamic_resources": {},
+            "control_efficiency": 25,
+            "operator_efficiency": 135,
+            "mood_consumption_delta": {},
+            "cross_station_operators": [],
+            "mood_consumption_override": {},
+            "effective_power_station_count": 3
+          }
+        ],
+        "trading": [
+          {
+            "operators": [
+              "巫恋",
+              "龙舌兰",
+              "卡夫卡"
+            ],
+            "product": "LMD",
+            "efficiency": 235,
+            "final_efficiency": 242.00000000000003,
+            "mood": {
+              "巫恋": {
+                "end": 20.8,
+                "start": 24,
+                "consumed": 3.2,
+                "red_face": false,
+                "cost_per_hour": 0.4,
+                "controlled_zero_mood": false
+              },
+              "卡夫卡": {
+                "end": 20.8,
+                "start": 24,
+                "consumed": 3.2,
+                "red_face": false,
+                "cost_per_hour": 0.4,
+                "controlled_zero_mood": false
+              },
+              "龙舌兰": {
+                "end": 20.8,
+                "start": 24,
+                "consumed": 3.2,
+                "red_face": false,
+                "cost_per_hour": 0.4,
+                "controlled_zero_mood": false
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "level": 3,
+            "autofill": false,
+            "overflow": {
+              "time": "16:58:09",
+              "type": "order",
+              "limit": 10,
+              "seconds": 61088.56,
+              "strategy": "high_quality",
+              "idle_time": "0:00:00",
+              "base_limit": 10,
+              "equivalent": {
+                "type": "tequila_lmd_bonus",
+                "base_efficiency": 242,
+                "bonus_probability": 0.5567,
+                "bonus_gold_per_hour": 0.3468,
+                "bonus_lmd_per_order": 278.36,
+                "bonus_gold_per_order": 0.56,
+                "equivalent_efficiency": 283.61,
+                "manufacturing_equivalent_efficiency": 41.61
+              },
+              "drone_order": {
+                "equivalent": {
+                  "type": "tequila_lmd_bonus",
+                  "base_efficiency": 242,
+                  "bonus_probability": 0.2,
+                  "bonus_gold_per_hour": 0.1445,
+                  "bonus_lmd_per_order": 100,
+                  "bonus_gold_per_order": 0.2,
+                  "equivalent_efficiency": 259.35,
+                  "manufacturing_equivalent_efficiency": 17.35
+                },
+                "expected_gold_per_order": 2.9000000000000004,
+                "expected_seconds_per_order": 12204
+              },
+              "global_buff": 7,
+              "limit_delta": 0,
+              "shift_hours": 8,
+              "idle_seconds": 0,
+              "current_count": 10,
+              "active_fraction": 1,
+              "full_efficiency": 242,
+              "orders_in_shift": 4.983069046349813,
+              "raw_limit_delta": 0,
+              "capacity_limited": false,
+              "speed_efficiency": 242.00000000000003,
+              "display_efficiency": 242.00000000000003,
+              "initial_efficiency": 242,
+              "quality_work_hours": {},
+              "expected_order_time": "1:41:49",
+              "order_limit_penalty": 0,
+              "order_probabilities": [
+                0.16279824034633947,
+                0.28047718455414317,
+                0.5567245750995173
+              ],
+              "effective_efficiency": 242,
+              "has_high_quality_buff": true,
+              "production_multiplier": 2.45,
+              "has_special_order_buff": false,
+              "expected_gold_per_order": 3.3939,
+              "speed_efficiency_reason": "巫恋+龙舌兰订单获取速度应为135%，八幡海铃在中枢时为140%；龙舌兰4赤金订单额外收益不影响订单速度",
+              "trading_order_efficiency": null,
+              "quality_probability_model": "linear_warmup_expected_orders",
+              "speed_efficiency_adjusted": false,
+              "expected_seconds_per_order": 14159.95,
+              "expected_tequila_lmd_bonus_per_order": 278.36
+            },
+            "facility_level": 3,
+            "dynamic_resources": {},
+            "order_limit_delta": 0,
+            "operator_efficiency": 135,
+            "mood_consumption_delta": {
+              "巫恋": -0.25,
+              "卡夫卡": -0.25,
+              "龙舌兰": -0.25
+            },
+            "cross_station_operators": [],
+            "mood_consumption_override": {},
+            "stable_position_operators": [
+              "巫恋",
+              "卡夫卡"
+            ],
+            "effective_order_limit_delta": 0,
+            "effective_power_station_count": 3
+          },
+          {
+            "operators": [
+              "但书",
+              "石英"
+            ],
+            "product": "LMD",
+            "efficiency": 134,
+            "final_efficiency": 141,
+            "mood": {
+              "但书": {
+                "end": 8,
+                "start": 13.6,
+                "consumed": 5.6,
+                "red_face": false,
+                "cost_per_hour": 0.7,
+                "controlled_zero_mood": false
+              },
+              "石英": {
+                "end": 18.4,
+                "start": 24,
+                "consumed": 5.6,
+                "red_face": false,
+                "cost_per_hour": 0.7,
+                "controlled_zero_mood": false
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "level": 2,
+            "autofill": false,
+            "overflow": {
+              "time": "15:53:17",
+              "type": "order",
+              "limit": 8,
+              "seconds": 57197.2,
+              "strategy": "normal",
+              "idle_time": "0:00:00",
+              "base_limit": 8,
+              "equivalent": {
+                "type": "bibeak_breach_order",
+                "reward_ratio": 1.8333,
+                "base_efficiency": 141,
+                "breach_probability": 1,
+                "extra_lmd_per_order": 1000,
+                "extra_gold_per_order": 2,
+                "equivalent_efficiency": 260.17,
+                "expected_gold_per_order": 2.4,
+                "equivalent_efficiency_delta": 119.17
+              },
+              "global_buff": 7,
+              "limit_delta": 0,
+              "shift_hours": 8,
+              "idle_seconds": 0,
+              "current_count": 8,
+              "active_fraction": 1,
+              "full_efficiency": null,
+              "raw_limit_delta": 0,
+              "capacity_limited": false,
+              "speed_efficiency": 141,
+              "display_efficiency": 141,
+              "initial_efficiency": null,
+              "expected_order_time": "1:59:10",
+              "order_limit_penalty": 0,
+              "effective_efficiency": 141,
+              "has_high_quality_buff": false,
+              "production_multiplier": 1.43,
+              "has_special_order_buff": false,
+              "expected_gold_per_order": 2.4,
+              "speed_efficiency_reason": "",
+              "trading_order_efficiency": null,
+              "speed_efficiency_adjusted": false,
+              "expected_seconds_per_order": 10224,
+              "expected_tequila_lmd_bonus_per_order": 0
+            },
+            "facility_level": 2,
+            "dynamic_resources": {},
+            "order_limit_delta": 0,
+            "operator_efficiency": 34,
+            "mood_consumption_delta": {},
+            "cross_station_operators": [],
+            "mood_consumption_override": {},
+            "stable_position_operators": [],
+            "effective_order_limit_delta": 0,
+            "effective_power_station_count": 3
+          }
+        ],
+        "dormitory": [
+          {
+            "operators": [
+              "见行者",
+              "缪尔赛思",
+              "阿米娅",
+              "八幡海铃",
+              "伺夜"
+            ],
+            "mood": {
+              "伺夜": {
+                "end": 24,
+                "start": 12.8
+              },
+              "见行者": {
+                "end": 24,
+                "start": 19.6
+              },
+              "阿米娅": {
+                "end": 24,
+                "start": 12.8
+              },
+              "八幡海铃": {
+                "end": 24,
+                "start": 12.8
+              },
+              "缪尔赛思": {
+                "end": 24,
+                "start": 12
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "autofill": true,
+            "facility_level": 1,
+            "cross_station_operators": []
+          },
+          {
+            "operators": [
+              "淬羽赫默",
+              "戴菲恩",
+              "可露希尔",
+              "铅踝",
+              "稀音"
+            ],
+            "mood": {
+              "稀音": {
+                "end": 24,
+                "start": 12.8
+              },
+              "铅踝": {
+                "end": 24,
+                "start": 12.8
+              },
+              "戴菲恩": {
+                "end": 24,
+                "start": 12.8
+              },
+              "可露希尔": {
+                "end": 24,
+                "start": 12.8
+              },
+              "淬羽赫默": {
+                "end": 24,
+                "start": 12.8
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "autofill": true,
+            "facility_level": 1,
+            "cross_station_operators": []
+          },
+          {
+            "operators": [
+              "信仰搅拌机",
+              "Mon3tr",
+              "摩根",
+              "推进之王",
+              "红云"
+            ],
+            "mood": {
+              "Mon3tr": {
+                "end": 24,
+                "start": 12.8
+              },
+              "摩根": {
+                "end": 24,
+                "start": 13.6
+              },
+              "红云": {
+                "end": 24,
+                "start": 16.8
+              },
+              "推进之王": {
+                "end": 24,
+                "start": 13.6
+              },
+              "信仰搅拌机": {
+                "end": 24,
+                "start": 12.8
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "autofill": true,
+            "facility_level": 1,
+            "cross_station_operators": []
+          },
+          {
+            "operators": [
+              "海沫",
+              "食铁兽",
+              "水月",
+              "夜烟"
+            ],
+            "mood": {
+              "夜烟": {
+                "end": 24,
+                "start": 18.8
+              },
+              "水月": {
+                "end": 24,
+                "start": 18.8
+              },
+              "海沫": {
+                "end": 24,
+                "start": 18.8
+              },
+              "食铁兽": {
+                "end": 24,
+                "start": 18.8
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "autofill": true,
+            "facility_level": 1,
+            "cross_station_operators": []
+          }
+        ],
+        "processing": [
+          {
+            "operators": [],
+            "skip": false,
+            "sort": true,
+            "facility_level": 3,
+            "cross_station_operators": []
+          }
+        ],
+        "manufacture": [
+          {
+            "operators": [
+              "温蒂",
+              "清流",
+              "冬时"
+            ],
+            "product": "Pure Gold",
+            "efficiency": 215,
+            "final_efficiency": 218,
+            "mood": {
+              "冬时": {
+                "end": 18.8,
+                "start": 24,
+                "consumed": 5.2,
+                "red_face": false,
+                "cost_per_hour": 0.65,
+                "controlled_zero_mood": false
+              },
+              "清流": {
+                "end": 18.8,
+                "start": 24,
+                "consumed": 5.2,
+                "red_face": false,
+                "cost_per_hour": 0.65,
+                "controlled_zero_mood": false
+              },
+              "温蒂": {
+                "end": 18.8,
+                "start": 24,
+                "consumed": 5.2,
+                "red_face": false,
+                "cost_per_hour": 0.65,
+                "controlled_zero_mood": false
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "level": 3,
+            "autofill": false,
+            "overflow": {
+              "time": "15:44:48",
+              "seconds": 56687.78,
+              "capacity": 59,
+              "idle_time": "0:00:00",
+              "craft_time": "1:12:00",
+              "global_buff": 3,
+              "shift_hours": 8,
+              "idle_seconds": 0,
+              "base_capacity": 54,
+              "craft_seconds": 4320,
+              "capacity_delta": 5,
+              "current_volume": 58,
+              "product_volume": 2,
+              "storable_count": 29,
+              "active_fraction": 1,
+              "base_efficiency": 215,
+              "capacity_limited": false,
+              "final_efficiency": 218,
+              "next_product_time": "16:17:23",
+              "effective_efficiency": 218,
+              "next_product_seconds": 58642.53,
+              "production_multiplier": 2.21
+            },
+            "facility_level": 3,
+            "dynamic_resources": {},
+            "operator_efficiency": 115,
+            "mood_consumption_delta": {},
+            "storage_capacity_delta": 5,
+            "cross_station_operators": [],
+            "special_stacking_cleared": false,
+            "mood_consumption_override": {},
+            "stable_position_operators": [],
+            "special_replaced_efficiency": 0,
+            "effective_power_station_count": 3,
+            "control_center_special_efficiency": 0
+          },
+          {
+            "operators": [
+              "槐琥",
+              "阿罗玛"
+            ],
+            "product": "Pure Gold",
+            "efficiency": 185,
+            "final_efficiency": 188,
+            "mood": {
+              "槐琥": {
+                "end": 18.4,
+                "start": 24,
+                "consumed": 5.6,
+                "red_face": false,
+                "cost_per_hour": 0.7,
+                "controlled_zero_mood": false
+              },
+              "阿罗玛": {
+                "end": 18.4,
+                "start": 24,
+                "consumed": 5.6,
+                "red_face": false,
+                "cost_per_hour": 0.7,
+                "controlled_zero_mood": false
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "level": 2,
+            "autofill": false,
+            "overflow": {
+              "time": "11:22:06",
+              "seconds": 40926.32,
+              "capacity": 36,
+              "idle_time": "0:00:00",
+              "craft_time": "1:12:00",
+              "global_buff": 3,
+              "shift_hours": 8,
+              "idle_seconds": 0,
+              "base_capacity": 36,
+              "craft_seconds": 4320,
+              "capacity_delta": 0,
+              "current_volume": 36,
+              "product_volume": 2,
+              "storable_count": 18,
+              "active_fraction": 1,
+              "base_efficiency": 185,
+              "capacity_limited": false,
+              "final_efficiency": 188,
+              "next_product_time": "12:00:00",
+              "effective_efficiency": 188,
+              "next_product_seconds": 43200,
+              "production_multiplier": 1.9
+            },
+            "facility_level": 2,
+            "dynamic_resources": {},
+            "operator_efficiency": 85,
+            "mood_consumption_delta": {
+              "槐琥": 0,
+              "阿罗玛": 0
+            },
+            "storage_capacity_delta": 0,
+            "cross_station_operators": [],
+            "special_stacking_cleared": false,
+            "mood_consumption_override": {},
+            "stable_position_operators": [
+              "阿罗玛"
+            ],
+            "special_replaced_efficiency": 0,
+            "effective_power_station_count": 3,
+            "control_center_special_efficiency": 0
+          },
+          {
+            "operators": [
+              "断罪者",
+              "怒潮凛冬",
+              "白雪"
+            ],
+            "product": "Battle Record",
+            "efficiency": 195,
+            "final_efficiency": 197,
+            "mood": {
+              "白雪": {
+                "end": 18.8,
+                "start": 24,
+                "consumed": 5.2,
+                "red_face": false,
+                "cost_per_hour": 0.65,
+                "controlled_zero_mood": false
+              },
+              "断罪者": {
+                "end": 18.8,
+                "start": 24,
+                "consumed": 5.2,
+                "red_face": false,
+                "cost_per_hour": 0.65,
+                "controlled_zero_mood": false
+              },
+              "怒潮凛冬": {
+                "end": 18.8,
+                "start": 24,
+                "consumed": 5.2,
+                "red_face": false,
+                "cost_per_hour": 0.65,
+                "controlled_zero_mood": false
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "level": 3,
+            "autofill": false,
+            "overflow": {
+              "time": "15:00:00",
+              "seconds": 54000,
+              "capacity": 54,
+              "idle_time": "0:00:00",
+              "craft_time": "3:00:00",
+              "global_buff": 2,
+              "shift_hours": 8,
+              "idle_seconds": 0,
+              "base_capacity": 54,
+              "craft_seconds": 10800,
+              "capacity_delta": 0,
+              "current_volume": 50,
+              "product_volume": 5,
+              "storable_count": 10,
+              "active_fraction": 1,
+              "base_efficiency": 195,
+              "capacity_limited": false,
+              "final_efficiency": 197,
+              "next_product_time": "16:30:00",
+              "effective_efficiency": 197,
+              "next_product_seconds": 59400,
+              "production_multiplier": 2
+            },
+            "facility_level": 3,
+            "dynamic_resources": {},
+            "operator_efficiency": 95,
+            "mood_consumption_delta": {},
+            "storage_capacity_delta": 0,
+            "cross_station_operators": [],
+            "special_stacking_cleared": false,
+            "mood_consumption_override": {},
+            "stable_position_operators": [],
+            "special_replaced_efficiency": 0,
+            "effective_power_station_count": 3,
+            "control_center_special_efficiency": 0
+          },
+          {
+            "operators": [
+              "泡泡",
+              "火神"
+            ],
+            "product": "Battle Record",
+            "efficiency": 162,
+            "final_efficiency": 164,
+            "mood": {
+              "泡泡": {
+                "end": 16.8,
+                "start": 20.4,
+                "consumed": 3.6,
+                "red_face": false,
+                "cost_per_hour": 0.45,
+                "controlled_zero_mood": false
+              },
+              "火神": {
+                "end": 16.8,
+                "start": 20.4,
+                "consumed": 3.6,
+                "red_face": false,
+                "cost_per_hour": 0.45,
+                "controlled_zero_mood": false
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "level": 2,
+            "autofill": false,
+            "overflow": {
+              "time": "23:29:38",
+              "seconds": 84578.31,
+              "capacity": 65,
+              "idle_time": "0:00:00",
+              "craft_time": "3:00:00",
+              "global_buff": 2,
+              "shift_hours": 8,
+              "idle_seconds": 0,
+              "base_capacity": 36,
+              "craft_seconds": 10800,
+              "capacity_delta": 29,
+              "current_volume": 65,
+              "product_volume": 5,
+              "storable_count": 13,
+              "active_fraction": 1,
+              "base_efficiency": 162,
+              "capacity_limited": false,
+              "final_efficiency": 164,
+              "next_product_time": "25:18:04",
+              "effective_efficiency": 164,
+              "next_product_seconds": 91084.34,
+              "production_multiplier": 1.66
+            },
+            "facility_level": 2,
+            "dynamic_resources": {},
+            "operator_efficiency": 62,
+            "mood_consumption_delta": {
+              "泡泡": -0.25,
+              "火神": -0.25
+            },
+            "storage_capacity_delta": 29,
+            "cross_station_operators": [],
+            "special_stacking_cleared": false,
+            "mood_consumption_override": {},
+            "stable_position_operators": [],
+            "special_replaced_efficiency": 0,
+            "effective_power_station_count": 3,
+            "control_center_special_efficiency": 0
+          },
+          {
+            "operators": [
+              "红豆",
+              "霜叶"
+            ],
+            "product": "Battle Record",
+            "efficiency": 160,
+            "final_efficiency": 162,
+            "mood": {
+              "红豆": {
+                "end": 13.2,
+                "start": 18.8,
+                "consumed": 5.6,
+                "red_face": false,
+                "cost_per_hour": 0.7,
+                "controlled_zero_mood": false
+              },
+              "霜叶": {
+                "end": 13.2,
+                "start": 18.8,
+                "consumed": 5.6,
+                "red_face": false,
+                "cost_per_hour": 0.7,
+                "controlled_zero_mood": false
+              }
+            },
+            "skip": false,
+            "sort": true,
+            "level": 2,
+            "autofill": false,
+            "overflow": {
+              "time": "12:48:18",
+              "seconds": 46097.56,
+              "capacity": 36,
+              "idle_time": "0:00:00",
+              "craft_time": "3:00:00",
+              "global_buff": 2,
+              "shift_hours": 8,
+              "idle_seconds": 0,
+              "base_capacity": 36,
+              "craft_seconds": 10800,
+              "capacity_delta": 0,
+              "current_volume": 35,
+              "product_volume": 5,
+              "storable_count": 7,
+              "active_fraction": 1,
+              "base_efficiency": 160,
+              "capacity_limited": false,
+              "final_efficiency": 162,
+              "next_product_time": "14:38:03",
+              "effective_efficiency": 162,
+              "next_product_seconds": 52682.93,
+              "production_multiplier": 1.64
+            },
+            "facility_level": 2,
+            "dynamic_resources": {},
+            "operator_efficiency": 60,
+            "mood_consumption_delta": {},
+            "storage_capacity_delta": 0,
+            "cross_station_operators": [],
+            "special_stacking_cleared": false,
+            "mood_consumption_override": {},
+            "stable_position_operators": [],
+            "special_replaced_efficiency": 0,
+            "effective_power_station_count": 3,
+            "control_center_special_efficiency": 0
+          }
+        ]
+      },
+      "drones": {
+        "room": "manufacture",
+        "index": 1,
+        "order": "pre",
+        "enable": true,
+        "reason": "库存平衡优先",
+        "product": "Pure Gold",
+        "efficiency": 218,
+        "candidate_count": 7,
+        "display_efficiency": 218
+      },
+      "Fiammetta": {
+        "order": "pre",
+        "enable": true,
+        "reason": "",
+        "status": "enabled",
+        "target": "",
+        "available": true,
+        "requested": true,
+        "target_slot": false
+      },
+      "mood_valid": true,
+      "binding_valid": true,
+      "mood_assumptions": {
+        "max_mood": 24,
+        "shift_hours": 8,
+        "cyclic_mood_simulation": true,
+        "dormitory_default_level": 1,
+        "dormitory_default_ambience": 1000,
+        "cyclic_mood_simulation_delta": 0,
+        "dormitory_recovery_calculated": true,
+        "fiammetta_target_recovers_full": false,
+        "resting_operator_recovers_full": false,
+        "cyclic_mood_simulation_iterations": 2
+      },
+      "dynamic_resources": {},
+      "facility_count_details": [
+        {
+          "type": "conditional_power_station_count_bonus",
+          "amount": 1,
+          "detail": "晨曦：其他发电站没有仍有心情的作业平台时，有效发电站数+1。",
+          "source": "单人 - 承曦格雷伊",
+          "active_fraction": 1
+        }
+      ],
+      "dynamic_resource_details": [],
+      "required_power_operators": [],
+      "required_control_operators": [],
+      "physical_power_station_count": 2,
+      "effective_power_station_count": 3
+    }
+  ],
+  "raw_results": [
+    {
+      "total_efficiency": 215,
+      "assignment_detail": [
+        {
+          "rule": "自动化 - 温蒂, 清流, 冬时",
+          "ops": [
+            "温蒂",
+            "清流",
+            "冬时"
+          ],
+          "eff": 115,
+          "workplace": "制造站1",
+          "product": "Pure Gold",
+          "type": "system"
+        }
+      ]
+    },
+    {
+      "total_efficiency": 185,
+      "assignment_detail": [
+        {
+          "rule": "通用单人 - 槐琥",
+          "ops": [
+            "槐琥"
+          ],
+          "eff": 40,
+          "workplace": "制造站2",
+          "product": "Pure Gold",
+          "type": "generic"
+        },
+        {
+          "rule": "通用单人 - 阿罗玛",
+          "ops": [
+            "阿罗玛"
+          ],
+          "eff": 45,
+          "workplace": "制造站2",
+          "product": "Pure Gold",
+          "type": "generic"
+        }
+      ]
+    },
+    {
+      "total_efficiency": 195,
+      "assignment_detail": [
+        {
+          "rule": "通用单人",
+          "ops": [
+            "断罪者"
+          ],
+          "eff": 35,
+          "workplace": "制造站3",
+          "product": "Battle Record",
+          "type": "each"
+        },
+        {
+          "rule": "通用单人",
+          "ops": [
+            "怒潮凛冬",
+            "白雪"
+          ],
+          "eff": 60,
+          "workplace": "制造站3",
+          "product": "Battle Record",
+          "type": "each"
+        }
+      ]
+    },
+    {
+      "total_efficiency": 165,
+      "assignment_detail": [
+        {
+          "rule": "红云组 - 红云, 稀音",
+          "ops": [
+            "红云",
+            "稀音"
+          ],
+          "eff": 65,
+          "workplace": "制造站4",
+          "product": "Battle Record",
+          "type": "generic"
+        }
+      ]
+    },
+    {
+      "total_efficiency": 160,
+      "assignment_detail": [
+        {
+          "rule": "通用单人",
+          "ops": [
+            "淬羽赫默",
+            "铅踝"
+          ],
+          "eff": 60,
+          "workplace": "制造站4",
+          "product": "Battle Record",
+          "type": "each"
+        }
+      ]
+    },
+    {
+      "total_efficiency": 195,
+      "assignment_detail": [
+        {
+          "rule": "但书体系 - 但书, 推进之王, 摩根",
+          "ops": [
+            "但书",
+            "推进之王",
+            "摩根"
+          ],
+          "eff": 95,
+          "workplace": "贸易站1",
+          "product": "LMD",
+          "type": "generic"
+        }
+      ]
+    },
+    {
+      "total_efficiency": 155,
+      "assignment_detail": [
+        {
+          "rule": "可露希尔组 - 可露希尔, 伺夜, 吉星, 空弦",
+          "ops": [
+            "可露希尔",
+            "伺夜"
+          ],
+          "eff": 55,
+          "workplace": "贸易站2",
+          "product": "LMD",
+          "type": "each"
+        }
+      ]
+    },
+    {
+      "total_efficiency": 144,
+      "assignment_detail": [
+        {
+          "rule": "单人 - 信仰搅拌机",
+          "ops": [
+            "信仰搅拌机"
+          ],
+          "eff": 70,
+          "workplace": "会客室",
+          "product": "",
+          "type": "generic"
+        },
+        {
+          "rule": "单人 - 见行者",
+          "ops": [
+            "见行者"
+          ],
+          "eff": 74,
+          "workplace": "会客室",
+          "product": "",
+          "type": "generic"
+        }
+      ]
+    },
+    {
+      "total_efficiency": 25,
+      "assignment_detail": [
+        {
+          "rule": "单人 - 缪尔赛思",
+          "ops": [
+            "缪尔赛思"
+          ],
+          "eff": 25,
+          "workplace": "发电站1",
+          "product": "",
+          "type": "generic"
+        }
+      ]
+    },
+    {
+      "total_efficiency": 23,
+      "assignment_detail": [
+        {
+          "rule": "单人 - 承曦格雷伊",
+          "ops": [
+            "承曦格雷伊"
+          ],
+          "eff": 23,
+          "workplace": "发电站2",
+          "product": "",
+          "type": "generic"
+        }
+      ]
+    },
+    {
+      "total_efficiency": 50,
+      "assignment_detail": [
+        {
+          "rule": "单人 - 斥罪",
+          "ops": [
+            "斥罪"
+          ],
+          "eff": 50,
+          "workplace": "办公室",
+          "product": "",
+          "type": "generic"
+        }
+      ]
+    },
+    {
+      "total_efficiency": 185,
+      "assignment_detail": [
+        {
+          "rule": "通用单人",
+          "ops": [
+            "夜烟"
+          ],
+          "eff": 30,
+          "workplace": "制造站1",
+          "product": "Pure Gold",
+          "type": "each"
+        },
+        {
+          "rule": "标准化 - 水月, 海沫",
+          "ops": [
+            "水月",
+            "海沫"
+          ],
+          "eff": 55,
+          "workplace": "制造站1",
+          "product": "Pure Gold",
+          "type": "generic"
+        }
+      ]
+    },
+    {
+      "total_efficiency": 162,
+      "assignment_detail": [
+        {
+          "rule": "泡泡组 - 泡泡, 火神",
+          "ops": [
+            "泡泡",
+            "火神"
+          ],
+          "eff": 62,
+          "workplace": "制造站2",
+          "product": "Pure Gold",
+          "type": "generic"
+        }
+      ]
+    },
+    {
+      "total_efficiency": 190,
+      "assignment_detail": [
+        {
+          "rule": "通用单人",
+          "ops": [
+            "红豆",
+            "霜叶",
+            "食铁兽"
+          ],
+          "eff": 90,
+          "workplace": "制造站3",
+          "product": "Battle Record",
+          "type": "each"
+        }
+      ]
+    },
+    {
+      "total_efficiency": 165,
+      "assignment_detail": [
+        {
+          "rule": "红云组 - 红云, 稀音",
+          "ops": [
+            "红云",
+            "稀音"
+          ],
+          "eff": 65,
+          "workplace": "制造站4",
+          "product": "Battle Record",
+          "type": "generic"
+        }
+      ]
+    },
+    {
+      "total_efficiency": 160,
+      "assignment_detail": [
+        {
+          "rule": "通用单人",
+          "ops": [
+            "淬羽赫默",
+            "铅踝"
+          ],
+          "eff": 60,
+          "workplace": "制造站4",
+          "product": "Battle Record",
+          "type": "each"
+        }
+      ]
+    },
+    {
+      "total_efficiency": 195,
+      "assignment_detail": [
+        {
+          "rule": "但书体系 - 但书, 推进之王, 摩根",
+          "ops": [
+            "但书",
+            "推进之王",
+            "摩根"
+          ],
+          "eff": 95,
+          "workplace": "贸易站1",
+          "product": "LMD",
+          "type": "generic"
+        }
+      ]
+    },
+    {
+      "total_efficiency": 155,
+      "assignment_detail": [
+        {
+          "rule": "可露希尔组 - 可露希尔, 伺夜, 吉星, 空弦",
+          "ops": [
+            "可露希尔",
+            "伺夜"
+          ],
+          "eff": 55,
+          "workplace": "贸易站2",
+          "product": "LMD",
+          "type": "each"
+        }
+      ]
+    },
+    {
+      "total_efficiency": 140,
+      "assignment_detail": [
+        {
+          "rule": "单人 - 伊内丝",
+          "ops": [
+            "伊内丝"
+          ],
+          "eff": 70,
+          "workplace": "会客室",
+          "product": "",
+          "type": "generic"
+        },
+        {
+          "rule": "单人 - 信仰搅拌机",
+          "ops": [
+            "信仰搅拌机"
+          ],
+          "eff": 70,
+          "workplace": "会客室",
+          "product": "",
+          "type": "generic"
+        }
+      ]
+    },
+    {
+      "total_efficiency": 25,
+      "assignment_detail": [
+        {
+          "rule": "单人 - 缪尔赛思",
+          "ops": [
+            "缪尔赛思"
+          ],
+          "eff": 25,
+          "workplace": "发电站1",
+          "product": "",
+          "type": "generic"
+        }
+      ]
+    },
+    {
+      "total_efficiency": 20,
+      "assignment_detail": [
+        {
+          "rule": "单人",
+          "ops": [
+            "格雷伊"
+          ],
+          "eff": 20,
+          "workplace": "发电站2",
+          "product": "",
+          "type": "each"
+        }
+      ]
+    },
+    {
+      "total_efficiency": 45,
+      "assignment_detail": [
+        {
+          "rule": "单人",
+          "ops": [
+            "艾雅法拉"
+          ],
+          "eff": 45,
+          "workplace": "办公室",
+          "product": "",
+          "type": "each"
+        }
+      ]
+    },
+    {
+      "total_efficiency": 215,
+      "assignment_detail": [
+        {
+          "rule": "自动化 - 温蒂, 清流, 冬时",
+          "ops": [
+            "温蒂",
+            "清流",
+            "冬时"
+          ],
+          "eff": 115,
+          "workplace": "制造站1",
+          "product": "Pure Gold",
+          "type": "system"
+        }
+      ]
+    },
+    {
+      "total_efficiency": 185,
+      "assignment_detail": [
+        {
+          "rule": "通用单人 - 槐琥",
+          "ops": [
+            "槐琥"
+          ],
+          "eff": 40,
+          "workplace": "制造站2",
+          "product": "Pure Gold",
+          "type": "generic"
+        },
+        {
+          "rule": "通用单人 - 阿罗玛",
+          "ops": [
+            "阿罗玛"
+          ],
+          "eff": 45,
+          "workplace": "制造站2",
+          "product": "Pure Gold",
+          "type": "generic"
+        }
+      ]
+    },
+    {
+      "total_efficiency": 195,
+      "assignment_detail": [
+        {
+          "rule": "通用单人",
+          "ops": [
+            "断罪者"
+          ],
+          "eff": 35,
+          "workplace": "制造站3",
+          "product": "Battle Record",
+          "type": "each"
+        },
+        {
+          "rule": "通用单人",
+          "ops": [
+            "怒潮凛冬",
+            "白雪"
+          ],
+          "eff": 60,
+          "workplace": "制造站3",
+          "product": "Battle Record",
+          "type": "each"
+        }
+      ]
+    },
+    {
+      "total_efficiency": 162,
+      "assignment_detail": [
+        {
+          "rule": "泡泡组 - 泡泡, 火神",
+          "ops": [
+            "泡泡",
+            "火神"
+          ],
+          "eff": 62,
+          "workplace": "制造站4",
+          "product": "Battle Record",
+          "type": "generic"
+        }
+      ]
+    },
+    {
+      "total_efficiency": 160,
+      "assignment_detail": [
+        {
+          "rule": "通用单人",
+          "ops": [
+            "红豆",
+            "霜叶"
+          ],
+          "eff": 60,
+          "workplace": "制造站5",
+          "product": "Battle Record",
+          "type": "each"
+        }
+      ]
+    },
+    {
+      "total_efficiency": 235,
+      "assignment_detail": [
+        {
+          "rule": "巫恋组 - 巫恋, 龙舌兰, 卡夫卡",
+          "ops": [
+            "巫恋",
+            "龙舌兰",
+            "卡夫卡"
+          ],
+          "eff": 135,
+          "workplace": "贸易站1",
+          "product": "LMD",
+          "type": "generic"
+        }
+      ]
+    },
+    {
+      "total_efficiency": 134,
+      "assignment_detail": [
+        {
+          "rule": "PRTS补全 - 但书",
+          "ops": [
+            "但书"
+          ],
+          "eff": 0,
+          "workplace": "贸易站2",
+          "product": "LMD",
+          "type": "generic"
+        },
+        {
+          "rule": "通用单人 - 石英",
+          "ops": [
+            "石英"
+          ],
+          "eff": 34,
+          "workplace": "贸易站2",
+          "product": "LMD",
+          "type": "generic"
+        }
+      ]
+    },
+    {
+      "total_efficiency": 135,
+      "assignment_detail": [
+        {
+          "rule": "单人 - 伊内丝",
+          "ops": [
+            "伊内丝"
+          ],
+          "eff": 70,
+          "workplace": "会客室",
+          "product": "",
+          "type": "generic"
+        },
+        {
+          "rule": "单人",
+          "ops": [
+            "陈"
+          ],
+          "eff": 65,
+          "workplace": "会客室",
+          "product": "",
+          "type": "each"
+        }
+      ]
+    },
+    {
+      "total_efficiency": 20,
+      "assignment_detail": [
+        {
+          "rule": "单人",
+          "ops": [
+            "格雷伊"
+          ],
+          "eff": 20,
+          "workplace": "发电站1",
+          "product": "",
+          "type": "each"
+        }
+      ]
+    },
+    {
+      "total_efficiency": 23,
+      "assignment_detail": [
+        {
+          "rule": "单人 - 承曦格雷伊",
+          "ops": [
+            "承曦格雷伊"
+          ],
+          "eff": 23,
+          "workplace": "发电站2",
+          "product": "",
+          "type": "generic"
+        }
+      ]
+    },
+    {
+      "total_efficiency": 45,
+      "assignment_detail": [
+        {
+          "rule": "单人",
+          "ops": [
+            "艾雅法拉"
+          ],
+          "eff": 45,
+          "workplace": "办公室",
+          "product": "",
+          "type": "each"
+        }
+      ]
+    }
+  ],
+  "upgrade_suggestions": [
+    {
+      "type": "single",
+      "name": "梅尔",
+      "current": 0,
+      "target": 2,
+      "gain": 58.720000000000255,
+      "id": "char_242_otter",
+      "roi": {
+        "payback_days": 98.75128644939966,
+        "payback_basis": "missing_sanity",
+        "efficiency_gain": 58.72,
+        "daily_sanity_gain": 5.83
+      },
+      "rooms": "制造站3",
+      "impact": {
+        "rooms": [
+          {
+            "product": "Battle Record",
+            "operators": [
+              "梅尔",
+              "淬羽赫默"
+            ],
+            "room_name": "制造站3",
+            "room_type": "manufacture",
+            "estimated_gain": 0,
+            "rule_description": "通用单人",
+            "missing_operators": [
+              "梅尔"
+            ]
+          }
+        ],
+        "summary": "影响 制造站3"
+      },
+      "specialType": "normal",
+      "suggestion_id": "upgrade-6886cf9d305731dbca74",
+      "training_cost": {
+        "status": "available",
+        "target": {
+          "id": "char_242_otter",
+          "name": "梅尔",
+          "target_elite": 2,
+          "current_elite": 0
+        },
+        "totals": {
+          "exp": 215000,
+          "cash": 345228,
+          "materials": [
+            {
+              "id": "30032",
+              "name": "聚酸酯",
+              "count": 5,
+              "rarity": 1,
+              "equivalent_sanity": 28.42
+            },
+            {
+              "id": "30044",
+              "name": "异铁块",
+              "count": 6,
+              "rarity": 3,
+              "equivalent_sanity": 658.26
+            },
+            {
+              "id": "30062",
+              "name": "装置",
+              "count": 2,
+              "rarity": 1,
+              "equivalent_sanity": 18.8
+            },
+            {
+              "id": "30103",
+              "name": "RMA70-12",
+              "count": 11,
+              "rarity": 2,
+              "equivalent_sanity": 411.62
+            },
+            {
+              "id": "3271",
+              "name": "辅助芯片",
+              "count": 4,
+              "rarity": 2,
+              "equivalent_sanity": 68.89
+            },
+            {
+              "id": "3273",
+              "name": "辅助双芯片",
+              "count": 3,
+              "rarity": 4,
+              "equivalent_sanity": 575.72
+            }
+          ],
+          "equivalent_sanity": 3148.98
+        },
+        "missing": {
+          "exp": 0,
+          "cash": 0,
+          "materials": [
+            {
+              "id": "3273",
+              "name": "辅助双芯片",
+              "count": 3,
+              "rarity": 4,
+              "equivalent_sanity": 575.72
+            }
+          ],
+          "equivalent_sanity": 575.72
+        },
+        "sources": {
+          "skland": "ok",
+          "lmd_exp": "fixed_lmd_trade_gold_net_exp_36_per_10000",
+          "yituliu": "fresh",
+          "pricing_age_ms": 44983672,
+          "valuation_version": "depot-v2:data.c00e21881f03:114a42f15c80ef49c321f45b97fc684a9f43d65f0f6787daf2b3b705d90f9388",
+          "pricing_fetched_at": "2026-10-11T15:05:07.930Z",
+          "pricing_snapshot_id": "114a42f15c80ef49c321f45b97fc684a9f43d65f0f6787daf2b3b705d90f9388"
+        },
+        "warnings": [],
+        "available": {
+          "exp": 215000,
+          "cash": 345228,
+          "materials": [
+            {
+              "id": "30032",
+              "name": "聚酸酯",
+              "count": 5,
+              "rarity": 1,
+              "equivalent_sanity": 28.42
+            },
+            {
+              "id": "30044",
+              "name": "异铁块",
+              "count": 6,
+              "rarity": 3,
+              "equivalent_sanity": 658.26
+            },
+            {
+              "id": "30062",
+              "name": "装置",
+              "count": 2,
+              "rarity": 1,
+              "equivalent_sanity": 18.8
+            },
+            {
+              "id": "30103",
+              "name": "RMA70-12",
+              "count": 11,
+              "rarity": 2,
+              "equivalent_sanity": 411.62
+            },
+            {
+              "id": "3271",
+              "name": "辅助芯片",
+              "count": 4,
+              "rarity": 2,
+              "equivalent_sanity": 68.89
+            }
+          ],
+          "equivalent_sanity": 2573.26
+        },
+        "operators": [
+          {
+            "id": "char_242_otter",
+            "name": "梅尔",
+            "status": "complete",
+            "totals": {
+              "exp": 215000,
+              "cash": 345228,
+              "materials": [
+                {
+                  "id": "30032",
+                  "name": "聚酸酯",
+                  "count": 5,
+                  "rarity": 1,
+                  "equivalent_sanity": 28.42
+                },
+                {
+                  "id": "30044",
+                  "name": "异铁块",
+                  "count": 6,
+                  "rarity": 3,
+                  "equivalent_sanity": 658.26
+                },
+                {
+                  "id": "30062",
+                  "name": "装置",
+                  "count": 2,
+                  "rarity": 1,
+                  "equivalent_sanity": 18.8
+                },
+                {
+                  "id": "30103",
+                  "name": "RMA70-12",
+                  "count": 11,
+                  "rarity": 2,
+                  "equivalent_sanity": 411.62
+                },
+                {
+                  "id": "3271",
+                  "name": "辅助芯片",
+                  "count": 4,
+                  "rarity": 2,
+                  "equivalent_sanity": 68.89
+                },
+                {
+                  "id": "3273",
+                  "name": "辅助双芯片",
+                  "count": 3,
+                  "rarity": 4,
+                  "equivalent_sanity": 575.72
+                }
+              ],
+              "equivalent_sanity": 3148.98
+            },
+            "missing": {
+              "exp": 0,
+              "cash": 0,
+              "materials": [
+                {
+                  "id": "3273",
+                  "name": "辅助双芯片",
+                  "count": 3,
+                  "rarity": 4,
+                  "equivalent_sanity": 575.72
+                }
+              ],
+              "equivalent_sanity": 575.72
+            },
+            "warnings": [],
+            "target_elite": 2,
+            "target_level": 1,
+            "current_elite": 0,
+            "current_level": 50
+          }
+        ],
+        "unpriced_items": [],
+        "equivalent_sanity": 3148.98
+      }
+    },
+    {
+      "type": "single",
+      "name": "多萝西",
+      "current": 1,
+      "target": 2,
+      "gain": 39.720000000000255,
+      "id": "char_4048_doroth",
+      "roi": {
+        "payback_days": 183.64354066985646,
+        "payback_basis": "missing_sanity",
+        "efficiency_gain": 39.72,
+        "daily_sanity_gain": 4.18
+      },
+      "rooms": "制造站4",
+      "impact": {
+        "rooms": [
+          {
+            "product": "Battle Record",
+            "operators": [
+              "多萝西",
+              "淬羽赫默"
+            ],
+            "room_name": "制造站4",
+            "room_type": "manufacture",
+            "estimated_gain": 0,
+            "rule_description": "莱茵生命 - 多萝西, 淬羽赫默",
+            "missing_operators": [
+              "多萝西"
+            ]
+          }
+        ],
+        "summary": "影响 制造站4"
+      },
+      "specialType": "normal",
+      "suggestion_id": "upgrade-f4979735d89f8ba5be55",
+      "training_cost": {
+        "status": "available",
+        "target": {
+          "id": "char_4048_doroth",
+          "name": "多萝西",
+          "target_elite": 2,
+          "current_elite": 1
+        },
+        "totals": {
+          "exp": 0,
+          "cash": 180000,
+          "materials": [
+            {
+              "id": "30115",
+              "name": "聚合剂",
+              "count": 4,
+              "rarity": 4,
+              "equivalent_sanity": 944.18
+            },
+            {
+              "id": "31054",
+              "name": "切削原液",
+              "count": 8,
+              "rarity": 3,
+              "equivalent_sanity": 614.32
+            },
+            {
+              "id": "3283",
+              "name": "特种双芯片",
+              "count": 4,
+              "rarity": 4,
+              "equivalent_sanity": 767.63
+            }
+          ],
+          "equivalent_sanity": 2645.89
+        },
+        "missing": {
+          "exp": 0,
+          "cash": 0,
+          "materials": [
+            {
+              "id": "3283",
+              "name": "特种双芯片",
+              "count": 4,
+              "rarity": 4,
+              "equivalent_sanity": 767.63
+            }
+          ],
+          "equivalent_sanity": 767.63
+        },
+        "sources": {
+          "skland": "ok",
+          "lmd_exp": "fixed_lmd_trade_gold_net_exp_36_per_10000",
+          "yituliu": "fresh",
+          "pricing_age_ms": 44983672,
+          "valuation_version": "depot-v2:data.c00e21881f03:114a42f15c80ef49c321f45b97fc684a9f43d65f0f6787daf2b3b705d90f9388",
+          "pricing_fetched_at": "2026-10-11T15:05:07.930Z",
+          "pricing_snapshot_id": "114a42f15c80ef49c321f45b97fc684a9f43d65f0f6787daf2b3b705d90f9388"
+        },
+        "warnings": [],
+        "available": {
+          "exp": 0,
+          "cash": 180000,
+          "materials": [
+            {
+              "id": "31054",
+              "name": "切削原液",
+              "count": 8,
+              "rarity": 3,
+              "equivalent_sanity": 614.32
+            }
+          ],
+          "equivalent_sanity": 934.08
+        },
+        "operators": [
+          {
+            "id": "char_4048_doroth",
+            "name": "多萝西",
+            "status": "complete",
+            "totals": {
+              "exp": 0,
+              "cash": 180000,
+              "materials": [
+                {
+                  "id": "30115",
+                  "name": "聚合剂",
+                  "count": 4,
+                  "rarity": 4,
+                  "equivalent_sanity": 944.18
+                },
+                {
+                  "id": "31054",
+                  "name": "切削原液",
+                  "count": 8,
+                  "rarity": 3,
+                  "equivalent_sanity": 614.32
+                },
+                {
+                  "id": "3283",
+                  "name": "特种双芯片",
+                  "count": 4,
+                  "rarity": 4,
+                  "equivalent_sanity": 767.63
+                }
+              ],
+              "equivalent_sanity": 2645.89
+            },
+            "missing": {
+              "exp": 0,
+              "cash": 0,
+              "materials": [
+                {
+                  "id": "3283",
+                  "name": "特种双芯片",
+                  "count": 4,
+                  "rarity": 4,
+                  "equivalent_sanity": 767.63
+                }
+              ],
+              "equivalent_sanity": 767.63
+            },
+            "warnings": [],
+            "target_elite": 2,
+            "target_level": 1,
+            "current_elite": 1,
+            "current_level": 80
+          }
+        ],
+        "unpriced_items": [],
+        "equivalent_sanity": 2645.89
+      }
+    },
+    {
+      "type": "single",
+      "name": "吉星",
+      "current": 0,
+      "target": 2,
+      "gain": 11.720000000000255,
+      "id": "char_4203_kichi",
+      "roi": {
+        "payback_days": 144.6532663316583,
+        "payback_basis": "missing_sanity",
+        "efficiency_gain": 11.72,
+        "daily_sanity_gain": 3.98
+      },
+      "rooms": "贸易站2",
+      "impact": {
+        "rooms": [
+          {
+            "product": "LMD",
+            "operators": [
+              "可露希尔",
+              "吉星"
+            ],
+            "room_name": "贸易站2",
+            "room_type": "trading",
+            "estimated_gain": 0,
+            "rule_description": "可露希尔组 - 可露希尔, 伺夜, 吉星, 空弦",
+            "missing_operators": [
+              "吉星"
+            ]
+          }
+        ],
+        "summary": "影响 贸易站2"
+      },
+      "specialType": "normal",
+      "suggestion_id": "upgrade-7b1c8baa9e729c8c6afc",
+      "training_cost": {
+        "status": "available",
+        "target": {
+          "id": "char_4203_kichi",
+          "name": "吉星",
+          "target_elite": 2,
+          "current_elite": 0
+        },
+        "totals": {
+          "exp": 239400,
+          "cash": 371947,
+          "materials": [
+            {
+              "id": "30022",
+              "name": "糖",
+              "count": 3,
+              "rarity": 1,
+              "equivalent_sanity": 17.1
+            },
+            {
+              "id": "30032",
+              "name": "聚酸酯",
+              "count": 4,
+              "rarity": 1,
+              "equivalent_sanity": 22.74
+            },
+            {
+              "id": "30054",
+              "name": "酮阵列",
+              "count": 6,
+              "rarity": 3,
+              "equivalent_sanity": 455.25
+            },
+            {
+              "id": "30093",
+              "name": "研磨石",
+              "count": 14,
+              "rarity": 2,
+              "equivalent_sanity": 442.3
+            },
+            {
+              "id": "3241",
+              "name": "狙击芯片",
+              "count": 4,
+              "rarity": 2,
+              "equivalent_sanity": 68.89
+            },
+            {
+              "id": "3243",
+              "name": "狙击双芯片",
+              "count": 3,
+              "rarity": 4,
+              "equivalent_sanity": 575.72
+            }
+          ],
+          "equivalent_sanity": 3104.57
+        },
+        "missing": {
+          "exp": 0,
+          "cash": 0,
+          "materials": [
+            {
+              "id": "3243",
+              "name": "狙击双芯片",
+              "count": 3,
+              "rarity": 4,
+              "equivalent_sanity": 575.72
+            }
+          ],
+          "equivalent_sanity": 575.72
+        },
+        "sources": {
+          "skland": "ok",
+          "lmd_exp": "fixed_lmd_trade_gold_net_exp_36_per_10000",
+          "yituliu": "fresh",
+          "pricing_age_ms": 44983672,
+          "valuation_version": "depot-v2:data.c00e21881f03:114a42f15c80ef49c321f45b97fc684a9f43d65f0f6787daf2b3b705d90f9388",
+          "pricing_fetched_at": "2026-10-11T15:05:07.930Z",
+          "pricing_snapshot_id": "114a42f15c80ef49c321f45b97fc684a9f43d65f0f6787daf2b3b705d90f9388"
+        },
+        "warnings": [],
+        "available": {
+          "exp": 239400,
+          "cash": 371947,
+          "materials": [
+            {
+              "id": "30022",
+              "name": "糖",
+              "count": 3,
+              "rarity": 1,
+              "equivalent_sanity": 17.1
+            },
+            {
+              "id": "30032",
+              "name": "聚酸酯",
+              "count": 4,
+              "rarity": 1,
+              "equivalent_sanity": 22.74
+            },
+            {
+              "id": "30054",
+              "name": "酮阵列",
+              "count": 6,
+              "rarity": 3,
+              "equivalent_sanity": 455.25
+            },
+            {
+              "id": "30093",
+              "name": "研磨石",
+              "count": 14,
+              "rarity": 2,
+              "equivalent_sanity": 442.3
+            },
+            {
+              "id": "3241",
+              "name": "狙击芯片",
+              "count": 4,
+              "rarity": 2,
+              "equivalent_sanity": 68.89
+            }
+          ],
+          "equivalent_sanity": 2528.85
+        },
+        "operators": [
+          {
+            "id": "char_4203_kichi",
+            "name": "吉星",
+            "status": "complete",
+            "totals": {
+              "exp": 239400,
+              "cash": 371947,
+              "materials": [
+                {
+                  "id": "30022",
+                  "name": "糖",
+                  "count": 3,
+                  "rarity": 1,
+                  "equivalent_sanity": 17.1
+                },
+                {
+                  "id": "30032",
+                  "name": "聚酸酯",
+                  "count": 4,
+                  "rarity": 1,
+                  "equivalent_sanity": 22.74
+                },
+                {
+                  "id": "30054",
+                  "name": "酮阵列",
+                  "count": 6,
+                  "rarity": 3,
+                  "equivalent_sanity": 455.25
+                },
+                {
+                  "id": "30093",
+                  "name": "研磨石",
+                  "count": 14,
+                  "rarity": 2,
+                  "equivalent_sanity": 442.3
+                },
+                {
+                  "id": "3241",
+                  "name": "狙击芯片",
+                  "count": 4,
+                  "rarity": 2,
+                  "equivalent_sanity": 68.89
+                },
+                {
+                  "id": "3243",
+                  "name": "狙击双芯片",
+                  "count": 3,
+                  "rarity": 4,
+                  "equivalent_sanity": 575.72
+                }
+              ],
+              "equivalent_sanity": 3104.57
+            },
+            "missing": {
+              "exp": 0,
+              "cash": 0,
+              "materials": [
+                {
+                  "id": "3243",
+                  "name": "狙击双芯片",
+                  "count": 3,
+                  "rarity": 4,
+                  "equivalent_sanity": 575.72
+                }
+              ],
+              "equivalent_sanity": 575.72
+            },
+            "warnings": [],
+            "target_elite": 2,
+            "target_level": 1,
+            "current_elite": 0,
+            "current_level": 1
+          }
+        ],
+        "unpriced_items": [],
+        "equivalent_sanity": 3104.57
+      }
+    },
+    {
+      "type": "single",
+      "name": "食铁兽",
+      "current": 0,
+      "target": 2,
+      "gain": -5.279999999999745,
+      "id": "char_241_panda",
+      "roi": {
+        "payback_days": 183.35031847133757,
+        "payback_basis": "missing_sanity",
+        "efficiency_gain": -5.28,
+        "daily_sanity_gain": 3.14
+      },
+      "rooms": "制造站3 / 制造站5",
+      "impact": {
+        "rooms": [
+          {
+            "product": "Battle Record",
+            "operators": [
+              "弑君者",
+              "断罪者",
+              "食铁兽"
+            ],
+            "room_name": "制造站3",
+            "room_type": "manufacture",
+            "estimated_gain": 5,
+            "rule_description": "通用单人",
+            "missing_operators": [
+              "食铁兽"
+            ]
+          },
+          {
+            "product": "Battle Record",
+            "operators": [
+              "食铁兽"
+            ],
+            "room_name": "制造站5",
+            "room_type": "manufacture",
+            "estimated_gain": 5,
+            "rule_description": "通用单人",
+            "missing_operators": [
+              "食铁兽"
+            ]
+          }
+        ],
+        "summary": "影响 制造站3 / 制造站5"
+      },
+      "specialType": "normal",
+      "suggestion_id": "upgrade-a1203e015ef75af1baf4",
+      "training_cost": {
+        "status": "available",
+        "target": {
+          "id": "char_241_panda",
+          "name": "食铁兽",
+          "target_elite": 2,
+          "current_elite": 0
+        },
+        "totals": {
+          "exp": 239400,
+          "cash": 371947,
+          "materials": [
+            {
+              "id": "30022",
+              "name": "糖",
+              "count": 3,
+              "rarity": 1,
+              "equivalent_sanity": 17.1
+            },
+            {
+              "id": "30033",
+              "name": "聚酸酯组",
+              "count": 15,
+              "rarity": 2,
+              "equivalent_sanity": 334.33
+            },
+            {
+              "id": "30062",
+              "name": "装置",
+              "count": 3,
+              "rarity": 1,
+              "equivalent_sanity": 28.2
+            },
+            {
+              "id": "30094",
+              "name": "五水研磨石",
+              "count": 8,
+              "rarity": 3,
+              "equivalent_sanity": 735.67
+            },
+            {
+              "id": "3281",
+              "name": "特种芯片",
+              "count": 4,
+              "rarity": 2,
+              "equivalent_sanity": 68.89
+            },
+            {
+              "id": "3283",
+              "name": "特种双芯片",
+              "count": 3,
+              "rarity": 4,
+              "equivalent_sanity": 575.72
+            }
+          ],
+          "equivalent_sanity": 3282.48
+        },
+        "missing": {
+          "exp": 0,
+          "cash": 0,
+          "materials": [
+            {
+              "id": "3283",
+              "name": "特种双芯片",
+              "count": 3,
+              "rarity": 4,
+              "equivalent_sanity": 575.72
+            }
+          ],
+          "equivalent_sanity": 575.72
+        },
+        "sources": {
+          "skland": "ok",
+          "lmd_exp": "fixed_lmd_trade_gold_net_exp_36_per_10000",
+          "yituliu": "fresh",
+          "pricing_age_ms": 44983672,
+          "valuation_version": "depot-v2:data.c00e21881f03:114a42f15c80ef49c321f45b97fc684a9f43d65f0f6787daf2b3b705d90f9388",
+          "pricing_fetched_at": "2026-10-11T15:05:07.930Z",
+          "pricing_snapshot_id": "114a42f15c80ef49c321f45b97fc684a9f43d65f0f6787daf2b3b705d90f9388"
+        },
+        "warnings": [],
+        "available": {
+          "exp": 239400,
+          "cash": 371947,
+          "materials": [
+            {
+              "id": "30022",
+              "name": "糖",
+              "count": 3,
+              "rarity": 1,
+              "equivalent_sanity": 17.1
+            },
+            {
+              "id": "30033",
+              "name": "聚酸酯组",
+              "count": 15,
+              "rarity": 2,
+              "equivalent_sanity": 334.33
+            },
+            {
+              "id": "30062",
+              "name": "装置",
+              "count": 3,
+              "rarity": 1,
+              "equivalent_sanity": 28.2
+            },
+            {
+              "id": "30094",
+              "name": "五水研磨石",
+              "count": 2,
+              "rarity": 3,
+              "equivalent_sanity": 183.92
+            },
+            {
+              "id": "3281",
+              "name": "特种芯片",
+              "count": 1,
+              "rarity": 2,
+              "equivalent_sanity": 17.22
+            }
+          ],
+          "equivalent_sanity": 2103.34
+        },
+        "operators": [
+          {
+            "id": "char_241_panda",
+            "name": "食铁兽",
+            "status": "complete",
+            "totals": {
+              "exp": 239400,
+              "cash": 371947,
+              "materials": [
+                {
+                  "id": "30022",
+                  "name": "糖",
+                  "count": 3,
+                  "rarity": 1,
+                  "equivalent_sanity": 17.1
+                },
+                {
+                  "id": "30033",
+                  "name": "聚酸酯组",
+                  "count": 15,
+                  "rarity": 2,
+                  "equivalent_sanity": 334.33
+                },
+                {
+                  "id": "30062",
+                  "name": "装置",
+                  "count": 3,
+                  "rarity": 1,
+                  "equivalent_sanity": 28.2
+                },
+                {
+                  "id": "30094",
+                  "name": "五水研磨石",
+                  "count": 8,
+                  "rarity": 3,
+                  "equivalent_sanity": 735.67
+                },
+                {
+                  "id": "3281",
+                  "name": "特种芯片",
+                  "count": 4,
+                  "rarity": 2,
+                  "equivalent_sanity": 68.89
+                },
+                {
+                  "id": "3283",
+                  "name": "特种双芯片",
+                  "count": 3,
+                  "rarity": 4,
+                  "equivalent_sanity": 575.72
+                }
+              ],
+              "equivalent_sanity": 3282.48
+            },
+            "missing": {
+              "exp": 0,
+              "cash": 0,
+              "materials": [
+                {
+                  "id": "3283",
+                  "name": "特种双芯片",
+                  "count": 3,
+                  "rarity": 4,
+                  "equivalent_sanity": 575.72
+                }
+              ],
+              "equivalent_sanity": 575.72
+            },
+            "warnings": [],
+            "target_elite": 2,
+            "target_level": 1,
+            "current_elite": 0,
+            "current_level": 1
+          }
+        ],
+        "unpriced_items": [],
+        "equivalent_sanity": 3282.48
+      }
+    },
+    {
+      "type": "single",
+      "name": "空构",
+      "current": 0,
+      "target": 2,
+      "gain": -10.279999999999745,
+      "id": "char_4015_spuria",
+      "roi": {
+        "payback_days": 216.4360902255639,
+        "payback_basis": "missing_sanity",
+        "efficiency_gain": -10.28,
+        "daily_sanity_gain": 2.66
+      },
+      "rooms": "发电站2 / 发电站1",
+      "impact": {
+        "rooms": [
+          {
+            "product": "",
+            "operators": [
+              "空构"
+            ],
+            "room_name": "发电站2",
+            "room_type": "power",
+            "estimated_gain": 0,
+            "rule_description": "单人 - 空构",
+            "missing_operators": [
+              "空构"
+            ]
+          },
+          {
+            "product": "",
+            "operators": [
+              "空构"
+            ],
+            "room_name": "发电站1",
+            "room_type": "power",
+            "estimated_gain": 0,
+            "rule_description": "单人 - 空构",
+            "missing_operators": [
+              "空构"
+            ]
+          }
+        ],
+        "summary": "影响 发电站2 / 发电站1"
+      },
+      "specialType": "normal",
+      "suggestion_id": "upgrade-11e62841a715bd9d3b27",
+      "training_cost": {
+        "status": "available",
+        "target": {
+          "id": "char_4015_spuria",
+          "name": "空构",
+          "target_elite": 2,
+          "current_elite": 0
+        },
+        "totals": {
+          "exp": 239400,
+          "cash": 371947,
+          "materials": [
+            {
+              "id": "30032",
+              "name": "聚酸酯",
+              "count": 5,
+              "rarity": 1,
+              "equivalent_sanity": 28.42
+            },
+            {
+              "id": "30052",
+              "name": "酮凝集",
+              "count": 2,
+              "rarity": 1,
+              "equivalent_sanity": 14.02
+            },
+            {
+              "id": "31034",
+              "name": "晶体电路",
+              "count": 7,
+              "rarity": 3,
+              "equivalent_sanity": 638.87
+            },
+            {
+              "id": "31053",
+              "name": "化合切削液",
+              "count": 9,
+              "rarity": 2,
+              "equivalent_sanity": 213.86
+            },
+            {
+              "id": "3281",
+              "name": "特种芯片",
+              "count": 4,
+              "rarity": 2,
+              "equivalent_sanity": 68.89
+            },
+            {
+              "id": "3283",
+              "name": "特种双芯片",
+              "count": 3,
+              "rarity": 4,
+              "equivalent_sanity": 575.72
+            }
+          ],
+          "equivalent_sanity": 3062.35
+        },
+        "missing": {
+          "exp": 0,
+          "cash": 0,
+          "materials": [
+            {
+              "id": "3283",
+              "name": "特种双芯片",
+              "count": 3,
+              "rarity": 4,
+              "equivalent_sanity": 575.72
+            }
+          ],
+          "equivalent_sanity": 575.72
+        },
+        "sources": {
+          "skland": "ok",
+          "lmd_exp": "fixed_lmd_trade_gold_net_exp_36_per_10000",
+          "yituliu": "fresh",
+          "pricing_age_ms": 44983672,
+          "valuation_version": "depot-v2:data.c00e21881f03:114a42f15c80ef49c321f45b97fc684a9f43d65f0f6787daf2b3b705d90f9388",
+          "pricing_fetched_at": "2026-10-11T15:05:07.930Z",
+          "pricing_snapshot_id": "114a42f15c80ef49c321f45b97fc684a9f43d65f0f6787daf2b3b705d90f9388"
+        },
+        "warnings": [],
+        "available": {
+          "exp": 239400,
+          "cash": 371947,
+          "materials": [
+            {
+              "id": "30032",
+              "name": "聚酸酯",
+              "count": 5,
+              "rarity": 1,
+              "equivalent_sanity": 28.42
+            },
+            {
+              "id": "30052",
+              "name": "酮凝集",
+              "count": 2,
+              "rarity": 1,
+              "equivalent_sanity": 14.02
+            },
+            {
+              "id": "31034",
+              "name": "晶体电路",
+              "count": 7,
+              "rarity": 3,
+              "equivalent_sanity": 638.87
+            },
+            {
+              "id": "31053",
+              "name": "化合切削液",
+              "count": 9,
+              "rarity": 2,
+              "equivalent_sanity": 213.86
+            },
+            {
+              "id": "3281",
+              "name": "特种芯片",
+              "count": 1,
+              "rarity": 2,
+              "equivalent_sanity": 17.22
+            }
+          ],
+          "equivalent_sanity": 2434.96
+        },
+        "operators": [
+          {
+            "id": "char_4015_spuria",
+            "name": "空构",
+            "status": "complete",
+            "totals": {
+              "exp": 239400,
+              "cash": 371947,
+              "materials": [
+                {
+                  "id": "30032",
+                  "name": "聚酸酯",
+                  "count": 5,
+                  "rarity": 1,
+                  "equivalent_sanity": 28.42
+                },
+                {
+                  "id": "30052",
+                  "name": "酮凝集",
+                  "count": 2,
+                  "rarity": 1,
+                  "equivalent_sanity": 14.02
+                },
+                {
+                  "id": "31034",
+                  "name": "晶体电路",
+                  "count": 7,
+                  "rarity": 3,
+                  "equivalent_sanity": 638.87
+                },
+                {
+                  "id": "31053",
+                  "name": "化合切削液",
+                  "count": 9,
+                  "rarity": 2,
+                  "equivalent_sanity": 213.86
+                },
+                {
+                  "id": "3281",
+                  "name": "特种芯片",
+                  "count": 4,
+                  "rarity": 2,
+                  "equivalent_sanity": 68.89
+                },
+                {
+                  "id": "3283",
+                  "name": "特种双芯片",
+                  "count": 3,
+                  "rarity": 4,
+                  "equivalent_sanity": 575.72
+                }
+              ],
+              "equivalent_sanity": 3062.35
+            },
+            "missing": {
+              "exp": 0,
+              "cash": 0,
+              "materials": [
+                {
+                  "id": "3283",
+                  "name": "特种双芯片",
+                  "count": 3,
+                  "rarity": 4,
+                  "equivalent_sanity": 575.72
+                }
+              ],
+              "equivalent_sanity": 575.72
+            },
+            "warnings": [],
+            "target_elite": 2,
+            "target_level": 1,
+            "current_elite": 0,
+            "current_level": 1
+          }
+        ],
+        "unpriced_items": [],
+        "equivalent_sanity": 3062.35
+      }
+    },
+    {
+      "type": "single",
+      "name": "普罗旺斯",
+      "current": 0,
+      "target": 2,
+      "gain": -10.279999999999745,
+      "id": "char_145_prove",
+      "roi": {
+        "payback_days": 216.4360902255639,
+        "payback_basis": "missing_sanity",
+        "efficiency_gain": -10.28,
+        "daily_sanity_gain": 2.66
+      },
+      "rooms": "办公室",
+      "impact": {
+        "rooms": [
+          {
+            "product": "",
+            "operators": [
+              "普罗旺斯"
+            ],
+            "room_name": "办公室",
+            "room_type": "hire",
+            "estimated_gain": 0,
+            "rule_description": "单人",
+            "missing_operators": [
+              "普罗旺斯"
+            ]
+          },
+          {
+            "product": "",
+            "operators": [
+              "普罗旺斯"
+            ],
+            "room_name": "办公室",
+            "room_type": "hire",
+            "estimated_gain": 0,
+            "rule_description": "单人",
+            "missing_operators": [
+              "普罗旺斯"
+            ]
+          }
+        ],
+        "summary": "影响 办公室"
+      },
+      "specialType": "normal",
+      "suggestion_id": "upgrade-59479d63d84d1e8a8fb3",
+      "training_cost": {
+        "status": "available",
+        "target": {
+          "id": "char_145_prove",
+          "name": "普罗旺斯",
+          "target_elite": 2,
+          "current_elite": 0
+        },
+        "totals": {
+          "exp": 239400,
+          "cash": 371947,
+          "materials": [
+            {
+              "id": "30024",
+              "name": "糖聚块",
+              "count": 9,
+              "rarity": 3,
+              "equivalent_sanity": 630.78
+            },
+            {
+              "id": "30042",
+              "name": "异铁",
+              "count": 3,
+              "rarity": 1,
+              "equivalent_sanity": 20.63
+            },
+            {
+              "id": "30052",
+              "name": "酮凝集",
+              "count": 4,
+              "rarity": 1,
+              "equivalent_sanity": 28.05
+            },
+            {
+              "id": "30063",
+              "name": "全新装置",
+              "count": 7,
+              "rarity": 2,
+              "equivalent_sanity": 260.01
+            },
+            {
+              "id": "3241",
+              "name": "狙击芯片",
+              "count": 4,
+              "rarity": 2,
+              "equivalent_sanity": 68.89
+            },
+            {
+              "id": "3243",
+              "name": "狙击双芯片",
+              "count": 3,
+              "rarity": 4,
+              "equivalent_sanity": 575.72
+            }
+          ],
+          "equivalent_sanity": 3106.65
+        },
+        "missing": {
+          "exp": 0,
+          "cash": 0,
+          "materials": [
+            {
+              "id": "3243",
+              "name": "狙击双芯片",
+              "count": 3,
+              "rarity": 4,
+              "equivalent_sanity": 575.72
+            }
+          ],
+          "equivalent_sanity": 575.72
+        },
+        "sources": {
+          "skland": "ok",
+          "lmd_exp": "fixed_lmd_trade_gold_net_exp_36_per_10000",
+          "yituliu": "fresh",
+          "pricing_age_ms": 44983672,
+          "valuation_version": "depot-v2:data.c00e21881f03:114a42f15c80ef49c321f45b97fc684a9f43d65f0f6787daf2b3b705d90f9388",
+          "pricing_fetched_at": "2026-10-11T15:05:07.930Z",
+          "pricing_snapshot_id": "114a42f15c80ef49c321f45b97fc684a9f43d65f0f6787daf2b3b705d90f9388"
+        },
+        "warnings": [],
+        "available": {
+          "exp": 239400,
+          "cash": 371947,
+          "materials": [
+            {
+              "id": "30024",
+              "name": "糖聚块",
+              "count": 9,
+              "rarity": 3,
+              "equivalent_sanity": 630.78
+            },
+            {
+              "id": "30042",
+              "name": "异铁",
+              "count": 3,
+              "rarity": 1,
+              "equivalent_sanity": 20.63
+            },
+            {
+              "id": "30052",
+              "name": "酮凝集",
+              "count": 4,
+              "rarity": 1,
+              "equivalent_sanity": 28.05
+            },
+            {
+              "id": "30063",
+              "name": "全新装置",
+              "count": 7,
+              "rarity": 2,
+              "equivalent_sanity": 260.01
+            },
+            {
+              "id": "3241",
+              "name": "狙击芯片",
+              "count": 4,
+              "rarity": 2,
+              "equivalent_sanity": 68.89
+            }
+          ],
+          "equivalent_sanity": 2530.93
+        },
+        "operators": [
+          {
+            "id": "char_145_prove",
+            "name": "普罗旺斯",
+            "status": "complete",
+            "totals": {
+              "exp": 239400,
+              "cash": 371947,
+              "materials": [
+                {
+                  "id": "30024",
+                  "name": "糖聚块",
+                  "count": 9,
+                  "rarity": 3,
+                  "equivalent_sanity": 630.78
+                },
+                {
+                  "id": "30042",
+                  "name": "异铁",
+                  "count": 3,
+                  "rarity": 1,
+                  "equivalent_sanity": 20.63
+                },
+                {
+                  "id": "30052",
+                  "name": "酮凝集",
+                  "count": 4,
+                  "rarity": 1,
+                  "equivalent_sanity": 28.05
+                },
+                {
+                  "id": "30063",
+                  "name": "全新装置",
+                  "count": 7,
+                  "rarity": 2,
+                  "equivalent_sanity": 260.01
+                },
+                {
+                  "id": "3241",
+                  "name": "狙击芯片",
+                  "count": 4,
+                  "rarity": 2,
+                  "equivalent_sanity": 68.89
+                },
+                {
+                  "id": "3243",
+                  "name": "狙击双芯片",
+                  "count": 3,
+                  "rarity": 4,
+                  "equivalent_sanity": 575.72
+                }
+              ],
+              "equivalent_sanity": 3106.65
+            },
+            "missing": {
+              "exp": 0,
+              "cash": 0,
+              "materials": [
+                {
+                  "id": "3243",
+                  "name": "狙击双芯片",
+                  "count": 3,
+                  "rarity": 4,
+                  "equivalent_sanity": 575.72
+                }
+              ],
+              "equivalent_sanity": 575.72
+            },
+            "warnings": [],
+            "target_elite": 2,
+            "target_level": 1,
+            "current_elite": 0,
+            "current_level": 1
+          }
+        ],
+        "unpriced_items": [],
+        "equivalent_sanity": 3106.65
+      }
+    }
+  ],
+  "build_meta": {
+    "frontend_version": "2.0.1016",
+    "backend_version": "2.0.1016",
+    "expected_backend_version": "2.0.1016",
+    "data_version": "data.c00e21881f03",
+    "source_mode": "full",
+    "source_schema_version": 1,
+    "data_content_sha256": "c00e21881f03d9c4c82bf30f1539a1577897074405d655bac9d3ae756e989442",
+    "data_source_updated_at": "2026-10-11T14:30:46.693Z",
+    "build_generated_at": "2026-10-11T14:30:46.693Z",
+    "generated_at": "2026-10-11T14:30:46.693Z",
+    "source_summary": "source=server/handlers/efficiency-data.json; mode=full; sha256=c00e21881f03d9c4c82bf30f1539a1577897074405d655bac9d3ae756e989442; workplaces=14; trading_rule_groups=8; manufacturing_rule_groups=10; control_center_rules=49",
+    "git_sha": "d9c72a3161e21921c7408f61d3c5ce36a9c15f09",
+    "build_context": "quality-checks-private"
+  },
+  "cache_key": "fast|252|8h-8h-8h|{\"LMD\":2}|{\"Pure Gold\":2,\"Battle Record\":3}",
+  "elapsed_ms": 32,
+  "optimality": "global_within_candidate_set",
+  "shift_hours": [
+    8,
+    8,
+    8
+  ],
+  "pruned_nodes": 7017,
+  "search_nodes": 36,
+  "schedule_mode": "maa",
+  "shift_pattern": "8h-8h-8h",
+  "dormitory_rule": "fixed",
+  "candidate_count": 78,
+  "job_recommended": false,
+  "daily_production": {
+    "net": {
+      "LMD": 53594.9895,
+      "Orundum": 0,
+      "Pure Gold": -5.9756,
+      "Battle Record": 42.4266,
+      "Originium Shard": 0
+    },
+    "hours": 24,
+    "drones": {
+      "used": 372.8,
+      "capacity": 235,
+      "discarded": 0,
+      "generated": 372.8,
+      "acceleration_minutes": 1118.4
+    },
+    "details": [
+      {
+        "unit": "item",
+        "shift": "第1班",
+        "amount": 14.6667,
+        "product": "Pure Gold",
+        "room_type": "manufacture",
+        "room_index": 1,
+        "capacity_limited": false,
+        "unconstrained_amount": 14.6667
+      },
+      {
+        "unit": "item",
+        "shift": "第1班",
+        "amount": 12.6,
+        "product": "Pure Gold",
+        "room_type": "manufacture",
+        "room_index": 2,
+        "capacity_limited": false,
+        "unconstrained_amount": 12.6
+      },
+      {
+        "unit": "item",
+        "shift": "第1班",
+        "amount": 5.3333,
+        "product": "Battle Record",
+        "room_type": "manufacture",
+        "room_index": 3,
+        "capacity_limited": false,
+        "unconstrained_amount": 5.3333
+      },
+      {
+        "unit": "item",
+        "shift": "第1班",
+        "amount": 4.5067,
+        "product": "Battle Record",
+        "room_type": "manufacture",
+        "room_index": 4,
+        "capacity_limited": false,
+        "unconstrained_amount": 4.5067
+      },
+      {
+        "unit": "item",
+        "shift": "第1班",
+        "amount": 4.3733,
+        "product": "Battle Record",
+        "room_type": "manufacture",
+        "room_index": 5,
+        "capacity_limited": false,
+        "unconstrained_amount": 4.3733
+      },
+      {
+        "shift": "第1班",
+        "amount": 10884.9558,
+        "orders": 4.8378,
+        "consume": {
+          "Pure Gold": 21.7699
+        },
+        "product": "LMD",
+        "room_type": "trading",
+        "room_index": 1,
+        "capacity_limited": false,
+        "base_gold_per_order": 2.9,
+        "extra_gold_per_order": 1.6,
+        "unconstrained_orders": 4.8378
+      },
+      {
+        "shift": "第1班",
+        "amount": 6560,
+        "orders": 5.4667,
+        "consume": {
+          "Pure Gold": 10.9333
+        },
+        "product": "LMD",
+        "room_type": "trading",
+        "room_index": 2,
+        "capacity_limited": false,
+        "base_gold_per_order": 2,
+        "extra_gold_per_order": 0,
+        "unconstrained_orders": 5.4667
+      },
+      {
+        "unit": "item",
+        "shift": "第1班",
+        "amount": 5.1,
+        "drones": 122.4,
+        "source": "drones",
+        "product": "Pure Gold",
+        "room_type": "manufacture",
+        "room_index": 1,
+        "base_seconds": 22032
+      },
+      {
+        "unit": "item",
+        "shift": "第2班",
+        "amount": 12.7333,
+        "product": "Pure Gold",
+        "room_type": "manufacture",
+        "room_index": 1,
+        "capacity_limited": false,
+        "unconstrained_amount": 12.7333
+      },
+      {
+        "unit": "item",
+        "shift": "第2班",
+        "amount": 11.1333,
+        "product": "Pure Gold",
+        "room_type": "manufacture",
+        "room_index": 2,
+        "capacity_limited": false,
+        "unconstrained_amount": 11.1333
+      },
+      {
+        "unit": "item",
+        "shift": "第2班",
+        "amount": 5.2,
+        "product": "Battle Record",
+        "room_type": "manufacture",
+        "room_index": 3,
+        "capacity_limited": false,
+        "unconstrained_amount": 5.2
+      },
+      {
+        "unit": "item",
+        "shift": "第2班",
+        "amount": 4.5067,
+        "product": "Battle Record",
+        "room_type": "manufacture",
+        "room_index": 4,
+        "capacity_limited": false,
+        "unconstrained_amount": 4.5067
+      },
+      {
+        "unit": "item",
+        "shift": "第2班",
+        "amount": 4.3733,
+        "product": "Battle Record",
+        "room_type": "manufacture",
+        "room_index": 5,
+        "capacity_limited": false,
+        "unconstrained_amount": 4.3733
+      },
+      {
+        "shift": "第2班",
+        "amount": 10884.9558,
+        "orders": 4.8378,
+        "consume": {
+          "Pure Gold": 21.7699
+        },
+        "product": "LMD",
+        "room_type": "trading",
+        "room_index": 1,
+        "capacity_limited": false,
+        "base_gold_per_order": 2.9,
+        "extra_gold_per_order": 1.6,
+        "unconstrained_orders": 4.8378
+      },
+      {
+        "shift": "第2班",
+        "amount": 6560,
+        "orders": 5.4667,
+        "consume": {
+          "Pure Gold": 10.9333
+        },
+        "product": "LMD",
+        "room_type": "trading",
+        "room_index": 2,
+        "capacity_limited": false,
+        "base_gold_per_order": 2,
+        "extra_gold_per_order": 0,
+        "unconstrained_orders": 5.4667
+      },
+      {
+        "unit": "item",
+        "shift": "第2班",
+        "amount": 5.2667,
+        "drones": 126.4,
+        "source": "drones",
+        "product": "Pure Gold",
+        "room_type": "manufacture",
+        "room_index": 1,
+        "base_seconds": 22752
+      },
+      {
+        "unit": "item",
+        "shift": "第3班",
+        "amount": 14.7333,
+        "product": "Pure Gold",
+        "room_type": "manufacture",
+        "room_index": 1,
+        "capacity_limited": false,
+        "unconstrained_amount": 14.7333
+      },
+      {
+        "unit": "item",
+        "shift": "第3班",
+        "amount": 12.6667,
+        "product": "Pure Gold",
+        "room_type": "manufacture",
+        "room_index": 2,
+        "capacity_limited": false,
+        "unconstrained_amount": 12.6667
+      },
+      {
+        "unit": "item",
+        "shift": "第3班",
+        "amount": 5.3333,
+        "product": "Battle Record",
+        "room_type": "manufacture",
+        "room_index": 3,
+        "capacity_limited": false,
+        "unconstrained_amount": 5.3333
+      },
+      {
+        "unit": "item",
+        "shift": "第3班",
+        "amount": 4.4267,
+        "product": "Battle Record",
+        "room_type": "manufacture",
+        "room_index": 4,
+        "capacity_limited": false,
+        "unconstrained_amount": 4.4267
+      },
+      {
+        "unit": "item",
+        "shift": "第3班",
+        "amount": 4.3733,
+        "product": "Battle Record",
+        "room_type": "manufacture",
+        "room_index": 5,
+        "capacity_limited": false,
+        "unconstrained_amount": 4.3733
+      },
+      {
+        "shift": "第3班",
+        "amount": 9843.1061,
+        "orders": 4.9831,
+        "consume": {
+          "Pure Gold": 16.912
+        },
+        "product": "LMD",
+        "room_type": "trading",
+        "room_index": 1,
+        "capacity_limited": false,
+        "base_gold_per_order": 3.3939,
+        "extra_gold_per_order": 0,
+        "unconstrained_orders": 4.9831
+      },
+      {
+        "shift": "第3班",
+        "amount": 8861.9718,
+        "orders": 4.0282,
+        "consume": {
+          "Pure Gold": 17.7239
+        },
+        "product": "LMD",
+        "room_type": "trading",
+        "room_index": 2,
+        "capacity_limited": false,
+        "base_gold_per_order": 2.4,
+        "extra_gold_per_order": 2,
+        "unconstrained_orders": 4.0282
+      },
+      {
+        "unit": "item",
+        "shift": "第3班",
+        "amount": 5.1667,
+        "drones": 124,
+        "source": "drones",
+        "product": "Pure Gold",
+        "room_type": "manufacture",
+        "room_index": 1,
+        "base_seconds": 22320
+      }
+    ],
+    "trading": {
+      "LMD": 53594.9895,
+      "Orundum": 0
+    },
+    "consumption": {
+      "Pure Gold": 100.0423,
+      "Originium Shard": 0
+    },
+    "shift_hours": [
+      8,
+      8,
+      8
+    ],
+    "manufacturing": {
+      "Pure Gold": 94.0667,
+      "Battle Record": 42.4266,
+      "Originium Shard": 0
+    },
+    "dynamic_resources": {
+      "passion": 20
+    },
+    "dynamic_resource_details": [
+      {
+        "rule": "进驻控制中枢时，热情值+10；人脉资源的联络速度+10%（同种效果取最高）",
+        "type": "dynamic_resource_contribution",
+        "shift": "第1班",
+        "amount": 10,
+        "detail": "可靠伙伴：八幡海铃进驻控制中枢时热情值+10。",
+        "resource": "passion",
+        "resources": {
+          "passion": 10
+        }
+      },
+      {
+        "rule": "进驻控制中枢时，热情值+10；人脉资源的联络速度+10%（同种效果取最高）",
+        "type": "dynamic_resource_contribution",
+        "shift": "第2班",
+        "amount": 10,
+        "detail": "可靠伙伴：八幡海铃进驻控制中枢时热情值+10。",
+        "resource": "passion",
+        "resources": {
+          "passion": 10
+        }
+      }
+    ]
+  },
+  "total_efficiency": 4851.58,
+  "cross_shift_trace": [
+    {
+      "mode": "exact-by-shift",
+      "exact": {
+        "shifts": [
+          {
+            "rooms": [
+              {
+                "raw": 195,
+                "room": "T1",
+                "score": 204.24,
+                "product": "LMD",
+                "operators": [
+                  "但书",
+                  "推进之王",
+                  "摩根"
+                ]
+              },
+              {
+                "raw": 155,
+                "room": "T2",
+                "score": 86.4,
+                "product": "LMD",
+                "operators": [
+                  "可露希尔",
+                  "伺夜"
+                ]
+              }
+            ],
+            "score": 290.64,
+            "shift": 1
+          },
+          {
+            "rooms": [
+              {
+                "raw": 195,
+                "room": "T1",
+                "score": 204.24,
+                "product": "LMD",
+                "operators": [
+                  "但书",
+                  "推进之王",
+                  "摩根"
+                ]
+              },
+              {
+                "raw": 155,
+                "room": "T2",
+                "score": 86.4,
+                "product": "LMD",
+                "operators": [
+                  "可露希尔",
+                  "伺夜"
+                ]
+              }
+            ],
+            "score": 290.64,
+            "shift": 2
+          },
+          {
+            "rooms": [
+              {
+                "raw": 235,
+                "room": "T1",
+                "score": 175.36,
+                "product": "LMD",
+                "operators": [
+                  "巫恋",
+                  "龙舌兰",
+                  "卡夫卡"
+                ]
+              },
+              {
+                "raw": 130,
+                "room": "T2",
+                "score": 102.83,
+                "product": "LMD",
+                "operators": [
+                  "但书",
+                  "石英"
+                ]
+              }
+            ],
+            "score": 278.19,
+            "shift": 3
+          }
+        ],
+        "moodRisk": 13.05,
+        "rawTotal": 1065,
+        "minShiftScore": 278.19,
+        "shiftScoreVariance": 34.445,
+        "totalEquivalentScore": 859.47
+      },
+      "label": "trading",
+      "greedy": null,
+      "elapsed_ms": 32,
+      "optimality": "global_within_candidate_set",
+      "score_delta": null,
+      "pruned_nodes": 7017,
+      "search_nodes": 36,
+      "highs_invoked": false,
+      "highs_mip_gap": null,
+      "solver_status": "completed",
+      "solver_backend": "dfs",
+      "candidate_count": 78,
+      "candidate_limit": 8,
+      "objective_order": [
+        "totalEquivalentScore",
+        "minShiftScore",
+        "shiftScoreVariance",
+        "rawTotal",
+        "moodRisk",
+        "stableSignature"
+      ],
+      "budget_exhausted": false,
+      "highs_elapsed_ms": 0,
+      "optimization_mode": "fast",
+      "search_space_size": "13144256",
+      "fallback_elapsed_ms": 0,
+      "shift_option_counts": [
+        236,
+        236,
+        236
+      ],
+      "highs_mip_node_count": null,
+      "solver_fallback_used": false,
+      "warm_start_completed": false,
+      "fallback_pruned_nodes": 0,
+      "fallback_search_nodes": 0,
+      "highs_objective_value": null,
+      "min_shift_score_delta": null,
+      "warm_start_elapsed_ms": 0,
+      "solver_fallback_reason": null,
+      "budget_exhausted_reason": null,
+      "highs_alternative_count": 0,
+      "solver_incumbent_source": null,
+      "warm_start_pruned_nodes": 0,
+      "warm_start_search_nodes": 0,
+      "fallback_exhausted_reason": null,
+      "highs_alternatives_complete": false,
+      "warm_start_exhausted_reason": null,
+      "highs_alternative_stop_reason": null,
+      "highs_alternative_rank_selected": null,
+      "highs_alternative_rank_requested": 0,
+      "highs_lexicographic_objective_values": null
+    },
+    {
+      "mode": "finalized-production-portfolio",
+      "label": "portfolio:fiammetta-targets",
+      "reason": "deadline",
+      "selected": false,
+      "attempted": false,
+      "budget_ms": 10000,
+      "current_target_count": 1
+    }
+  ],
+  "optimization_mode": "fast",
+  "search_space_size": "trading:13144256",
+  "schedule_mode_name": "MAA 排班表",
+  "dormitory_rule_name": "排班表固定",
+  "raw_total_efficiency": 4463,
+  "searched_state_count": 53285,
+  "total_schedule_hours": 24,
+  "fiammetta_target_slots": [
+    1
+  ],
+  "intermediate_depletion": [
+    {
+      "stock": 771,
+      "product": "Pure Gold",
+      "net_per_day": -5.9756,
+      "days_remaining": 129.02
+    },
+    {
+      "stock": 0,
+      "product": "Originium Shard",
+      "net_per_day": 0,
+      "days_remaining": null
+    }
+  ],
+  "maa_default_comparison": {
+    "delta": {
+      "net": {
+        "LMD": -7283.3603,
+        "Orundum": 0,
+        "Pure Gold": 29.2058,
+        "Battle Record": 0.2668,
+        "Originium Shard": 0
+      },
+      "drones": {
+        "used": 8,
+        "capacity": 0,
+        "discarded": 0,
+        "generated": 8,
+        "acceleration_minutes": 24
+      },
+      "trading": {
+        "LMD": -7283.3603,
+        "Orundum": 0
+      },
+      "consumption": {
+        "Pure Gold": -14.2057,
+        "Originium Shard": 0
+      },
+      "manufacturing": {
+        "Pure Gold": 15.0001,
+        "Battle Record": 0.2668,
+        "Originium Shard": 0
+      },
+      "total_efficiency": 126.71,
+      "raw_total_efficiency": 127
+    },
+    "source": "maa_default_simulation_v1",
+    "baseline": {
+      "plan_count": 3,
+      "room_count": 51,
+      "daily_production": {
+        "net": {
+          "LMD": 60878.3498,
+          "Orundum": 0,
+          "Pure Gold": -35.1814,
+          "Battle Record": 42.1598,
+          "Originium Shard": 0
+        },
+        "hours": 24,
+        "drones": {
+          "used": 364.8,
+          "capacity": 235,
+          "discarded": 0,
+          "generated": 364.8,
+          "acceleration_minutes": 1094.4
+        },
+        "details": [
+          {
+            "unit": "item",
+            "shift": "MAA Default Baseline 1",
+            "amount": 15.3333,
+            "product": "Pure Gold",
+            "room_type": "manufacture",
+            "room_index": 1,
+            "capacity_limited": false,
+            "unconstrained_amount": 15.3333
+          },
+          {
+            "unit": "item",
+            "shift": "MAA Default Baseline 1",
+            "amount": 12.4,
+            "product": "Pure Gold",
+            "room_type": "manufacture",
+            "room_index": 2,
+            "capacity_limited": false,
+            "unconstrained_amount": 12.4
+          },
+          {
+            "unit": "item",
+            "shift": "MAA Default Baseline 1",
+            "amount": 5.3333,
+            "product": "Battle Record",
+            "room_type": "manufacture",
+            "room_index": 3,
+            "capacity_limited": false,
+            "unconstrained_amount": 5.3333
+          },
+          {
+            "unit": "item",
+            "shift": "MAA Default Baseline 1",
+            "amount": 4.3733,
+            "product": "Battle Record",
+            "room_type": "manufacture",
+            "room_index": 4,
+            "capacity_limited": false,
+            "unconstrained_amount": 4.3733
+          },
+          {
+            "unit": "item",
+            "shift": "MAA Default Baseline 1",
+            "amount": 4.3733,
+            "product": "Battle Record",
+            "room_type": "manufacture",
+            "room_index": 5,
+            "capacity_limited": false,
+            "unconstrained_amount": 4.3733
+          },
+          {
+            "shift": "MAA Default Baseline 1",
+            "amount": 10088.4956,
+            "orders": 4.4838,
+            "consume": {
+              "Pure Gold": 20.177
+            },
+            "product": "LMD",
+            "room_type": "trading",
+            "room_index": 1,
+            "capacity_limited": false,
+            "base_gold_per_order": 2.9,
+            "extra_gold_per_order": 1.6,
+            "unconstrained_orders": 4.4838
+          },
+          {
+            "shift": "MAA Default Baseline 1",
+            "amount": 6560,
+            "orders": 5.4667,
+            "consume": {
+              "Pure Gold": 10.9333
+            },
+            "product": "LMD",
+            "room_type": "trading",
+            "room_index": 2,
+            "capacity_limited": false,
+            "base_gold_per_order": 2,
+            "extra_gold_per_order": 0,
+            "unconstrained_orders": 5.4667
+          },
+          {
+            "shift": "MAA Default Baseline 1",
+            "amount": 3982.3009,
+            "drones": 120,
+            "orders": 1.7699,
+            "source": "drones",
+            "consume": {
+              "Pure Gold": 7.9646
+            },
+            "product": "LMD",
+            "room_type": "trading",
+            "room_index": 1,
+            "base_seconds": 21600,
+            "base_gold_per_order": 2.9,
+            "extra_gold_per_order": 1.6
+          },
+          {
+            "unit": "item",
+            "shift": "MAA Default Baseline 2",
+            "amount": 15.3333,
+            "product": "Pure Gold",
+            "room_type": "manufacture",
+            "room_index": 1,
+            "capacity_limited": false,
+            "unconstrained_amount": 15.3333
+          },
+          {
+            "unit": "item",
+            "shift": "MAA Default Baseline 2",
+            "amount": 12.4,
+            "product": "Pure Gold",
+            "room_type": "manufacture",
+            "room_index": 2,
+            "capacity_limited": false,
+            "unconstrained_amount": 12.4
+          },
+          {
+            "unit": "item",
+            "shift": "MAA Default Baseline 2",
+            "amount": 5.3333,
+            "product": "Battle Record",
+            "room_type": "manufacture",
+            "room_index": 3,
+            "capacity_limited": false,
+            "unconstrained_amount": 5.3333
+          },
+          {
+            "unit": "item",
+            "shift": "MAA Default Baseline 2",
+            "amount": 4.3733,
+            "product": "Battle Record",
+            "room_type": "manufacture",
+            "room_index": 4,
+            "capacity_limited": false,
+            "unconstrained_amount": 4.3733
+          },
+          {
+            "unit": "item",
+            "shift": "MAA Default Baseline 2",
+            "amount": 4.3733,
+            "product": "Battle Record",
+            "room_type": "manufacture",
+            "room_index": 5,
+            "capacity_limited": false,
+            "unconstrained_amount": 4.3733
+          },
+          {
+            "shift": "MAA Default Baseline 2",
+            "amount": 10088.4956,
+            "orders": 4.4838,
+            "consume": {
+              "Pure Gold": 20.177
+            },
+            "product": "LMD",
+            "room_type": "trading",
+            "room_index": 1,
+            "capacity_limited": false,
+            "base_gold_per_order": 2.9,
+            "extra_gold_per_order": 1.6,
+            "unconstrained_orders": 4.4838
+          },
+          {
+            "shift": "MAA Default Baseline 2",
+            "amount": 6560,
+            "orders": 5.4667,
+            "consume": {
+              "Pure Gold": 10.9333
+            },
+            "product": "LMD",
+            "room_type": "trading",
+            "room_index": 2,
+            "capacity_limited": false,
+            "base_gold_per_order": 2,
+            "extra_gold_per_order": 0,
+            "unconstrained_orders": 5.4667
+          },
+          {
+            "shift": "MAA Default Baseline 2",
+            "amount": 4061.9469,
+            "drones": 122.4,
+            "orders": 1.8053,
+            "source": "drones",
+            "consume": {
+              "Pure Gold": 8.1239
+            },
+            "product": "LMD",
+            "room_type": "trading",
+            "room_index": 1,
+            "base_seconds": 22032,
+            "base_gold_per_order": 2.9,
+            "extra_gold_per_order": 1.6
+          },
+          {
+            "unit": "item",
+            "shift": "MAA Default Baseline 3",
+            "amount": 13,
+            "product": "Pure Gold",
+            "room_type": "manufacture",
+            "room_index": 1,
+            "capacity_limited": false,
+            "unconstrained_amount": 13
+          },
+          {
+            "unit": "item",
+            "shift": "MAA Default Baseline 3",
+            "amount": 10.6,
+            "product": "Pure Gold",
+            "room_type": "manufacture",
+            "room_index": 2,
+            "capacity_limited": false,
+            "unconstrained_amount": 10.6
+          },
+          {
+            "unit": "item",
+            "shift": "MAA Default Baseline 3",
+            "amount": 5.3333,
+            "product": "Battle Record",
+            "room_type": "manufacture",
+            "room_index": 3,
+            "capacity_limited": false,
+            "unconstrained_amount": 5.3333
+          },
+          {
+            "unit": "item",
+            "shift": "MAA Default Baseline 3",
+            "amount": 4.24,
+            "product": "Battle Record",
+            "room_type": "manufacture",
+            "room_index": 4,
+            "capacity_limited": false,
+            "unconstrained_amount": 4.24
+          },
+          {
+            "unit": "item",
+            "shift": "MAA Default Baseline 3",
+            "amount": 4.4267,
+            "product": "Battle Record",
+            "room_type": "manufacture",
+            "room_index": 5,
+            "capacity_limited": false,
+            "unconstrained_amount": 4.4267
+          },
+          {
+            "shift": "MAA Default Baseline 3",
+            "amount": 9843.1061,
+            "orders": 4.9831,
+            "consume": {
+              "Pure Gold": 16.912
+            },
+            "product": "LMD",
+            "room_type": "trading",
+            "room_index": 1,
+            "capacity_limited": false,
+            "base_gold_per_order": 3.3939,
+            "extra_gold_per_order": 0,
+            "unconstrained_orders": 4.9831
+          },
+          {
+            "shift": "MAA Default Baseline 3",
+            "amount": 6895.7746,
+            "orders": 5.7465,
+            "consume": {
+              "Pure Gold": 13.7915
+            },
+            "product": "LMD",
+            "room_type": "trading",
+            "room_index": 2,
+            "capacity_limited": false,
+            "base_gold_per_order": 2.4,
+            "extra_gold_per_order": 0,
+            "unconstrained_orders": 5.7465
+          },
+          {
+            "shift": "MAA Default Baseline 3",
+            "amount": 2798.2301,
+            "drones": 122.4,
+            "orders": 1.8053,
+            "source": "drones",
+            "consume": {
+              "Pure Gold": 5.2354
+            },
+            "product": "LMD",
+            "room_type": "trading",
+            "room_index": 1,
+            "base_seconds": 22032,
+            "base_gold_per_order": 2.9,
+            "extra_gold_per_order": 0
+          }
+        ],
+        "trading": {
+          "LMD": 60878.3498,
+          "Orundum": 0
+        },
+        "consumption": {
+          "Pure Gold": 114.248,
+          "Originium Shard": 0
+        },
+        "shift_hours": [
+          8,
+          8,
+          8
+        ],
+        "manufacturing": {
+          "Pure Gold": 79.0666,
+          "Battle Record": 42.1598,
+          "Originium Shard": 0
+        },
+        "dynamic_resources": {
+          "passion": 20,
+          "engineering_robot": 44
+        },
+        "dynamic_resource_details": [
+          {
+            "rule": "进驻控制中枢时，热情值+10；人脉资源的联络速度+10%（同种效果取最高）",
+            "type": "dynamic_resource_contribution",
+            "shift": "MAA Default Baseline 1",
+            "amount": 10,
+            "detail": "可靠伙伴：八幡海铃进驻控制中枢时热情值+10。",
+            "resource": "passion",
+            "resources": {
+              "passion": 10
+            }
+          },
+          {
+            "rule": "进驻控制中枢时，热情值+10；人脉资源的联络速度+10%（同种效果取最高）",
+            "type": "dynamic_resource_contribution",
+            "shift": "MAA Default Baseline 2",
+            "amount": 10,
+            "detail": "可靠伙伴：八幡海铃进驻控制中枢时热情值+10。",
+            "resource": "passion",
+            "resources": {
+              "passion": 10
+            }
+          },
+          {
+            "rule": "通用单人 - 至简",
+            "type": "dynamic_resource_contribution",
+            "shift": "MAA Default Baseline 3",
+            "amount": 44,
+            "detail": "至简精二：基建内设施等级总和（不包含活动室）按满级243布局上限64点工程机器人建模。",
+            "resource": "engineering_robot",
+            "resources": {
+              "engineering_robot": 44
+            }
+          }
+        ]
+      },
+      "total_efficiency": 4724.87,
+      "raw_total_efficiency": 4336
+    },
+    "warnings": [
+      "skipped_external_dependency_rules"
+    ],
+    "simulation": {
+      "drones": "Money",
+      "algorithm": "maa_default_room_local_greedy_v1",
+      "shift_hours": [
+        8,
+        8,
+        8
+      ],
+      "facility_order": [
+        "Mfg",
+        "Trade",
+        "Control",
+        "Power",
+        "Reception",
+        "Office",
+        "Dorm",
+        "Processing",
+        "Training"
+      ]
+    }
+  },
+  "optimal_objective_value": 859.47,
+  "upgrade_suggestions_status": "completed",
+  "upgrade_suggestions_candidate_count": 8,
+  "upgrade_suggestions_evaluated_count": 8
+}

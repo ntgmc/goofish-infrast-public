@@ -15,7 +15,7 @@ import type { AuthSuccessResponse, OptimizeJobAccepted, UserGameAccount, UserWor
 import { createAccountLicense } from '../tool/tool-utils'
 import { buildOptimizeJobStorageKey, writeActiveOptimizeJob } from '../tool/optimize/job-progress'
 import { buildOptimizeSignature } from '../tool/optimize/workflow-utils'
-import { SAMPLE_CONFIG, SAMPLE_OPERATORS, SAMPLE_RESULT } from './sample-result'
+import { SAMPLE_CONFIG, SAMPLE_OPERATORS, SAMPLE_RESULT } from './test-fixtures/sample-252'
 import V2Page from './V2Page'
 
 vi.mock('./ScheduleExplanation', () => ({ default: () => null }))

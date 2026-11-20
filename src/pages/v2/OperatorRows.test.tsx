@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, waitFor, within } from '@testing-libra
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import OperatorRows from './OperatorRows'
-import { SAMPLE_OPERATORS } from './sample-result'
+import { SAMPLE_OPERATORS } from './test-fixtures/sample-252'
 
 const observers = new Set<TestResizeObserver>()
 let containerWidth = 400

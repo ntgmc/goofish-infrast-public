@@ -1,0 +1,16 @@
+{
+  "id": "char_242_otter",
+  "name": "梅尔",
+  "current": 0,
+  "target": 2,
+  "dailySanityGain": 5.83,
+  "paybackDays": 98.75128644939966,
+  "totalCost": 3148.98,
+  "missingCost": 575.72,
+  "missingMaterials": [
+    {
+      "name": "辅助双芯片",
+      "count": 3
+    }
+  ]
+}

@@ -9,7 +9,7 @@ import { DEFAULT_SITE_FEATURES } from '../../lib/site-features'
 import { MotionPreferenceProvider } from '../../lib/motion-preference'
 import OperatorManagementPanel from './OperatorManagementPanel'
 import type { V2Session } from './OptionsDrawer'
-import { SAMPLE_CONFIG, SAMPLE_OPERATORS } from './sample-result'
+import { SAMPLE_CONFIG, SAMPLE_OPERATORS } from './test-fixtures/sample-252'
 
 vi.mock('../../lib/api-client', async (original) => ({ ...await original<typeof import('../../lib/api-client')>(), apiJson: vi.fn() }))
 vi.mock('../../lib/site-feature-context', () => ({ useSiteFeatures: () => ({ features: DEFAULT_SITE_FEATURES }) }))

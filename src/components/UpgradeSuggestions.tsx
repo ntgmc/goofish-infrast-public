@@ -19,6 +19,8 @@ import './upgrade-suggestions.css'
 interface Props {
   suggestions: UpgradeSuggestion[];
   embedded?: boolean;
+  description?: string;
+  sortByCost?: boolean;
   projectScope?: CultivationProjectScope;
 }
 
@@ -30,17 +32,18 @@ const SORT_OPTIONS: { id: SortMode; label: string }[] = [
   { id: 'stock', label: copy.optimize.components_UpgradeSuggestions_003 },
 ]
 
-export default function UpgradeSuggestions({ suggestions, embedded = false, projectScope }: Props) {
+export default function UpgradeSuggestions({ suggestions, embedded = false, description = copy.optimize.components_UpgradeSuggestions_005, sortByCost = true, projectScope }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [sortMode, setSortMode] = useState<SortMode>('payback')
   const [singleOnly, setSingleOnly] = useState(false)
 
   const visibleSuggestions = useMemo(() => {
+    const sort = sortByCost ? sortMode : 'gain'
     return suggestions
       .map((suggestion, index) => ({ suggestion, index, id: getUpgradeSuggestionId(suggestion, index) }))
       .filter((item) => !singleOnly || item.suggestion.type === 'single')
-      .sort((left, right) => compareSuggestions(left.suggestion, right.suggestion, sortMode, left.index, right.index))
-  }, [singleOnly, sortMode, suggestions])
+      .sort((left, right) => compareSuggestions(left.suggestion, right.suggestion, sort, left.index, right.index))
+  }, [singleOnly, sortByCost, sortMode, suggestions])
   const visibleIdSet = useMemo(() => new Set(visibleSuggestions.map((item) => item.id)), [visibleSuggestions])
 
   useEffect(() => {
@@ -69,10 +72,10 @@ export default function UpgradeSuggestions({ suggestions, embedded = false, proj
               {copy.optimize.components_UpgradeSuggestions_004}</h2>
           )}
           <p className="text-sm leading-6 text-ink-secondary">
-            {copy.optimize.components_UpgradeSuggestions_005}</p>
+            {description}</p>
         </div>
         <div className="upgrade-suggestions-filters">
-          <div className="upgrade-suggestions-sort" role="group" aria-label={copy.optimize.components_UpgradeSuggestions_006}>
+          {sortByCost && <div className="upgrade-suggestions-sort" role="group" aria-label={copy.optimize.components_UpgradeSuggestions_006}>
             {SORT_OPTIONS.map((option) => (
               <button
                 key={option.id}
@@ -88,7 +91,7 @@ export default function UpgradeSuggestions({ suggestions, embedded = false, proj
                 {option.label}
               </button>
             ))}
-          </div>
+          </div>}
           <label className="upgrade-suggestions-single">
             <input
               type="checkbox"
