@@ -52,15 +52,14 @@ export default function FeedbackSection({ active, canManage = false, canViewUser
   }, [search])
   useEffect(() => { if (selected && window.matchMedia?.('(max-width: 60rem)').matches) detailRegion.current?.scrollIntoView({ block: 'start', behavior: 'instant' }) }, [selected])
   return <section className="tool-panel min-w-0 p-4 sm:p-6">
-    <p className="text-sm leading-6 text-ink-secondary">{text.adminDescription}</p>
-    {data?.metrics && <dl className="mt-4 grid gap-3 sm:grid-cols-3" aria-label="反馈处理指标">
+    {data?.metrics && <dl className="admin-feedback-metrics" aria-label="反馈处理指标">
       <div className="tool-inset p-3"><dt className="text-xs text-ink-muted">{text.firstResponse}</dt><dd className="mt-2 text-xl font-semibold">{formatDuration(data.metrics.first_response_seconds)}</dd></div>
       <div className="tool-inset p-3"><dt className="text-xs text-ink-muted">{text.longestWait}</dt><dd className="mt-2 text-xl font-semibold">{formatDuration(data.metrics.longest_wait_seconds)}</dd></div>
       <div className="tool-inset p-3"><dt className="text-xs text-ink-muted">{text.reopened}</dt><dd className="mt-2 text-xl font-semibold">{data.metrics.reopened_count}</dd></div>
     </dl>}
     {data?.metrics && <p className="mt-2 text-xs text-ink-muted">{text.metricsHint}</p>}
     <div className="mt-4 flex flex-wrap gap-2" aria-label="反馈快捷筛选">{(['', ...FEEDBACK_TODOS] as const).map((value) => <button key={value} type="button" className={`tool-secondary-action whitespace-nowrap ${todo === value ? 'border-brand-500 text-brand-500' : ''}`} aria-pressed={todo === value} disabled={saving} onClick={() => { setTodo(value); setPage(1); setSelected(null) }}>{value ? text.todos[value] : '全部反馈'}</button>)}</div>
-    <div className="mt-4 flex flex-wrap items-end gap-3">
+    <div className="admin-feedback-filters mt-4">
       <label className="grid min-w-0 gap-2 text-sm"><span>{text.category}</span><select className="tool-field" value={category} disabled={saving} onChange={(event) => { setCategory(event.target.value); setPage(1) }}><option value="">全部分类</option>{FEEDBACK_CATEGORIES.map((value) => <option key={value} value={value}>{text.categories[value]}</option>)}</select></label>
       <label className="grid min-w-0 gap-2 text-sm"><span>{text.emailFilter}</span><input className="tool-field" value={email} maxLength={254} disabled={saving} onChange={(event) => { setEmail(event.target.value); setPage(1) }} /></label>
       <label className="grid min-w-0 gap-2 text-sm"><span>{text.waitFilter}</span><select className="tool-field" value={minWait} disabled={saving} onChange={(event) => { setMinWait(event.target.value); setPage(1) }}><option value="">{text.allWaits}</option>{[1, 4, 24, 72, 168].map((hours) => <option key={hours} value={hours}>超过 {hours} 小时</option>)}</select></label>
@@ -87,9 +86,9 @@ export default function FeedbackSection({ active, canManage = false, canViewUser
 function formatDuration(seconds: number | null) {
   if (seconds === null) return copy.feedback.noSample
   const minutes = Math.ceil(Math.max(0, seconds) / 60)
-  if (minutes < 60) return `${minutes} 分钟`
+  if (minutes < 60) return `${minutes}\u00a0分钟`
   const hours = Math.floor(minutes / 60)
-  return hours < 24 ? `${hours} 小时 ${minutes % 60} 分钟` : `${Math.floor(hours / 24)} 天 ${hours % 24} 小时`
+  return hours < 24 ? `${hours}\u00a0小时 ${minutes % 60}\u00a0分钟` : `${Math.floor(hours / 24)}\u00a0天 ${hours % 24}\u00a0小时`
 }
 
 function FeedbackWorkspace({ thread, canManage, canViewUser, canViewTasks }: { thread: ReturnType<typeof useFeedbackThread>; canManage: boolean; canViewUser: boolean; canViewTasks: boolean }) {

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { StrictMode } from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -67,6 +68,18 @@ describe('homework training recommendations', () => {
     await waitFor(() => expect(mocks.api).toHaveBeenCalledTimes(2))
     expect(mocks.refresh).not.toHaveBeenCalled()
     expect(screen.getByRole('spinbutton', { name: text.limit })).toHaveValue(12)
+  })
+
+  it.each([false, true])('calculates a cached snapshot once on entry (StrictMode: %s)', async (strict) => {
+    mocks.snapshot.mockReturnValue({ data: { version: 'cached' }, busy: false, error: '', refresh: mocks.refresh })
+    mocks.api.mockResolvedValue({ ...sample(), snapshotVersion: 'cached' })
+    const page = content(true)
+    render(strict ? <StrictMode>{page}</StrictMode> : page)
+    await screen.findByRole('heading', { name: text.suggestions })
+    expect(screen.getByRole('button', { name: copy.skland.refresh })).toBeEnabled()
+    expect(mocks.api).toHaveBeenCalledOnce()
+    expect(mocks.api.mock.calls[0][1].signal.aborted).toBe(false)
+    expect(mocks.refresh).not.toHaveBeenCalled()
   })
 
   it.each([false, true])('recommends from homework and imports targets without material or calendar UI in V2=%s', async (v2) => {

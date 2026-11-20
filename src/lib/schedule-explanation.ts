@@ -1,13 +1,14 @@
 import { z } from 'zod'
 import { ApiError } from './api-client'
 import { readServerSentEvents } from './server-sent-events'
+import { aiCreditQuoteSchema } from './ai-credits'
 
 export const scheduleExplanationStateSchema = z.object({
   explanation: z.object({ text: z.string().min(1).max(4000), created_at: z.iso.datetime() }).nullable(),
   pending: z.boolean(),
   available: z.boolean(),
-  reason: z.enum(['disabled', 'quota', 'budget', 'daily_limit', 'busy']).nullable(),
-  quota: z.object({ kind: z.enum(['trial', 'monthly']), limit: z.number().int().nonnegative(), remaining: z.number().int().nonnegative(), resets_at: z.iso.datetime().nullable() }),
+  reason: z.enum(['disabled', 'unpriced', 'budget', 'daily_limit', 'busy', 'balance', 'debt', 'pricing_changed']).nullable(),
+  credits: aiCreditQuoteSchema,
   provider: z.string().nullable(),
 })
 

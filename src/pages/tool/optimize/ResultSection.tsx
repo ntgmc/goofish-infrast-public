@@ -174,12 +174,12 @@ export default function ResultSection({
   )
 }
 
-export function LockedCapabilityPreview({ title, description }: { title: string; description: string }) {
+export function LockedCapabilityPreview({ title, description, className = '' }: { title: string; description: string; className?: string }) {
   const { features } = useSiteFeatures()
   const { content, isFallback } = usePublicContent()
   const purchaseHref = isFallback ? undefined : resolveActivePurchaseChannel(content.cdk_purchase.xianyu_url)?.href ?? undefined
   return (
-    <div className="relative min-h-80 overflow-hidden rounded-xl">
+    <div className={`relative min-h-80 overflow-hidden rounded-xl ${className}`}>
       <div className="space-y-4 select-none opacity-50 blur-[3px]" aria-hidden="true" data-locked-capability-preview>
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div className="space-y-2">
@@ -202,7 +202,7 @@ export function LockedCapabilityPreview({ title, description }: { title: string;
           </div>
         ))}
       </div>
-      <div className="absolute inset-0 flex items-center justify-center bg-surface-1/70 p-4 backdrop-blur-[2px]">
+      <div className="absolute inset-0 flex items-center justify-center bg-surface-1/70 p-4 backdrop-blur-[2px]" data-locked-capability-overlay>
         <div className="tool-panel max-w-lg p-5 text-center shadow-lg sm:p-6">
           <span className="tool-status">{copy.optimize.pages_tool_optimize_ResultSection_015}</span>
           <h3 className="mt-3 text-lg font-semibold text-ink-primary">{title}</h3>

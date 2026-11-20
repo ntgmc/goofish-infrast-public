@@ -7,11 +7,9 @@ import { copy } from '../../../copy'
 import { benchmarkNumber as number, siteBenchmark } from '../../../lib/site-benchmark'
 import { useOptionalTheme } from '../../../lib/theme'
 import { useAppReducedMotion } from '../../../lib/motion-preference'
-import { getUpgradePaybackDays } from '../../../lib/upgrade-suggestion-roi'
-import { SAMPLE_RESULT } from '../sample-result'
+import training from './pricing-training-example.json'
 
 const text = copy.public.pricing_story
-const training = SAMPLE_RESULT.upgrade_suggestions!.filter((suggestion) => suggestion.type === 'single').find((suggestion) => suggestion.id === 'char_242_otter')!
 const comparison = ['S1', 'S2'].map((layout) => siteBenchmark.cases.find((item) => item.sample === 'A01' && item.layout === layout && item.site === 'maatool')!)
 const chartMaximum = Math.ceil(Math.max(...comparison.map((item) => item.resources.sanity)) / 100) * 100
 
@@ -61,16 +59,14 @@ function MaaDownload() {
 }
 
 function TrainingResult() {
-  const cost = training.training_cost!
-  const roi = training.roi!
   return <figure className="v2-benefit-scene v2-benefit-training">
     <figcaption className="v2-benefit-caption">{text.training.source}</figcaption>
-    <div className="v2-benefit-operator"><img src={`/webp96/${training.id}.webp`} alt="" width={56} height={56} loading="lazy" /><strong>{text.training.upgrade(training.name!, training.current!, training.target!)}</strong></div>
+    <div className="v2-benefit-operator"><img src={`/webp96/${training.id}.webp`} alt="" width={56} height={56} loading="lazy" /><strong>{text.training.upgrade(training.name, training.current, training.target)}</strong></div>
     <dl className="v2-benefit-readings">
-      <div><dt>{text.training.daily}</dt><dd className="v2-benefit-gain">+{number(roi.daily_sanity_gain!)}<small>{text.training.per_day}</small></dd></div>
-      <div><dt>{text.training.payback}</dt><dd>{number(getUpgradePaybackDays(training))}<small>{text.training.days}</small></dd></div>
+      <div><dt>{text.training.daily}</dt><dd className="v2-benefit-gain">+{number(training.dailySanityGain)}<small>{text.training.per_day}</small></dd></div>
+      <div><dt>{text.training.payback}</dt><dd>{number(training.paybackDays)}<small>{text.training.days}</small></dd></div>
     </dl>
-    <dl className="v2-benefit-costs"><div><dt>{text.training.total}</dt><dd>{number(cost.totals.equivalent_sanity)} {text.training.sanity}</dd></div><div><dt>{text.training.missing_cost}</dt><dd>{number(cost.missing.equivalent_sanity)} {text.training.sanity}</dd></div><div><dt>{text.training.missing}</dt><dd>{cost.missing.materials.map((material) => `${material.name} × ${material.count}`).join('、')}</dd></div></dl>
+    <dl className="v2-benefit-costs"><div><dt>{text.training.total}</dt><dd>{number(training.totalCost)} {text.training.sanity}</dd></div><div><dt>{text.training.missing_cost}</dt><dd>{number(training.missingCost)} {text.training.sanity}</dd></div><div><dt>{text.training.missing}</dt><dd>{training.missingMaterials.map((material) => `${material.name} × ${material.count}`).join('、')}</dd></div></dl>
     <p className="v2-benefit-detail">{text.training.caption}</p>
   </figure>
 }

@@ -9,9 +9,9 @@ import { getScheduleExplanationConfig } from '../storage/ai-settings-store'
 import { readScheduleExplanation, reserveScheduleExplanation, settleScheduleExplanation } from '../storage/schedule-explanation-store'
 import { getProfileForUser } from '../storage/user-store'
 import { assistantInstructions } from '../workspace-assistant'
+import { BalanceError } from '../storage/balance-store'
 import { resolveProfileAuthorization } from './profile-authorization'
 import { jsonResponse, requireUserSession } from './user-auth'
-import { hasMonthlyAiQuota } from './user-schedule-explanation'
 
 export default async function userWorkspaceAssistantHandler(req: Request): Promise<Response> {
   try {
@@ -32,7 +32,7 @@ export default async function userWorkspaceAssistantHandler(req: Request): Promi
     const input = {
       userId: auth.user.id, profileId: profile.id, resultId: null,
       cacheKey: createHash('sha256').update(JSON.stringify(['workspace-assistant', auth.user.id, profile.id, body])).digest('hex'),
-      monthly: await hasMonthlyAiQuota(auth.user.id), config,
+      config, service: task.data, acceptedPoints: body?.accepted_points,
     }
     if (!body) return jsonResponse(await readScheduleExplanation(input))
     if (!config.enabled) return jsonResponse({ reply: null, state: await readScheduleExplanation(input) })
@@ -51,9 +51,10 @@ export default async function userWorkspaceAssistantHandler(req: Request): Promi
     const reply = generated.text ? parseWorkspaceAssistantReply(generated.text, body) : null
     await settleScheduleExplanation(input, attemptId, { ...generated, text: reply ? generated.text : null,
       errorCode: generated.errorCode ?? (reply ? null : 'incomplete_output'), durationMs: Date.now() - started })
-    if (!reply) return jsonResponse({ error: '助手未能完成整理，未扣除 AI 次数。请缩短描述或稍后重试。', code: 'assistant_invalid_output' }, 502)
+    if (!reply) return jsonResponse({ error: '助手未能完成整理，未扣除积分。请缩短描述或稍后重试。', code: 'assistant_invalid_output' }, 502)
     return jsonResponse({ reply, state: await readScheduleExplanation(input) })
   } catch (error) {
+    if (error instanceof BalanceError) return jsonResponse({ error: error.message, code: error.code }, error.status)
     if (error instanceof RequestInputError) return jsonResponse({ error: '请核对问题和待比较的选项。', code: error.code }, error.status)
     return jsonResponse({ error: '助手暂时不可用，请稍后重试。', code: 'assistant_unavailable' }, 503)
   }

@@ -3,7 +3,7 @@ import { readScheduleExplanationResponse } from './schedule-explanation'
 import { readServerSentEvents } from './server-sent-events'
 
 const state = { explanation: { text: '**库存** 🐰', created_at: '2026-11-17T12:00:00.000Z' }, pending: false,
-  available: false, reason: null, quota: { kind: 'trial', limit: 3, remaining: 2, resets_at: null }, provider: '测试' }
+  available: false, reason: null, credits: { service: 'schedule_explanation', price: '1.00', charge: '0.00', available: '5.00' }, provider: '测试' }
 function response(text: string) {
   const bytes = new TextEncoder().encode(text)
   return new Response(new ReadableStream({ start(controller) {
@@ -36,8 +36,8 @@ it.each([
 })
 
 it('surfaces a safe generation error and supports existing JSON cached/pending responses', async () => {
-  await expect(readScheduleExplanationResponse(response(event({ type: 'error', error: '本次未扣除次数。', code: 'ai_generation_failed' })), vi.fn()))
-    .rejects.toMatchObject({ message: '本次未扣除次数。', code: 'ai_generation_failed' })
+  await expect(readScheduleExplanationResponse(response(event({ type: 'error', error: '本次未扣除积分。', code: 'ai_generation_failed' })), vi.fn()))
+    .rejects.toMatchObject({ message: '本次未扣除积分。', code: 'ai_generation_failed' })
   const pending = { ...state, explanation: null, pending: true }
   await expect(readScheduleExplanationResponse(Response.json(pending), vi.fn())).resolves.toEqual(pending)
 })

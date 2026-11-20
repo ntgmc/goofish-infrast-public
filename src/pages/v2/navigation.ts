@@ -2,10 +2,10 @@ import { routesCopy } from '../../copy/zh-CN/routes'
 import type { FeaturePauseNotices, PausableSiteFeature, SiteFeatures } from '../../lib/site-features'
 import { METERED_BILLING_AVAILABLE } from '../../lib/site-features'
 
-const V2_SECTIONS = ['overview', 'generation', 'plans', 'lab', 'tools', 'manual-tool', 'schedule-comparison', 'cultivation', 'thanks-recruitment', 'cultivation-projects', 'training-ratio', 'material-demand', 'depot', 'skland', 'profiles', 'add-account', 'inventory', 'commercial', 'balance', 'announcements', 'settings', 'help', 'updates', 'terms', 'privacy', 'disclaimer', 'support', 'status', 'pricing', 'purchase', 'benchmarks'] as const
+const V2_SECTIONS = ['overview', 'generation', 'plans', 'lab', 'tools', 'manual-tool', 'schedule-comparison', 'building-ratings', 'cultivation', 'thanks-recruitment', 'cultivation-projects', 'training-ratio', 'material-demand', 'depot', 'skland', 'profiles', 'add-account', 'inventory', 'commercial', 'balance', 'announcements', 'settings', 'help', 'updates', 'terms', 'privacy', 'disclaimer', 'support', 'status', 'pricing', 'purchase', 'benchmarks'] as const
 export type V2Section = typeof V2_SECTIONS[number]
 
-export const V2_PUBLIC_SECTIONS: V2Section[] = ['announcements', 'help', 'updates', 'terms', 'privacy', 'disclaimer', 'support', 'status', 'pricing', 'purchase', 'benchmarks']
+export const V2_PUBLIC_SECTIONS: V2Section[] = ['announcements', 'help', 'updates', 'terms', 'privacy', 'disclaimer', 'support', 'status', 'pricing', 'purchase', 'benchmarks', 'building-ratings']
 export const V2_GUEST_SECTIONS: V2Section[] = ['overview', 'generation', 'tools', 'depot', 'manual-tool', 'schedule-comparison', 'cultivation', 'thanks-recruitment', 'cultivation-projects', 'training-ratio', 'material-demand', 'settings', ...V2_PUBLIC_SECTIONS]
 
 export const sectionLabels: Record<V2Section, string> = routesCopy.labels
@@ -47,7 +47,8 @@ export function v2SectionAvailable(section: V2Section, features: SiteFeatures): 
     case 'generation': case 'plans': return features.site && features.profiles
     case 'skland': return features.site && features.profiles && features.skland
     case 'inventory': return features.site && features.inventory
-    case 'commercial': case 'balance': return features.site && METERED_BILLING_AVAILABLE && features.metered_billing
+    case 'commercial': return features.site && METERED_BILLING_AVAILABLE && features.metered_billing
+    case 'balance': return features.ai_credits
     case 'announcements': return features.announcements
     case 'settings': return features.site
     case 'status': return features.service_status

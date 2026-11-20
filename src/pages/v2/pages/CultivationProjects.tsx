@@ -52,6 +52,7 @@ function ProjectWorkspace({ session, profile, onConfig }: { session: V2Session; 
   const route = !m.pendingRefresh ? m.plans?.route : null
   const previousData = useRef<CultivationData | null>(null)
   const [changes, setChanges] = useState<AssistantCandidate[] | null>(null)
+  const [changesOpen, setChangesOpen] = useState(false)
   useEffect(() => {
     const previous = previousData.current
     const current = m.data
@@ -87,8 +88,8 @@ function ProjectWorkspace({ session, profile, onConfig }: { session: V2Session; 
     <Notice error>{m.error}</Notice><Notice>{m.storageError ? text.storageFailed : null}</Notice>
     {m.busy && !m.data && !m.projects.length && <DataSkeleton layout="projects" />}
     {m.data?.warnings.map((warning) => <Notice key={warning}>{warning}</Notice>)}
-    {changes && m.data && !m.busy && !m.error && <details className="v2-disclosure"><summary>{copy.v2.workspaceAssistant.changes}</summary>
-      <AccountChanges userId={session.user!.id} profileId={profile.id} changes={changes}>
+    {changes && m.data && !m.busy && !m.error && <details className="v2-disclosure" onToggle={(event) => setChangesOpen(event.currentTarget.open)}><summary>{copy.v2.workspaceAssistant.changes}</summary>
+      <AccountChanges userId={session.user!.id} profileId={profile.id} changes={changes} visible={changesOpen}>
         {changes.length > 0 && <button type="button" className="v2-text-button" onClick={() => changeView('plan')}>{text.route}</button>}
       </AccountChanges>
     </details>}

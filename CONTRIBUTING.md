@@ -6,12 +6,12 @@ or OptimizerPort contract.
 ## Development
 
 1. Create a focused branch from `main`.
-2. Use Node.js 24.22.1 and pnpm 12.14.0, then install dependencies with `pnpm install --frozen-lockfile`.
-3. Add or update tests for behavior changes.
-4. Run the public checks documented in `README.md`.
-5. Submit a pull request with a concise explanation of the behavior and tests.
+2. Follow [README.md](README.md) to install dependencies and start the application.
+3. Choose tests and run the required checks in [agent validation](docs/agent-validation.md).
+4. Submit a pull request explaining the resulting behavior and validation.
 
-Contributions are submitted under Apache License 2.0.
+Contributions are submitted under Apache License 2.0. The [documentation index](docs/README.md)
+routes product, feature, integration and deployment work to its topic guide.
 
 ## Backend tooling
 
@@ -22,14 +22,8 @@ semicolons. Generated data, frozen benchmark evidence, schema contracts and buil
 output stay with their generators. Format only the files touched by a change.
 TypeScript, Knip, architecture checks and tests remain separate gates.
 
-`biome.json` enables Tailwind syntax and project-specific rules. React dependency
-arrays, component factories, index keys, TypeScript's control-flow inference,
-security regular expressions and CSS specificity retain their existing conventions.
-Frontend rules retain the ES2020 target, including its own-property checks.
-Accessibility checks cover alternative text, ARIA validity, hidden focus targets,
-tab order, document language and frame titles. Component interaction and semantics
-are also verified by the existing UI tests. Other diagnostics include advisory
-style suggestions; `check:lint` fails on errors.
+Lint rules are defined in `biome.json`; `check:lint` fails on errors. Use existing
+UI tests to verify interaction and accessibility beyond static diagnostics.
 
 `server/routes.ts` declares API paths, handlers and feature-gate policy;
 `server/http-server.ts` registers those handlers directly with Fastify. Tests
@@ -66,10 +60,9 @@ and test every preview destination.
 
 ## Public/private boundary
 
-Do not submit production optimizer source, private fixtures, benchmarks, or
-algorithm diagnostics. The public repository may discuss the OptimizerPort
-contract and observable job behavior. Keep private implementations in the
-private repository.
+Follow [OPEN_SOURCE_BOUNDARY.md](OPEN_SOURCE_BOUNDARY.md) for source and fixture
+boundaries. The public repository owns the OptimizerPort contract and observable
+job behavior; private optimizer implementations stay in the private repository.
 
 Adding an optimization job kind requires updating the public payload union,
 OptimizerPort interface, exhaustive dispatcher, snapshots, UI labels, and

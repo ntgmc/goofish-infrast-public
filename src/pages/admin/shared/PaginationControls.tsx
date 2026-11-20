@@ -10,8 +10,8 @@ export function PaginationControls({ pagination, loading, onPageChange, onPageSi
   const last = pagination.total_pages
   const pages = compactPages(current, last)
   return (
-    <nav className="flex flex-col gap-3 border-t border-surface-3 p-4 sm:flex-row sm:items-center sm:justify-between" aria-label="分页导航">
-      <div className="flex flex-wrap items-center gap-3 text-sm text-ink-muted">
+    <nav className="admin-pagination" aria-label="分页导航">
+      <div className="admin-pagination-summary text-sm text-ink-muted">
         <span role="status" aria-live="polite">共 {pagination.total} 条 · {last === 0 ? '暂无分页' : `第 ${current}/${last} 页`}</span>
         <label className="flex items-center gap-2">
           <span>每页</span>
@@ -20,7 +20,7 @@ export function PaginationControls({ pagination, loading, onPageChange, onPageSi
           </select>
         </label>
       </div>
-      <div className="flex flex-wrap items-center gap-1">
+      <div className="admin-pagination-pages">
         <PageButton label="首页" disabled={loading || current <= 1} onClick={() => onPageChange(1)} />
         <PageButton label="上一页" disabled={loading || current <= 1} onClick={() => onPageChange(current - 1)} />
         {pages.map((page, index) => page === null
@@ -34,7 +34,7 @@ export function PaginationControls({ pagination, loading, onPageChange, onPageSi
 }
 
 function PageButton({ label, disabled, onClick }: { label: string; disabled: boolean; onClick: () => void }) {
-  return <button type="button" aria-label={label} disabled={disabled} onClick={onClick} className="tool-secondary-action min-h-10 px-3 text-sm">{label}</button>
+  return <button type="button" aria-label={label} disabled={disabled} onClick={onClick} className={`tool-secondary-action min-h-10 px-3 text-sm ${label === '首页' || label === '末页' ? 'admin-pagination-boundary' : ''}`}>{label}</button>
 }
 
 function compactPages(current: number, last: number): Array<number | null> {

@@ -11,11 +11,12 @@ import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson, RequestInputError } from '../security/request-validation'
 import { getProfileOptimizationResult } from '../storage/optimization-result-store'
 import { readScheduleExplanation, reserveScheduleExplanation, settleScheduleExplanation } from '../storage/schedule-explanation-store'
-import { getProfileForUser, listStoredProfilesForUser, normalizeProfileKind } from '../storage/user-store'
+import { getProfileForUser } from '../storage/user-store'
+import { BalanceError } from '../storage/balance-store'
 import { resolveProfileAuthorization } from './profile-authorization'
 import { jsonResponse, requireUserSession } from './user-auth'
 
-const generationFailed = '本次解读未能完成，未扣除次数。请稍后重试。'
+const generationFailed = '本次解读未能完成，未扣除积分。请稍后重试。'
 
 export default async function userScheduleExplanationHandler(req: Request): Promise<Response> {
   try {
@@ -35,9 +36,9 @@ export default async function userScheduleExplanationHandler(req: Request): Prom
     const result = projectOptimizeResultForCapabilities(parseOptimizeResult(stored.result), authorization.subject, Boolean(stored.job_id) && await hasTrainingDiagnosisEntitlement(stored.job_id!))
     const summary = buildScheduleExplanationSummary(result)
     const config = await getScheduleExplanationConfig()
-    const monthly = await hasMonthlyAiQuota(auth.user.id)
     const input = {
-      userId: auth.user.id, profileId: profile.id, resultId: stored.id, config, monthly,
+      userId: auth.user.id, profileId: profile.id, resultId: stored.id, config,
+      acceptedPoints: ids.accepted_points,
       cacheKey: createHash('sha256').update(JSON.stringify([SCHEDULE_EXPLANATION_VERSION, auth.user.id, profile.id, stored.id, summary])).digest('hex'),
     }
     if (req.method === 'GET') return jsonResponse(await readScheduleExplanation(input))
@@ -61,21 +62,13 @@ export default async function userScheduleExplanationHandler(req: Request): Prom
     if (req.headers.get('accept')?.includes('text/event-stream')) return explanationStream(finish)
     return jsonResponse(await finish())
   } catch (error) {
+    if (error instanceof BalanceError) return jsonResponse({ error: error.message, code: error.code }, error.status)
     if (error instanceof Error && error.message === 'ai_generation_failed') return jsonResponse({ error: generationFailed, code: 'ai_generation_failed' }, 502)
     if (error instanceof RequestInputError) return jsonResponse({ error: '解读请求无效。', code: error.code }, error.status)
     if (error instanceof ZodError) return jsonResponse({ error: '排班数据无效，无法解读。', code: 'ai_input_invalid' }, 400)
     // Provider errors may contain credentials or report data; never log their payloads.
     return jsonResponse({ error: '读取排班解读失败，请稍后重试。', code: 'ai_unavailable' }, 503)
   }
-}
-
-export async function hasMonthlyAiQuota(userId: string): Promise<boolean> {
-  for (const candidate of await listStoredProfilesForUser(userId)) {
-    if (normalizeProfileKind(candidate) !== 'cdk') continue
-    const access = await resolveProfileAuthorization(candidate)
-    if (access.ok && access.subject.kind === 'cdk') return true
-  }
-  return false
 }
 
 function explanationStream(finish: (onDelta: (text: string) => void) => Promise<ScheduleExplanationState>) {

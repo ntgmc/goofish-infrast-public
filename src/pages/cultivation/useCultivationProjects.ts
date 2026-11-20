@@ -46,7 +46,7 @@ export function useCultivationProjects(session: V2Session, profile: UserGameAcco
   const request = useRef<AbortController | null>(null)
   useEffect(() => () => request.current?.abort(), [])
   useEffect(() => {
-    if (snapshot.available === false) { request.current?.abort(); setData(null); setPhase(null) }
+    if (snapshot.available === false) { request.current?.abort(); calculatedVersion.current = ''; setData(null); setPhase(null) }
   }, [snapshot.available])
   const history = session.workspace?.profile_id === profile.id ? session.workspace.result_history.filter((row) => row.source !== 'manual') : []
   const [normalId, setNormalId] = useState(history[0]?.id ?? '')
@@ -98,7 +98,9 @@ export function useCultivationProjects(session: V2Session, profile: UserGameAcco
       if (!controller.signal.aborted) setData(result)
     } catch (caught) {
       if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : text.failed)
-    } finally { if (!controller.signal.aborted) setPhase(null) }
+    } finally {
+      if (request.current === controller) { request.current = null; setPhase(null) }
+    }
   }
   useEffect(() => {
     const version = snapshot.data?.version ?? data?.snapshotVersion ?? data?.importedAt
@@ -106,8 +108,14 @@ export function useCultivationProjects(session: V2Session, profile: UserGameAcco
       && row.target.elite === project.elite && row.target.level === project.level && row.target.skill === project.skill && row.target.skillLevel === project.skillLevel))
     const key = `${version}:${JSON.stringify(projects.map(({ operatorId, elite, level, skill, skillLevel }) => ({ operatorId, elite, level, skill, skillLevel })))}`
     if (snapshot.available === false || snapshot.expired || !version || busy || matching && (data?.snapshotVersion ?? data?.importedAt) === version || calculatedVersion.current === key) return
-    calculatedVersion.current = key
-    void load(projectRef.current, false)
+    let cancelled = false
+    // Wait for mount cleanup before marking this snapshot as requested.
+    queueMicrotask(() => {
+      if (cancelled) return
+      calculatedVersion.current = key
+      void load(projectRef.current, false)
+    })
+    return () => { cancelled = true }
   }, [snapshot.data?.version, snapshot.available, snapshot.expired, busy, projects, data]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return { projects, setProjects, data, busy: busy || snapshot.busy, phase: phase ?? (snapshot.busy ? 'syncing' : null), error: error || snapshot.error || null, load, storageError, dailySanity, setDailySanity, startDate, setStartDate, allOpen, setAllOpen,

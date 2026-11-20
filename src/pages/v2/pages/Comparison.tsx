@@ -54,11 +54,14 @@ function ComparisonWorkspace({ workflow: w, onConfig }: { workflow: V2Workflow; 
         const factors = comparisonAssistantFactors(reply, w.activeConfig)
         const { scenarios, skipped } = expandScenarioComparison(w.activeConfig, factors)
         if (scenarios.length < 2) return <Notice>{assistant.comparisonTooFew}</Notice>
-        return <><p>{reply.answer}</p><p>{assistant.comparisonFocus} · {reply.goal.metrics.map((metric) => comparisonMetricLabels[metric]).join('、')}</p>
-          {reply.goal.priority && <p>{assistant.comparisonFirst} · {comparisonMetricLabels[reply.goal.priority]}</p>}
-          <ScenarioPreview labels={scenarios.map((scenario) => scenario.label)} initiallyOpen />
+        return <><div className="v2-assistant-scenario-result">
+          <h3>{assistant.preview(scenarios.length)}</h3><p>{reply.answer}</p>
+          <dl><div><dt>{assistant.comparisonFocus}</dt><dd>{reply.goal.metrics.map((metric) => comparisonMetricLabels[metric]).join('、')}</dd></div>
+            {reply.goal.priority && <div><dt>{assistant.comparisonFirst}</dt><dd>{comparisonMetricLabels[reply.goal.priority]}</dd></div>}</dl>
+          <ol>{scenarios.map((scenario) => <li key={scenario.id}>{scenario.label}</li>)}</ol>
           {skipped.length > 0 && <ul>{skipped.map((item) => <li key={`${item.code}:${item.droneStrategy}`}>{ui.skippedItem(item.message, item.count)}</li>)}</ul>}
-          <button type="button" className="v2-button v2-button-secondary" disabled={model.loading} onClick={() => { model.setFactors(factors); setDraftGoal(reply.goal); confirmation.current?.focus() }}>{assistant.applyComparison}</button>
+          </div>
+          <button type="button" className="v2-button v2-button-primary" disabled={model.loading} onClick={() => { model.setFactors(factors); setDraftGoal(reply.goal); confirmation.current?.focus() }}>{assistant.applyComparison}<ArrowRight size={16} aria-hidden="true" /></button>
         </>
       } catch (error) { return <Notice error>{error instanceof Error ? error.message : assistant.failed}</Notice> }
     }} />
@@ -100,8 +103,8 @@ function ComparisonWorkspace({ workflow: w, onConfig }: { workflow: V2Workflow; 
   </div>
 }
 
-function ScenarioPreview({ labels, initiallyOpen }: { labels: string[]; initiallyOpen?: boolean }) {
-  return <details className="v2-goal-preview" open={initiallyOpen}><summary>{copy.v2.workspaceAssistant.preview(labels.length)}</summary><ol>{labels.map((label, index) => <li key={index}>{label}</li>)}</ol></details>
+function ScenarioPreview({ labels }: { labels: string[] }) {
+  return <details className="v2-goal-preview"><summary>{copy.v2.workspaceAssistant.preview(labels.length)}</summary><ol>{labels.map((label, index) => <li key={index}>{label}</li>)}</ol></details>
 }
 
 function Factors({ factors, config, disabled, onChange }: { factors: ScenarioComparisonFactors; config: LicenseConfig; disabled: boolean; onChange: (next: ScenarioComparisonFactors) => void }) {

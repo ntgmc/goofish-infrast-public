@@ -672,7 +672,7 @@ END $$;
 CREATE TABLE IF NOT EXISTS user_balance_transactions (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES user_accounts(id) ON DELETE CASCADE,
-  kind TEXT NOT NULL CHECK (kind IN ('cdk_credit', 'admin_credit', 'admin_debit', 'schedule_debit', 'admin_credit_reversal', 'debt_repayment')),
+  kind TEXT NOT NULL CHECK (kind IN ('cdk_credit', 'admin_credit', 'admin_debit', 'schedule_debit', 'ai_debit', 'admin_credit_reversal', 'debt_repayment')),
   amount NUMERIC(20,2) NOT NULL CHECK (amount <> 0),
   balance_after NUMERIC(20,2) NOT NULL CHECK (balance_after >= 0),
   reference_type TEXT NOT NULL,
@@ -696,7 +696,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_user_balance_transactions_reference
   WHERE kind <> 'admin_credit_reversal';
 ALTER TABLE user_balance_transactions DROP CONSTRAINT IF EXISTS user_balance_transactions_kind_check;
 ALTER TABLE user_balance_transactions ADD CONSTRAINT user_balance_transactions_kind_check CHECK (
-  kind IN ('cdk_credit', 'admin_credit', 'admin_debit', 'schedule_debit', 'admin_credit_reversal', 'debt_repayment')
+  kind IN ('cdk_credit', 'admin_credit', 'admin_debit', 'schedule_debit', 'ai_debit', 'admin_credit_reversal', 'debt_repayment')
 );
 
 CREATE TABLE IF NOT EXISTS user_balance_operations (
@@ -1506,16 +1506,18 @@ CREATE TABLE IF NOT EXISTS ai_settings (
   revision INTEGER NOT NULL CHECK (revision > 0),
   updated_at TIMESTAMPTZ NOT NULL
 );
+UPDATE ai_settings SET settings = settings - 'trialLimit' - 'monthlyLimit'
+  WHERE settings ? 'trialLimit' OR settings ? 'monthlyLimit';
 
 CREATE TABLE IF NOT EXISTS ai_schedule_usage (
   id TEXT PRIMARY KEY,
   user_id TEXT REFERENCES user_accounts(id) ON DELETE SET NULL,
   cache_key TEXT NOT NULL,
-  quota_period TEXT NOT NULL,
   status TEXT NOT NULL CHECK (status IN ('pending', 'succeeded', 'failed')),
   cost_micro_cny BIGINT NOT NULL CHECK (cost_micro_cny >= 0),
   created_at TIMESTAMPTZ NOT NULL
 );
+ALTER TABLE ai_schedule_usage DROP COLUMN IF EXISTS quota_period;
 ALTER TABLE ai_schedule_usage ADD COLUMN IF NOT EXISTS profile_id TEXT;
 ALTER TABLE ai_schedule_usage ADD COLUMN IF NOT EXISTS result_id TEXT;
 ALTER TABLE ai_schedule_usage ADD COLUMN IF NOT EXISTS pricing JSONB;
@@ -1527,12 +1529,15 @@ ALTER TABLE ai_schedule_usage ADD COLUMN IF NOT EXISTS settled_at TIMESTAMPTZ;
 ALTER TABLE ai_schedule_usage ADD COLUMN IF NOT EXISTS duration_ms INTEGER CHECK (duration_ms >= 0);
 ALTER TABLE ai_schedule_usage ADD COLUMN IF NOT EXISTS provider_request_id TEXT;
 ALTER TABLE ai_schedule_usage ADD COLUMN IF NOT EXISTS error_code TEXT;
+ALTER TABLE ai_schedule_usage ADD COLUMN IF NOT EXISTS credit_service TEXT NOT NULL DEFAULT 'schedule_explanation'
+  CHECK (credit_service IN ('schedule_explanation', 'comparison', 'cultivation', 'changes'));
+ALTER TABLE ai_schedule_usage ADD COLUMN IF NOT EXISTS points_amount NUMERIC(20,2) NOT NULL DEFAULT 0 CHECK (points_amount >= 0);
 ALTER TABLE ai_schedule_usage DROP CONSTRAINT IF EXISTS ai_schedule_usage_cost_basis_check;
 ALTER TABLE ai_schedule_usage ADD CONSTRAINT ai_schedule_usage_cost_basis_check CHECK (cost_basis IN ('usage', 'estimated', 'reserved', 'legacy'));
 ALTER TABLE ai_schedule_usage DROP CONSTRAINT IF EXISTS ai_schedule_usage_result_fkey;
 ALTER TABLE ai_schedule_usage ADD CONSTRAINT ai_schedule_usage_result_fkey
   FOREIGN KEY (profile_id, result_id) REFERENCES optimization_result_history(profile_id, id) ON DELETE SET NULL;
-CREATE INDEX IF NOT EXISTS idx_ai_schedule_usage_user ON ai_schedule_usage(user_id, quota_period, created_at);
+CREATE INDEX IF NOT EXISTS idx_ai_schedule_usage_user ON ai_schedule_usage(user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_ai_schedule_usage_created ON ai_schedule_usage(created_at);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_ai_schedule_usage_pending ON ai_schedule_usage(cache_key) WHERE status = 'pending';
 

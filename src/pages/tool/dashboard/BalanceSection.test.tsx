@@ -76,7 +76,7 @@ describe('BalanceSection', () => {
     expect(screen.queryByText('暂无积分变动记录。')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '重试' }))
     expect(mocks.apiJson).toHaveBeenCalledTimes(2)
-    expect(await screen.findByText('12.30')).toBeInTheDocument()
+    expect(await screen.findByText('12.3')).toBeInTheDocument()
   })
 
   it('loads the balance and appends cursor-paginated transactions', async () => {
@@ -97,13 +97,13 @@ describe('BalanceSection', () => {
     const user = userEvent.setup()
     render(<BalanceSection redemptionEnabled />)
 
-    expect(await screen.findByText('12.30')).toBeInTheDocument()
+    expect(await screen.findByText('12.3')).toBeInTheDocument()
     const historyToggle = screen.getByText('积分明细').closest('summary')!
     const history = historyToggle.closest('details')!
     expect(history).not.toHaveAttribute('open')
     await user.click(historyToggle)
     expect(history).toHaveAttribute('open')
-    expect(screen.getByText('+12.30')).toBeInTheDocument()
+    expect(screen.getByText('+12.3')).toBeInTheDocument()
     expect(screen.getByText('12000')).toBeInTheDocument()
     expect(screen.getByText('1000 积分/每次成功生成')).toBeInTheDocument()
     expect(screen.getByText('Lv1 · 1350 积分/每次成功生成')).toBeInTheDocument()
@@ -124,7 +124,7 @@ describe('BalanceSection', () => {
 
     const { unmount } = render(<BalanceSection redemptionEnabled />)
 
-    await screen.findByText('12.30')
+    await screen.findByText('12.3')
     expect(screen.queryByText('待补扣积分')).not.toBeInTheDocument()
     unmount()
 
@@ -162,7 +162,7 @@ describe('BalanceSection', () => {
 
     const user = userEvent.setup()
     render(<BalanceSection redemptionEnabled />)
-    await screen.findByText('+12.30')
+    await screen.findByText('+12.3')
     const input = screen.getByPlaceholderText('输入积分 CDK')
     await user.type(input, 'balance-code')
     await user.click(screen.getByRole('button', { name: '确认兑换' }))
@@ -170,7 +170,7 @@ describe('BalanceSection', () => {
 
     await user.click(screen.getByRole('button', { name: '确认兑换' }))
     expect(await screen.findByText(/兑换成功：\+10 积分/)).toBeInTheDocument()
-    expect(await screen.findByText('22.30')).toBeInTheDocument()
+    expect(await screen.findByText('22.3')).toBeInTheDocument()
 
     const redeemCalls = mocks.apiJson.mock.calls.filter(([url]) => url === '/api/user/balance/redeem')
     expect(redeemCalls).toHaveLength(2)
@@ -185,7 +185,7 @@ describe('BalanceSection', () => {
       .mockRejectedValueOnce(new Error('账单刷新失败'))
     const user = userEvent.setup()
     render(<BalanceSection redemptionEnabled />)
-    await screen.findByText('+12.30')
+    await screen.findByText('+12.3')
     await user.type(screen.getByPlaceholderText('输入积分 CDK'), 'balance-code')
     await user.click(screen.getByRole('button', { name: '确认兑换' }))
     expect(await screen.findByText(/兑换成功：\+10 积分/)).toBeInTheDocument()
@@ -205,7 +205,7 @@ describe('BalanceSection', () => {
       ))
     const user = userEvent.setup()
     render(<BalanceSection redemptionEnabled />)
-    await screen.findByText('+12.30')
+    await screen.findByText('+12.3')
 
     await user.type(screen.getByPlaceholderText('输入积分 CDK'), 'account-code')
     await user.click(screen.getByRole('button', { name: '确认兑换' }))

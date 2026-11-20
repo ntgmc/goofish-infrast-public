@@ -6,7 +6,7 @@ import type { BalancePage, AdminBalanceTransaction } from '../../../lib/balance-
 
 const api = vi.hoisted(() => vi.fn())
 vi.mock('../../../lib/admin-api-client', () => ({ adminApiJson: api }))
-vi.mock('../../../lib/site-features', () => ({ METERED_BILLING_AVAILABLE: true }))
+vi.mock('../../../lib/site-feature-context', () => ({ useSiteFeatures: () => ({ features: { ai_credits: true } }) }))
 beforeEach(() => { api.mockReset() })
 afterEach(cleanup)
 const page = { balance: { available: '12.00' }, transactions: [], next_cursor: null, as_of: '2026-10-27T00:00:00Z' } as unknown as BalancePage<AdminBalanceTransaction>
@@ -23,7 +23,7 @@ it('keeps a successful adjustment separate from failed reads and never repeats t
   const hook = renderHook(() => useAdminUserBalance({ username: 'alice', capabilities: ['user_manage'], userId: 'user-1', active: true, ...effects }))
   await waitFor(() => expect(hook.result.current.balance?.balance.available).toBe('12.00'))
   await act(async () => { expect(await hook.result.current.handleAdjustUserBalance('credit', '1.00', 'audit reason', 'same-key', 'root-secret')).toBe(true) })
-  expect(effects.setNotice).toHaveBeenCalledWith('已增加 1.00 积分')
+  expect(effects.setNotice).toHaveBeenCalledWith('已增加 1 积分')
   expect(effects.setError).toHaveBeenLastCalledWith('积分调整已成功，数据刷新失败，请手动刷新。')
   expect(hook.result.current.balance?.balance.available).toBe('12.00')
   hook.unmount()

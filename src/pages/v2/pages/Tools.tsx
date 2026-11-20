@@ -1,4 +1,4 @@
-import { ScheduleComparisonIcon, NextIcon as ArrowRight, TrainingRatioIcon as Calculator, ProjectsIcon, CultivationIcon, ThanksRecruitmentIcon, MaterialDemandIcon, ManualScheduleIcon as CalendarClock, DepotValueIcon as Gem } from '../../../components/icons'
+import { ScheduleComparisonIcon, NextIcon as ArrowRight, TrainingRatioIcon as Calculator, OperatorsIcon, ProjectsIcon, CultivationIcon, ThanksRecruitmentIcon, MaterialDemandIcon, ManualScheduleIcon as CalendarClock, DepotValueIcon as Gem } from '../../../components/icons'
 import { copy } from '../../../copy'
 import { useLocation, useNavigate } from 'react-router'
 import { authPath } from '../../../lib/auth-navigation'
@@ -26,6 +26,7 @@ export default function Tools({ profileId }: { profileId?: string }) {
     { id: 'base', title: text.groups.base, tools: [
       { section: 'manual-tool' as const, icon: CalendarClock, title: copy.tools.manualSchedule.title, description: text.descriptions.manualSchedule },
       { section: 'schedule-comparison' as const, icon: ScheduleComparisonIcon, title: copy.tools.scheduleComparison.title, description: text.descriptions.scheduleComparison },
+      { section: 'building-ratings' as const, icon: OperatorsIcon, title: copy.buildingRatings.title, description: copy.buildingRatings.description },
     ] },
     { id: 'cultivation', title: text.groups.cultivation, tools: [
       { section: 'cultivation-projects' as const, icon: ProjectsIcon, title: copy.cultivationProjects.title, description: text.descriptions.cultivationProjects },

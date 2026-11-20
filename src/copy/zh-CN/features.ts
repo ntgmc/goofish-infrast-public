@@ -38,6 +38,7 @@ export const featuresCopy = {
     schedule_generation: '排班生成',
     one_shift_per_day: '一天一换（24 小时一换）',
     metered_billing: '按次排班与商用账户',
+    ai_credits: 'AI 积分',
     depot_value: '基建价值分析',
     skland: '森空岛导入',
     invitations: '邀请与奖励',

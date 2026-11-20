@@ -54,9 +54,9 @@ it('serializes edits and rolls back credential and feature changes on conflicts'
   expect((await getAdminAiSettings()).revision).toBe(next.revision)
 })
 it('preserves an omitted key, accepts rotation, follows feature switches and clears only explicitly', async () => {
-  await update({ api_key: 'rotated-token', settings: { ...settings, protocol: 'openai_responses', monthlyLimit: 25 } })
-  await update({ settings: { ...settings, protocol: 'anthropic_messages', trialLimit: 5 } })
-  expect(await getScheduleExplanationConfig()).toMatchObject({ apiKey: 'rotated-token', protocol: 'anthropic_messages', trialLimit: 5 })
+  await update({ api_key: 'rotated-token', settings: { ...settings, protocol: 'openai_responses', dailyAttemptLimit: 25 } })
+  await update({ settings: { ...settings, protocol: 'anthropic_messages', concurrencyLimit: 5 } })
+  expect(await getScheduleExplanationConfig()).toMatchObject({ apiKey: 'rotated-token', protocol: 'anthropic_messages', concurrencyLimit: 5 })
   vi.stubEnv('MAA_ADMIN_SECRET_PREVIOUS', process.env.MAA_ADMIN_SECRET!)
   vi.stubEnv('MAA_ADMIN_SECRET', 'replacement-admin-secret-at-least-32-characters')
   expect((await getScheduleExplanationConfig()).apiKey).toBe('rotated-token')

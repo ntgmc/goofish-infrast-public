@@ -4,15 +4,13 @@ import handler from './user-schedule-explanation'
 import { readServerSentEvents } from '../../src/lib/server-sent-events'
 
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn(), profile: vi.fn(), profiles: vi.fn(), authorization: vi.fn(), result: vi.fn(),
+  auth: vi.fn(), profile: vi.fn(), authorization: vi.fn(), result: vi.fn(),
   read: vi.fn(), reserve: vi.fn(), settle: vi.fn(), generate: vi.fn(), config: vi.fn(),
 }))
 vi.mock('./user-auth', () => ({ requireUserSession: mocks.auth,
   jsonResponse: (value: unknown, status = 200) => new Response(JSON.stringify(value), { status, headers: { 'Content-Type': 'application/json' } }),
 }))
-vi.mock('../storage/user-store', () => ({ getProfileForUser: mocks.profile, listStoredProfilesForUser: mocks.profiles,
-  normalizeProfileKind: (profile: { kind?: string }) => profile.kind ?? 'cdk',
-}))
+vi.mock('../storage/user-store', () => ({ getProfileForUser: mocks.profile }))
 vi.mock('./profile-authorization', () => ({ resolveProfileAuthorization: mocks.authorization }))
 vi.mock('../storage/optimization-result-store', () => ({ getProfileOptimizationResult: mocks.result }))
 vi.mock('../storage/schedule-explanation-store', () => ({ readScheduleExplanation: mocks.read, reserveScheduleExplanation: mocks.reserve, settleScheduleExplanation: mocks.settle }))
@@ -26,7 +24,7 @@ const report: OptimizeResult = { author: 'test', title: 'test', description: '',
   intermediate_depletion: [{ product: 'Pure Gold', stock: 100, net_per_day: -2, days_remaining: 50 }],
 }
 const state = { explanation: null, pending: false, available: true, reason: null,
-  quota: { kind: 'trial', limit: 3, remaining: 3, resets_at: null }, provider: '测试' }
+  credits: { service: 'schedule_explanation', price: '1.00', charge: '1.00', available: '5.00' }, provider: '测试' }
 const request = (method = 'GET', body = { profile_id: 'p1', result_id: 'r1' }) => new Request(
   `https://example.test/api/user/schedule-explanation${method === 'GET' ? `?${new URLSearchParams(body)}` : ''}`,
   { method, ...(method === 'POST' ? { body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } } : {}) },
@@ -35,7 +33,6 @@ beforeEach(() => {
   vi.resetAllMocks()
   mocks.auth.mockResolvedValue({ user: { id: 'u1' } })
   mocks.profile.mockResolvedValue({ id: 'p1', kind: 'free_preview' })
-  mocks.profiles.mockResolvedValue([{ id: 'p1', kind: 'free_preview' }])
   mocks.authorization.mockImplementation(async (profile) => ({ ok: true, permission: 'recommended', subject: { ...profile, permission: 'recommended' } }))
   mocks.result.mockResolvedValue({ id: 'r1', result: structuredClone(report) })
   mocks.read.mockResolvedValue(state)
@@ -69,25 +66,12 @@ it('GET only reads; cached or pending POSTs do not call the model', async () => 
 it('projects private capabilities before summarizing and uses a stable cache key', async () => {
   await handler(request('POST'))
   expect(mocks.generate).toHaveBeenCalledWith(expect.objectContaining({ training: [], inventory: [], maaDefaultComparison: null }), expect.anything())
-  expect(mocks.settle).toHaveBeenCalledWith(expect.objectContaining({ userId: 'u1', profileId: 'p1', resultId: 'r1', monthly: false }), 'a1', expect.objectContaining({ text: '解读正文', cost: 600, costBasis: 'usage', providerRequestId: 'req1', durationMs: expect.any(Number) }))
+  expect(mocks.settle).toHaveBeenCalledWith(expect.objectContaining({ userId: 'u1', profileId: 'p1', resultId: 'r1' }), 'a1', expect.objectContaining({ text: '解读正文', cost: 600, costBasis: 'usage', providerRequestId: 'req1', durationMs: expect.any(Number) }))
   await handler(request())
   expect(mocks.read.mock.calls[0][0].cacheKey).toBe(mocks.read.mock.calls[1][0].cacheKey)
 })
 
-it('awards monthly allowance only for an authorized maintenance profile, shared with the current free profile', async () => {
-  mocks.profiles.mockResolvedValue([{ id: 'paid', kind: 'cdk' }])
-  await handler(request())
-  expect(mocks.read).toHaveBeenCalledWith(expect.objectContaining({ monthly: true }))
-  mocks.authorization.mockResolvedValueOnce({ ok: true, permission: 'recommended', subject: { kind: 'free_preview', permission: 'recommended' } }).mockResolvedValueOnce({ ok: false })
-  await handler(request())
-  expect(mocks.read).toHaveBeenLastCalledWith(expect.objectContaining({ monthly: false }))
-  mocks.authorization.mockResolvedValueOnce({ ok: true, permission: 'recommended', subject: { kind: 'free_preview' } })
-    .mockResolvedValueOnce({ ok: true, permission: 'recommended', subject: { kind: 'free_preview', expires_at: '2020-01-01' } })
-  await handler(request())
-  expect(mocks.read).toHaveBeenLastCalledWith(expect.objectContaining({ monthly: false }))
-})
-
-it('settles unknown provider expenses conservatively, returns a safe error and refunds the user allowance', async () => {
+it('settles unknown provider expenses conservatively, returns a safe error and releases the points reservation', async () => {
   mocks.generate.mockRejectedValue(new Error('secret token and private body'))
   const response = await handler(request('POST'))
   expect(response.status).toBe(502)
@@ -141,7 +125,7 @@ it('emits a safe stream failure after refund settlement and never sends provider
   const response = await handler(req)
   const events = []
   for await (const data of readServerSentEvents(response.body!)) events.push(JSON.parse(data))
-  expect(events).toEqual([{ type: 'error', code: 'ai_generation_failed', error: expect.stringContaining('未扣除次数') }])
+  expect(events).toEqual([{ type: 'error', code: 'ai_generation_failed', error: expect.stringContaining('未扣除积分') }])
   expect(mocks.settle).toHaveBeenCalledWith(expect.anything(), 'a1', expect.objectContaining({ text: null, cost: 10000, costBasis: 'reserved' }))
   expect(JSON.stringify(events)).not.toContain('secret')
 })

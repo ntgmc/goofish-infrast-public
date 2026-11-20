@@ -1,12 +1,14 @@
 export const POINTS_CURRENCY = 'points' as const
 
 import type { CommercialTierSummary } from './metered-billing'
+import type { AiCreditPrices, AiCreditService } from './ai-credits'
 
 export type BalanceTransactionKind =
   | 'cdk_credit'
   | 'admin_credit'
   | 'admin_debit'
   | 'schedule_debit'
+  | 'ai_debit'
   | 'admin_credit_reversal'
   | 'debt_repayment'
 
@@ -23,6 +25,7 @@ export interface BalanceSummary {
 export interface PublicBalanceTransaction {
   id: string
   kind: BalanceTransactionKind
+  service?: AiCreditService
   amount: string
   balance_after: string
   created_at: string
@@ -41,6 +44,17 @@ export interface BalancePage<Transaction = PublicBalanceTransaction> {
   transactions: Transaction[]
   next_cursor: string | null
   as_of: string
+  ai_prices?: AiCreditPrices
+}
+
+export function pointsToMinor(value: string): bigint {
+  const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(value)
+  if (!match) throw new Error(`Invalid points amount: ${value}`)
+  return BigInt(match[1]!) * 100n + BigInt((match[2] ?? '').padEnd(2, '0'))
+}
+
+export function formatPoints(value: string): string {
+  return value.includes('.') ? value.replace(/\.?0+$/, '') : value
 }
 
 export function normalizePointsAmount(value: unknown): string | null {

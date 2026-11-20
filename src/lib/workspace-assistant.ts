@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { aiAcceptedPointsSchema } from './ai-credits'
 import { CONFIG_PRESETS, normalizeScheduleMode } from './config'
 import { getCurrentScenarioProductionPlan, SCENARIO_LAYOUT_COUNTS, type ScenarioComparisonFactors } from './scenario-comparison'
 import type { LicenseConfig } from './types'
@@ -10,10 +11,10 @@ const profileId = z.string().trim().min(1).max(128)
 export const workspaceAssistantTaskSchema = z.enum(['comparison', 'cultivation', 'changes'])
 
 export const workspaceAssistantRequestSchema = z.discriminatedUnion('task', [
-  z.strictObject({ task: z.literal('comparison'), profile_id: profileId, question, context: z.strictObject({
+  z.strictObject({ task: z.literal('comparison'), profile_id: profileId, accepted_points: aiAcceptedPointsSchema, question, context: z.strictObject({
     layout: z.string().regex(/^\d{1,2}-\d{1,2}-\d{1,2}$/).nullable(), schedule: z.enum(['maa', 'variable', 'rotation']),
   }) }),
-  z.strictObject({ task: z.enum(['cultivation', 'changes']), profile_id: profileId, question, candidates: z.array(candidate).min(1).max(12) })
+  z.strictObject({ task: z.enum(['cultivation', 'changes']), profile_id: profileId, accepted_points: aiAcceptedPointsSchema, question, candidates: z.array(candidate).min(1).max(12) })
     .refine(({ candidates }) => new Set(candidates.map(({ key }) => key)).size === candidates.length),
 ])
 

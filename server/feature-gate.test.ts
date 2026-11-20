@@ -50,13 +50,9 @@ describe('feature gate', () => {
   })
 
   it.each([
-    ['/api/user/balance', 'GET'],
-    ['/api/user/balance/redeem', 'POST'],
     ['/api/user/profiles/metered-personal', 'POST'],
     ['/api/user/commercial/profiles', 'GET'],
     ['/api/user/billing/quote', 'POST'],
-    ['/api/admin/balance', 'GET'],
-    ['/api/admin/balance', 'POST'],
     ['/api/admin/commercial', 'GET'],
     ['/api/admin/commercial', 'PUT'],
   ])('keeps the retired billing endpoint closed: %s %s', async (path, method) => {
@@ -64,6 +60,16 @@ describe('feature gate', () => {
     const response = await enforceFeatureGate(new Request(`http://localhost${path}`, { method }))
     expect(response?.status).toBe(503)
     await expect(response?.json()).resolves.toMatchObject({ code: 'feature_disabled', feature: 'metered_billing' })
+  })
+
+  it.each([
+    ['/api/user/balance', 'GET'], ['/api/user/balance/redeem', 'POST'],
+    ['/api/admin/balance', 'GET'], ['/api/admin/balance', 'POST'],
+  ])('gates AI credits independently of scheduling: %s %s', async (path, method) => {
+    const request = new Request(`http://localhost${path}`, { method })
+    await expect((await enforceFeatureGate(request))?.json()).resolves.toMatchObject({ feature: 'ai_credits' })
+    getSiteFeatureSettings.mockResolvedValue(settingsWith({ ai_credits: true, schedule_generation: false, metered_billing: false }))
+    await expect(enforceFeatureGate(request)).resolves.toBeNull()
   })
 
   it('blocks ordinary sessions while keeping recovery, logout, privacy and admin routes open', async () => {

@@ -9,6 +9,7 @@ export const SITE_FEATURE_KEYS = [
   'schedule_generation',
   'one_shift_per_day',
   'metered_billing',
+  'ai_credits',
   'depot_value',
   'skland',
   'invitations',
@@ -68,7 +69,7 @@ export function isPausableSiteFeature(feature: SiteFeatureKey): feature is Pausa
   return (PAUSABLE_SITE_FEATURES as readonly SiteFeatureKey[]).includes(feature)
 }
 
-// Keep the billing implementation and stored settings dormant until it is reimplemented.
+// Legacy schedule billing stays closed; AI credits have their own switch.
 export const METERED_BILLING_AVAILABLE = false
 
 export interface SiteFeatureSettingsV1 {
@@ -93,6 +94,7 @@ export const DEFAULT_SITE_FEATURES: SiteFeatures = Object.freeze({
   schedule_generation: true,
   one_shift_per_day: false,
   metered_billing: false,
+  ai_credits: false,
   depot_value: true,
   skland: true,
   invitations: true,
@@ -188,6 +190,7 @@ function effectiveSiteFeatures(raw: SiteFeatures): SiteFeatures {
     schedule_generation: profiles && raw.schedule_generation,
     one_shift_per_day: profiles && raw.schedule_generation && raw.one_shift_per_day,
     metered_billing: METERED_BILLING_AVAILABLE && profiles && raw.schedule_generation && raw.metered_billing,
+    ai_credits: login && v2 && raw.ai_credits,
     depot_value: tools && raw.depot_value,
     skland: profiles && raw.skland,
     invitations: login && raw.invitations,

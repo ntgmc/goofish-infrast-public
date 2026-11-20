@@ -7,15 +7,15 @@ const text = copy.v2.workspaceAssistant
 
 export function ChangeList({ changes }: { changes: AssistantCandidate[] }) {
   if (!changes.length) return <p className="v2-muted">{text.changesEmpty}</p>
-  return <ul>{changes.map(({ key, title, facts }) => <li key={key}><strong>{title}</strong>{facts.map((fact) => <p key={fact}>{fact}</p>)}</li>)}</ul>
+  return <ul className="v2-change-items">{changes.map(({ key, title, facts }) => <li key={key}><strong>{title}</strong>{facts.map((fact) => <p key={fact}>{fact}</p>)}</li>)}</ul>
 }
 
-export default function AccountChanges({ userId, profileId, changes, children }: { userId: string; profileId: string; changes: AssistantCandidate[]; children?: ReactNode }) {
+export default function AccountChanges({ userId, profileId, changes, visible = true, children }: { userId: string; profileId: string; changes: AssistantCandidate[]; visible?: boolean; children?: ReactNode }) {
   return <div className="v2-change-list">
     <ChangeList changes={changes} />
     {children}
-    {changes.length > 1 && <WorkspaceAssistant key={JSON.stringify(changes)} task="changes" userId={userId} profileId={profileId} title={text.changesFocus} description={text.changesHelp} fixedQuestion={text.changesQuestion}
+    {changes.length > 1 && <WorkspaceAssistant key={JSON.stringify(changes)} task="changes" userId={userId} profileId={profileId} title={text.changesFocus} description={text.changesHelp} fixedQuestion={text.changesQuestion} visible={visible}
       buildRequest={(question) => ({ task: 'changes', profile_id: profileId, question, candidates: changes.slice(0, 12) })}
-      renderReply={(reply) => 'keys' in reply && reply.keys.length ? <ChangeList changes={reply.keys.flatMap((key) => changes.find((change) => change.key === key) ?? [])} /> : <p>{text.noneSelected}</p>} />}
+      renderReply={(reply) => 'keys' in reply && reply.keys.length ? <><h3>{text.changesResults}</h3><ChangeList changes={reply.keys.flatMap((key) => changes.find((change) => change.key === key) ?? [])} /></> : <p>{text.noneSelected}</p>} />}
   </div>
 }

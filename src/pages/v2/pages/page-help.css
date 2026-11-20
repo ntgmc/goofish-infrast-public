@@ -92,10 +92,3 @@
 .v2-generation-status-line { display: flex; align-items: center; justify-content: space-between; gap: var(--space-xs); }
 .v2-generation-status-line:has(> .v2-page-help-trigger) > .v2-generation-state { margin: 0; }
 .v2-generation-status-line:has(> .v2-page-help-trigger) { margin-bottom: var(--space-xs); }
-
-@media (max-width: 40rem) {
-  .v2-result-actions:has(> .v2-page-help-trigger) .v2-current-shift { flex-basis: 0; }
-}
-@media (max-width: 25rem) {
-  .v2-result-actions:has(> .v2-page-help-trigger) .v2-current-shift > span { display: none; }
-}

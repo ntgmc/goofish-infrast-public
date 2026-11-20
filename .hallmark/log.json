@@ -108,7 +108,7 @@
     "nav": "grouped side rail with compact mobile menu",
     "brief": "Rebuild the admin workspace around record search, selected details, task views and domain data loading",
     "design_system": "design.md",
-    "report": "docs/admin-workspace-redesign.md"
+    "report": "docs/v2-workspace.md"
   },
   {
     "date": "2026-10-07",
@@ -122,7 +122,7 @@
     "footer": "Ft2 inline rule",
     "brief": "Rebuild supporting V2 pages with independent components and task interactions, sharing business hooks with V1",
     "design_system": "design.md",
-    "report": "docs/v2-workspace-redesign.md"
+    "report": "docs/v2-workspace.md"
   },
   {
     "date": "2026-10-05",
@@ -136,7 +136,7 @@
     "footer": "Ft2 inline rule",
     "brief": "Review all 23 V2 sections and restructure supporting workspace pages with horizontal rows, controls/results regions, and document navigation",
     "design_system": "design.md",
-    "report": "docs/v2-workspace-redesign.md"
+    "report": "docs/v2-workspace.md"
   },
   {
     "date": "2026-10-04",

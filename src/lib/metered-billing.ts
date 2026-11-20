@@ -1,4 +1,6 @@
 import { productPolicies } from './product-catalog'
+import { pointsToMinor } from './balance-contracts'
+export { pointsToMinor } from './balance-contracts'
 import type { UserGameAccountKind } from './types'
 
 export type MeteredBillingKind = Extract<UserGameAccountKind, 'metered_personal' | 'metered_commercial'>
@@ -109,12 +111,6 @@ export function getMeteredScheduleQuote(
 
 export function getMeteredBillingPolicy() {
   return policy
-}
-
-export function pointsToMinor(value: string): bigint {
-  const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(value)
-  if (!match) throw new Error(`Invalid points amount: ${value}`)
-  return BigInt(match[1]!) * 100n + BigInt((match[2] ?? '').padEnd(2, '0'))
 }
 
 function minorToPoints(value: bigint): string {

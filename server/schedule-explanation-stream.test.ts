@@ -3,7 +3,7 @@ import { DEFAULT_AI_SETTINGS } from '../src/lib/ai-settings'
 import type { OptimizeResult } from '../src/lib/types'
 import { buildScheduleExplanationSummary, generateScheduleExplanation } from './schedule-explanation'
 
-const config = { ...DEFAULT_AI_SETTINGS, enabled: true, apiKey: 'test-key', baseURL: 'https://example.test/v1', model: 'chat-model',
+const config = { ...DEFAULT_AI_SETTINGS, enabled: true, creditsEnabled: false, apiKey: 'test-key', baseURL: 'https://example.test/v1', model: 'chat-model',
   provider: '测试', inputPrice: 1, outputPrice: 2, cachedInputPrice: 0.1, reservation: 9600 }
 const summary = buildScheduleExplanationSummary({ buildingType: 243, plans: [] } as unknown as OptimizeResult)
 const event = (value: unknown) => `data: ${JSON.stringify(value)}\n\n`

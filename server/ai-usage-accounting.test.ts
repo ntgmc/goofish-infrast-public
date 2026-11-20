@@ -3,7 +3,7 @@ import { DEFAULT_AI_SETTINGS, aiConfigurationIssues } from '../src/lib/ai-settin
 import { accountAiUsage, normalizeAiUsage } from './ai-usage-accounting'
 import type { ScheduleExplanationConfig } from './storage/ai-settings-store'
 
-const config: ScheduleExplanationConfig = { ...DEFAULT_AI_SETTINGS, enabled: true, apiKey: 'test',
+const config: ScheduleExplanationConfig = { ...DEFAULT_AI_SETTINGS, enabled: true, creditsEnabled: false, apiKey: 'test',
   provider: 'test', baseURL: 'https://example.test', model: 'test', inputPrice: 2, outputPrice: 8,
   cachedInputPrice: 0.2, cacheWritePrice: 2.5, cacheWrite1hPrice: 4,
   reservation: 50000, dailyBudget: 10e6, monthlyBudget: 200e6 }

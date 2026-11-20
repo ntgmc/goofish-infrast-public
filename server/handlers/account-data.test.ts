@@ -141,7 +141,7 @@ describe('account data Skland controls', () => {
 
   it('exports saved AI explanations and account usage without provider expense or cache identifiers', async () => {
     const explanation = { profile_id: 'profile-1', result_id: 'result-1', explanation: '我的解读', created_at: '2026-11-17' }
-    const usage = { id: 'attempt-1', quota_period: '2026-11', status: 'succeeded', created_at: '2026-11-17' }
+    const usage = { id: 'attempt-1', credit_service: 'schedule_explanation', points_amount: '1.50', status: 'succeeded', created_at: '2026-11-17' }
     mocks.query.mockImplementation(async (statement: string) => ({ rows: statement.includes('from ai_schedule_explanations') ? [explanation]
       : statement.includes('from ai_schedule_usage') ? [usage] : [] }))
     const response = await accountDataHandler(new Request('http://localhost/api/user/data/export'))

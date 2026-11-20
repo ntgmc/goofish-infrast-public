@@ -40,6 +40,27 @@ afterAll(async () => {
 })
 
 describe('PostgreSQL schema migration', () => {
+  it('removes retired AI allowance fields while preserving settings and recorded charges', async () => {
+    const usageId = randomUUID()
+    const settings = { provider: '测试服务商', creditPrices: { schedule_explanation: '1.50' } }
+    try {
+      await query(`insert into ai_settings (key, settings, revision, updated_at)
+        values ('global', $1::jsonb, 1, now())`, [JSON.stringify({ ...settings, trialLimit: 3, monthlyLimit: 10 })])
+      await query("alter table ai_schedule_usage add column quota_period text not null default 'trial'")
+      await query(`insert into ai_schedule_usage (id, cache_key, status, cost_micro_cny, points_amount, created_at)
+        values ($1, $1, 'succeeded', 600, 1.50, now())`, [usageId])
+      await markCurrentMigrationPending()
+      await migrateDatabaseSchema()
+      expect((await query("select settings, revision from ai_settings where key = 'global'")).rows[0]).toEqual({ settings, revision: 1 })
+      expect((await query('select status, cost_micro_cny::text, points_amount::text from ai_schedule_usage where id = $1', [usageId])).rows[0])
+        .toEqual({ status: 'succeeded', cost_micro_cny: '600', points_amount: '1.50' })
+      expect((await query("select column_name from information_schema.columns where table_name = 'ai_schedule_usage' and column_name = 'quota_period'")).rows).toHaveLength(0)
+    } finally {
+      await query("delete from ai_settings where key = 'global'")
+      await query('delete from ai_schedule_usage where id = $1', [usageId])
+    }
+  })
+
   it('restores a custom session timeout on the same pooled connection after both completed and new migrations', async () => {
     const previousMax = process.env.POSTGRES_POOL_MAX
     await closePool()

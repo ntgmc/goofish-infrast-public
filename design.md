@@ -1,691 +1,162 @@
 # Goofish Infrastructure design
 
-All pages follow this design system. Read it before a Hallmark run and update
-it deliberately when changing the shared design.
+Use this guide for layout and interaction changes. Runtime values live in
+[tokens.css](tokens.css); reuse its tokens rather than copying color, spacing,
+typography or component mappings into another file. Feature behavior and routes
+live in [V2 workspace](docs/v2-workspace.md).
 
-## System
+## Visual system
 
-- Genre · modern-minimal
-- Marketing macrostructure · Workbench
-- Application macrostructure · Workbench
-- Content macrostructure · Long Document
-- Theme · custom tuned (vibe: "technical, restrained, precise, trustworthy")
-- Axes · light / geometric-sans / cool-violet
-- Navigation · N9 edge-aligned public shell; existing side rail for app and admin
-- Footer · Ft2 inline rule, collapsing to a vertical list below 40rem
-- Enrichment · existing product captures on marketing pages; none elsewhere
+- Genre: modern-minimal. Applications use a Workbench layout; documents use a
+  Long Document layout. Keep the existing navigation and route ownership.
+- V2 and admin use mist paper, slate text and copper accents. `--color-v2-*`
+  supplies both themes; `.v2-app`, `.v2-drawer`, `.admin-app` and `.admin-dialog`
+  map them to shared semantic tokens. Other routes retain the canonical palette.
+- Keep Noto Sans SC display, Geist body and the existing monospace stack. Use
+  tabular numbers for production, prices, efficiency and time.
+- Accent identifies primary actions, selection and focus. Destructive actions
+  use semantic red. Secondary actions use a quiet surface and visible boundary.
+- Use one primary containment layer. `.tool-inset` is a ruled region inside
+  `.tool-panel`, not another card. Prefer open data regions to nested panels.
+- Public pages lead with actual product evidence. Documents use a reading width
+  of 60–65ch, line height of at least 1.65 and left-aligned copy.
+- Allow headings to wrap, use `min-width: 0` in constrained columns and keep
+  dense tables or graphs scrollable within their own region.
 
-## Tokens (canonical · `tokens.css` is the source of truth)
+## Workspace and admin
 
-```css
-:root {
-  --color-paper:      oklch(0.985 0.008 285);
-  --color-paper-2:    oklch(0.958 0.012 285);
-  --color-ink:        oklch(0.205 0.018 285);
-  --color-ink-2:      oklch(0.390 0.016 285);
-  --color-rule:       oklch(0.820 0.016 285);
-  --color-accent:     oklch(0.470 0.185 285);
-  --color-accent-ink: oklch(0.985 0.008 285);
-  --color-focus:      oklch(0.550 0.220 285);
+The shell owns page headings, navigation, theme and utility actions. V2 supporting
+pages use `src/pages/v2/pages/` and `.v2-page-section` in `workspace-pages.css`;
+admin uses `AdminShell.tsx` and `admin.css`. Reuse business hooks and specialized
+editors, binding dialogs, task progress and comparison charts.
 
-  --font-display: "Noto Sans SC Variable", "Microsoft YaHei", sans-serif;
-  --font-body: "Geist Variable", "PingFang SC", "Microsoft YaHei", sans-serif;
-  --font-mono: "SFMono-Regular", Consolas, monospace;
+| Area | Composition |
+| --- | --- |
+| V2 navigation | Fixed brand and bottom help/appearance controls; independently scrolling task links. Destinations are real links preserving the profile; editors open drawers. Tool details retain the tools selection. |
+| Top bar | Breadcrumb and current location beside notification/account utilities. Keep one compact row on phones, moving secondary actions into “更多操作”; preserve full accessible labels. |
+| Overview | One production strip and a full-width schedule, three room columns on wide screens. Phones show the schedule first; configuration and full readings expand below it. |
+| Generation | Preparation beside execution, with compact editable summaries and an explicit generate action. Keep the action and charge summary visible without covering content. |
+| Tools | Group by 基建、干员养成、材料与仓库. Two columns per group, one on phones; omit unavailable empty groups. |
+| Accounts, history, announcements | Searchable index and one selected detail region. Separate records from saved configurations and expose actions in context. |
+| Cultivation | Separate target queue from resource planning; keep add/edit actions available. Material acquisition, synthesis and calendar have independent views. |
+| Inventory | Item shelf with inspect/use dialogs; tasks and activity records have separate views. |
+| Settings and documents | One settings task at a time. Legal documents use a reading region with an adjacent index; FAQ uses search and disclosure. |
+| Admin records | Lead with search, common filters and records. Advanced filters expand on demand; batch actions appear after selection. User detail selects one profile. |
+| Admin monitoring | Separate queue, service history and dead letters. Risk uses a case index and one evidence region. Preserve visited drafts and stop inactive polling. |
 
-  /* 4px spacing scale: --space-3xs through --space-4xl. */
-  /* Major-third type scale: --text-xs through --text-display. */
-  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --dur-fast: 160ms;
-  --dur-base: 220ms;
-  --dur-slow: 300ms;
-  --radius-card: 10px;
-  --radius-pill: 999px;
-  --radius-input: 7px;
-}
-```
+Menus retain keyboard navigation, visible focus, Escape dismissal and focus return.
+Mobile navigation locks background scrolling and keeps a focus loop. Unread counts,
+pending account switches, feature availability and unsaved drafts remain visible.
+Admin operation safeguards are defined in [admin operations](docs/admin-operations.md).
 
-## Composition rules
+## Drawers, dialogs and details
 
-- One primary containment layer. `.tool-panel` is primary; `.tool-inset` is a ruled region, never a second card.
-- Public pages lead with real product evidence. Avoid three-equal-column feature grids and generic SaaS section sequences.
-- App and admin pages preserve route ownership and side-rail information architecture while using open data regions.
-- Content pages use a reading width of 60 to 65ch, a line height of at least 1.65, and whitespace instead of card stacks.
-- Display headings use `overflow-wrap: anywhere` and `min-width: 0`; document copy stays left aligned.
-- Accent is a signal only: primary action, active state, focus, and compact status marks.
-- The deployment dialog interrupts an outdated page with the new version's release
-  notes and a refresh action. Reopening a newer build welcomes returning users
-  with the latest three nonempty release summaries since their last version, a
-  full changelog link and a dismissible continue action. Read returning summaries
-  lazily from the opened build's published history. Remember the latest visited
-  build on this browser; record the refresh target before reloading so that
-  entering that build does not show a second prompt. First visits stay quiet.
-  V2 account preferences expose repeatable update and welcome previews after
-  administrator session confirmation. Reuse the production dialog with local
-  release notes; simulated refresh advances to the welcome, and closing restores
-  the opener without reloading or changing the last visited build.
-  Refresh fades into a full-screen update surface before reloading the document.
-  The next document restores that surface before the app bundle runs, then fades
-  it out after the application's first paint. Keep the same theme, logo and light
-  timeline across the reload; reduced motion switches directly. Administrator
-  previews use the same transition without navigating or writing refresh markers.
+- Use a fixed compact heading, a bounded scrolling body and separate actions.
+  Keep close controls visible, including image previews and nested dialogs.
+  When content fits, avoid reserved scrollbar gutters or asymmetric padding.
+- Operator drawers keep search available and use a responsive grid of compact
+  cards. Reserve two name lines, retain training data and align skill previews.
+  Virtualize whole rows, retaining focused and adjacent rows; reduce columns
+  when text is enlarged. The full card is one keyboard-accessible trigger.
+- `SharedCardDialog` shares background, artwork and name with its source. Keep
+  source cards mounted and hidden during the modal, body text at natural scale,
+  and source focus restored on dismissal. Use `layoutScroll` on scroll hosts
+  and projection roots for dialog/return portals.
+- Dismissal releases the modal, scroll lock and focus trap immediately. Decorative
+  return portals are inert; scrolling, resizing, another selection or reduced
+  motion cancels their return animation. Do not reopen hover previews on focus return.
+- Material routes use `stationaryContent` so graph coordinates stay fixed during
+  the surface transition. Keep local scrolling and the selected material visible.
+- Facility details lead with product, efficiency and shift production. Align
+  operator identity, skills and mood tracks. Show actual start/end readings;
+  clamp only the drawing, use the selected maximum mood (default 24), and leave
+  missing data unavailable. Collapsed skill details stay inert and hidden.
+- Feedback keeps its tabs and frame steady. Protect drafts and pending requests;
+  empty forms may dismiss through the overlay. Associated IDs expand on demand.
 
-## Variants
+## Feature presentation
 
-### V2 workspace (`/v2`)
+- AI explanations use the local Amiya portrait, a short launcher label and a
+  small AI badge. The floating dialog leaves the schedule usable. Launcher and
+  title bar support pointer and arrow-key movement; move them as a group and
+  clamp within the visible workspace, clear of the rail. Preserve position and
+  generation state per report. Escape returns focus to the launcher.
+  Render Markdown and locally scroll tables; show streamed text progressively
+  without replaying old text or placing partial text in the query cache.
+  Billing, consent and saved-answer rules live in [AI explanations](docs/ai-schedule-explanation.md).
+- Pricing prioritizes the execution outcome, free-start/redemption paths and
+  accurate plan terms. Desktop compares four cards; mobile uses a wrapping native
+  plan selector and one selected plan. Keep UID binding and activation beside
+  purchase. Capability chapters may use one sticky visual on wide screens;
+  smaller screens and reduced motion show visuals inline. Preserve native scroll.
+- Keep plan headers visible in the entitlement table, merge equal adjacent
+  values and retain custom capability rows. Examples remain distinguishable from
+  measured benchmark evidence; use published data and theme-matched screenshots.
+  Do not copy prices, quotas or availability into design rules; see
+  [product copy](docs/product-copy.md) and [site comparison](docs/site-benchmark.md).
+- Purchase dialogs and pages share product content. Prioritize the listing action,
+  binding terms, delivery expectation and support. Generate QR images locally from
+  the selected link, with dark modules, white background and a four-module quiet
+  zone. Keep direct purchase usable if QR generation fails; disclose media on
+  phones unless it is the only purchase route. See [purchase configuration](docs/v2-workspace.md#购买与公开图片).
+- Service status pairs labels and icons with distinct colors/patterns from
+  `service-status.css`. Unknown periods remain neutral and hatched. History has
+  one Tab stop, arrow navigation, Home/End within a day and Ctrl for the week.
+  Preserve missing-data states, retry and incident updates.
 
-- Keep the modern-minimal / Workbench application family, current routes,
-  side navigation, configuration drawers, and result workflow.
-- Audience: Arknights players reviewing and exporting base schedules. Lead with
-  the current result, daily production, shift selection, and operator assignments.
-- Palette: mist paper, slate ink and navigation, copper accent. `tokens.css`
-  defines `--color-v2-*`; `.v2-app` and `.v2-drawer` map those values to shared
-  semantic tokens. Routes outside V2 and the management console retain the
-  canonical palette.
-- Light paper: `oklch(0.967 0.007 75)`; accent: `oklch(0.490 0.120 45)`.
-  Dark paper: `oklch(0.205 0.016 255)`; accent: `oklch(0.770 0.125 45)`.
-- Keep Noto Sans SC display and Geist body fonts, with tabular numbers for
-  production, efficiency, and shift times.
-- Keep six core tasks in the side rail: overview, generation, history and
-  “比较基建配置” under the schedule workspace; cultivation projects and tools in
-  their own group. Tools label saved-schedule comparison “比较已有排班”. Use
-  full-width compact “干员管理” and “编辑基建” actions for their drawers, retaining the
-  owned-operator count. Use an import icon for operator data and a pencil for configuration.
-  The compact brand header and bottom help trigger stay visible while the
-  middle navigation scrolls independently. Keep consistent 44px targets,
-  visible inset focus rings and copper active icons. Page destinations are
-  real links with the current profile in the URL; configuration opens dialogs.
-  On mobile, align the close button with the brand, lock background scrolling,
-  retain the keyboard focus loop, and restore the menu trigger on dismissal.
-  The top-right account drawer owns profile management, Skland data, inventory,
-  account settings and available billing
-  pages. Group guides, announcements, releases and site links under the rail's
-  “帮助与更多” menu, which opens above its bottom trigger without moving the
-  trigger or resizing the rail. Separate help and support from product news and
-  comparisons, with service status in the menu footer. Keep “外观与动画” visible
-  above the help trigger, opening one drawer with theme and animation preferences;
-  reuse these controls in account preferences and keep the top-bar theme shortcut. Use compact
-  group labels, 44px rows, readable labels and inset focus rings. Retain the
-  unread announcement count while collapsed and scroll inside the menu when
-  needed. Native disclosure semantics retain Tab navigation; arrow keys and
-  Home/End browse available entries, Escape returns to the trigger, and leaving
-  with Tab closes the menu. Nested dialogs retain their opener and draft.
-  Tool detail pages keep the tools entry highlighted. Preserve the Ft2 footer.
-- The top bar separates page location from utility actions and the account
-  opener. Use a semantic breadcrumb with a profile-preserving workspace link,
-  readable current page, consistent 44px utility buttons and visible open/focus
-  states. Show the current profile name with a secondary label on wide screens;
-  retain its full accessible label and avatar on mobile. Below 40rem, keep one
-  compact row with location, notifications and account access; place theme and
-  calculation tools in the “更多操作” popover. Truncate long locations within
-  their column; retain the full page heading below. Mobile announcements show
-  their title and disclosure arrow, with the body available on expansion. Keep
-  unread and calculation badges, existing dialogs and theme menu.
-- Operator and account drawers share a compact fixed heading and an independently
-  scrolling body. Keep the operator profile, sync and MAA import actions compact;
-  binding timestamps and authorization details expand on demand. The list search
-  stays visible while browsing operators. The operator drawer grows to 800px on desktop and
-  shows a compact responsive grid with a minimum card width of 8rem and 0.5rem gaps. Reserve two
-  lines for each name beside a prominent 48–64px portrait, with training data wrapping beneath
-  the name. Make the full card a single keyboard-accessible trigger, with skill previews aligned
-  at the bottom. Open full skill descriptions in a wide `SharedCardDialog`; keep the source card compact. Share the background, portrait and
-  name between card and detail, with a heavily damped spring and no bounce. Keep the source mounted
-  during the transition, allow detail scrolling immediately, contain it at its boundaries
-  and restore the source button's focus on dismissal. Scroll descriptions inside
-  the detail surface so its top-right close control remains visible.
-  Reduced motion switches directly. Virtualize whole rows for large rosters, retaining focused and
-  adjacent rows. Reduce columns with text enlargement. Operator data comes from import or sync.
-  Account identity
-  precedes profile switching; mark the selected profile and show pending switches.
-  Personal destinations use simple rows, with logout in a separate fixed footer.
-  Preserve full names, feature availability, nested binding dialogs and focus return.
-- Large task, feedback and Skland dialogs share a fixed heading, bounded scrolling
-  body and separate actions. Keep feedback tabs visible during scrolling.
-  Feedback keeps a steady frame height across tabs and disclosure changes, with
-  an overlay scrollbar that occupies no content width. Start with the issue and
-  screenshot; associated IDs expand on demand with reduced-motion support.
-  Protect actual drafts and pending submissions, while allowing empty forms to
-  dismiss through the overlay. Task rows emphasize status and next action, with
-  diagnostic identifiers inside details. Image previews retain a visible close
-  target and return to their parent. Support narrow screens and enlarged text.
-  Use automatic scrollbars without a reserved gutter or asymmetric padding when
-  content fits. Let the dialog primitive compensate for page scroll locking.
-- Use one production summary strip and an open, full-width schedule region.
-  Facility cards provide the object boundaries; keep shift selection and controls
-  directly above them without a surrounding panel or repeated schedule heading.
-  Wide screens show three room columns. Put configuration and detailed production
-  below the schedule in a native disclosure; keep its DOM order aligned with its position.
-  Below 40rem, place the schedule before the production strip so facilities are
-  visible on entry. Operator portraits and efficiency carry the visual weight.
-- AI schedule explanations use a bottom-right character portrait with a short
-  speech label and a small AI badge. Reuse the local Amiya portrait and V2 copper
-  accent. Open an independent floating dialog so the schedule remains usable,
-  with the same portrait, a draggable title bar and a close control. Support
-  pointer dragging and arrow keys on both the launcher and title bar. Move the
-  portrait and window as one group, preserving the portrait's anchor on closing.
-  Clamp the group within the visible workspace, clear of the desktop navigation
-  rail, after dragging, resizing or content growth; scroll the body independently.
-  Escape and close return focus to the launcher. Preserve generation state and
-  the current position across closing, scoped to the current report. Render
-  Markdown with readable lists, emphasis, code and horizontally scrollable tables.
-  Show incoming text progressively, preserving it while collapsed; mark it saved
-  only after generation finishes. Keep streamed text out of the shared query cache.
-  Layer the assistant surface with 2–3% ink mixes instead of a strong perimeter or
-  table grid. Use tabular lining numerals, pretty body wrapping, balanced headings
-  and nonbreaking short CJK paragraph tails to avoid a single trailing character.
-  Lower body/medium/emphasis weights from 400/500/580 to 350/450/500 in dark mode.
-  Before generation show the action and transmission/allowance details; during
-  and after generation let the answer lead, with saved notes below.
-  Reveal only new streamed text with a short staggered Gaussian blur/opacity ink
-  effect, bounded to 24 fragments and 108ms delay; preserve number/Latin-word
-  groups and do not replay old text on reopening. Keep drag coordinates immediate
-  and clamped; use a small spring on opening and damped release feedback only on
-  the portrait image. Keep the window, body text and launcher label at their native
-  scale on release, with no positional inertia. Disable spatial/ink effects for
-  the app or system reduced-motion setting.
-- Keep generation beside the overview title and export beside result navigation.
-  Copper marks the primary action and focus; station colors identify room types
-  through the same icon backgrounds on desktop and mobile.
-- V2 navigation keeps the rail and top bar steady. Use scoped native page
-  snapshots when supported: the old content leaves in 90ms and the destination
-  enters over 220ms with a 6px translation, without scaling. Loading screens
-  stay live; skip their snapshots and fade in the content once it arrives.
-  The fallback enters from 72% opacity over 220ms without a blank frame.
-  First load and reduced motion update directly. Wait for a deferred page to
-  commit before restoring history scroll and route focus; cancel superseded
-  transitions and preserve mounted drafts. Keep room shells and operator
-  slots across shifts; crossfade only their occupants and
-  exclude departing occupants from interaction and accessibility. Animate room
-  geometry over 280ms while keeping text and portraits at their original scale. Keep shared active
-  indicators, result crossfades, and drawer enter/exit.
-  Reduced motion removes translation, scaling, layout transitions, and chart
-  drawing; retained opacity transitions stay at or below 150ms.
-- The public result layout at `riic.autos` informed result hierarchy,
-  adjacent shift controls, and portrait-led assignments. Use an independent
-  palette and implementation.
-- Supporting pages own their V2 components in `src/pages/v2/pages/`. Share
-  business hooks with V1; compose each workspace around its user's next task.
-  Keep the specialized configuration editor, schedule editor, binding dialog,
-  progress renderer and comparison chart as shared controls.
-- The tools directory groups links under “基建”, “干员养成” and “材料与仓库”,
-  with base scheduling first and special recruitment after the ongoing cultivation
-  tools. Use two columns within each group and one column below 40rem, concise
-  purpose descriptions and larger gaps between groups. Omit sequence numbers;
-  preserve profile-aware links and hide groups with no available tools.
-- Accounts use a searchable selection index and one account detail region.
-  History separates result records from saved configurations, then exposes
-  actions for the selected record. Inventory uses an item shelf, inspect/use
-  dialogs, and separate task and activity views.
-- Generation separates preparation from execution with a column gap and one rule.
-  Keep operator and configuration summaries beside their edit actions, with compact
-  row spacing and no enclosing panel or step numbers. Use at least 14px for action
-  guidance, operator names and inventory hints; reserve 12px for auxiliary metadata
-  such as times and facility levels. Separate room groups with larger gaps than the
-  spacing within a group. “生成我的排班” opens a public four-step tutorial before
-  authentication: sign in or register, bind and import operators, confirm the base
-  configuration, then generate. Keep its progress bar and current step visible;
-  below 40rem only the detailed checklist collapses. The first step links to the
-  independent authentication pages and returns here after completion or cancellation.
-  Keep a visible route back to the example schedule. Infer progress from the
-  current account, imported operators and saved configuration; generation remains
-  an explicit action. Preparation rows open the existing editors across the whole row.
-  Coupon options expand on demand on mobile; when no coupons are available, show
-  “暂无可用券” and keep the rules collapsed at every width. Keep the generation action
-  and any charge summary at the bottom, reserve its measured height in the page,
-  and retain validation and retry messages.
-  Comparison composes the
-  experiment before inspecting candidate results. Cultivation separates
-  conditions from priority, material, calendar and inventory results. Manual
-  scheduling makes account, layout and starting schedule explicit steps.
-- Settings use task navigation and a single visible content region. Pricing opens with
-  the MAA execution outcome and a concise free/maintenance comparison. Keep four cards
-  on desktop, each listing the common maintenance benefits, total price, duration,
-  audience, comparison quota, result retention and purchase action. Purchases open the
-  selected product in a dialog on the current page. Comparison quotas come from the
-  product policy. Explain retention inline by expanding its benefit row.
-  The 30-day and lifetime cards carry compact top-edge recommendation badges.
-  Below 40rem, show common maintenance benefits once and compare all four terms and
-  total prices in a wrapping native radio group,
-  then show the selected plan, with UID binding and activation immediately above its action.
-  New users get free-start and redemption actions. An active free profile gets a single
-  code-redemption entry for upgrading its existing data and configuration. Paid profiles
-  get a compact account summary beside the page introduction: identify the profile with
-  an account icon and name, show the access tier in a quiet badge, and give validity its
-  own line. Group account management and redemption below a divider, with renewal/upgrade
-  consultation for time-limited maintenance. Stack this summary naturally on smaller screens. Preserve
-  profile context without starting a calculation or redeeming a code during navigation.
-  Below the cards, show the purchase flow and binding terms. Explain comparison through
-  its use: compare daily output and shift counts before changing layouts or production
-  strategies, followed by the per-comparison scope. Explain result retention outside
-  automatic history cleanup within each plan's retention row.
-  Four capability chapters pair paid configuration controls and a compact MAA file flow with
-  readable cultivation results and a measured layout comparison. Screenshots in
-  `public/assets/pricing/` capture the real editor's drone strategy section with `SAMPLE_CONFIG`.
-  The configuration chapter names custom shift intervals, drone allocation and Fiammetta settings.
-  Light and dark assets follow the app theme and expand in a keyboard-accessible dialog. The
-  export chapter highlights unlimited downloads during maintenance for MAA schedules, with a small
-  file moving from the website download to MAA selection. Animate only while visible and show the
-  complete flow without motion under reduced motion. Cultivation readings come from the public
-  sample result's Mayer suggestion; the
-  zero-based comparison chart uses A01's MaaTool S1/S2 cases from the frozen 2026-11-04 snapshot,
-  with a link to the underlying evidence. Keep sample estimates distinct from measured results.
-  At 80rem and above, native scrolling selects a chapter beside one sticky visual, based on
-  current chapter positions at 45% of the viewport. Recalculate on scroll and resize; select the
-  last chapter when its bottom is visible. Smaller screens and reduced motion show visuals inline. Keep comparison quotas and
-  current service availability beside the relevant chapter. Place the compact benchmark
-  proof strip near the cards, before the capability chapters, and a return-to-plans action
-  after the chapters. The return action preserves the selected term. On desktop, plan
-  descriptions expand on demand; at every width, the full entitlement comparison,
-  purchase rules and upgrade details are expandable. Order the standard comparison rows
-  by import, scheduling and strategy, cultivation and comparison, export and retention,
-  then usage terms; retain custom rows after the standard capabilities. In each row,
-  merge consecutive columns with identical values. Skland import and refresh have the
-  same default description across free and maintenance plans. Keep the plan headers
-  visible while scrolling within the comparison table. On mobile, use a compact sticky
-  plan header that wraps to fewer columns when text is enlarged. List the covered plans
-  above each merged value, spanning the available
-  width. Include result archive quotas with support status icons: free previews include
-  none, 30/90/365-day maintenance can retain one result at a time, and lifetime maintenance
-  can retain three. Cards and the table share these quotas. Account rules use one short
-  redemption-and-binding flow followed by four points: one game account and UID binding,
-  lifetime service conditions and existing rights, anomalies and manual review, and
-  transfer restrictions.
-  Purchase dialogs and the independent purchase page share the same content and retain
-  the selected product and profile. Group the product, price, binding terms and listing
-  action first, with copying as a text action and the raw URL available on demand.
-  Show manual-delivery expectations beside the listing action: buy the corresponding
-  duration directly, normally receive the code within ten minutes, and message the seller
-  if it has not arrived. Provide a nearby link to the support page for redemption or usage
-  issues when support is available, preserving the profile context. Upgrade orders retain
-  their amount-confirmation process.
-  Generate a PNG QR locally from the selected product's purchase URL with the existing
-  QR library. Use dark slate modules on a white background, a four-module quiet zone,
-  and a theme-aware frame; allow saving the PNG. Keep direct purchasing available if
-  generation fails, with a retry action. Pair the product with the QR on desktop.
-  On mobile, prioritize the listing action and
-  disclose scanning/saving media on demand; open media initially when it is the only
-  purchase route. Show the share poster when there is no QR; when both exist, expand the
-  complete poster separately when a purchase URL generates a QR. Place redemption in a separate row below the product,
-  directing eligible free profiles to in-place upgrade. Buying steps expand
-  on demand (initially open for upgrades), in three columns on desktop and vertically on
-  mobile. Each product owns its media;
-  blank images take no space.
-  Admins configure a purchase link and optional share poster; QR images are generated
-  from that link. Ignore retired QR upload fields when reading saved content. Share
-  poster fields support direct upload, preview, replacement and removal,
-  with optional URL entry. Preserve original image bytes, pause publishing during
-  uploads, and retain the previous image after a failed upload. Keep keyboard
-  focus clear of the settings save bar.
-  Keep original-image links and recovery for failed media or content loads.
-  All pages use bounded content widths and V2 tokens.
-- The workspace shell owns page headings. Legal documents place their index
-  to the right of a reading area of up to 65ch. FAQ pairs search with expandable
-  answers; support pairs a contact region with preparation steps. Releases and
-  signed-in announcements use a selection index and reading region.
-- `src/pages/v2/workspace-pages.css` styles V2-owned structure under
-  `.v2-page-section`. Collapse secondary columns below 80rem, selection and
-  document columns below 60rem, and dense controls below 40rem. Retain padded
-  surfaces, keyboard focus, 44px controls, and shared reduced-motion support.
-- The public site comparison at `/v2/benchmarks` uses Stat-Led composition inside
-  the same V2 rail: paired execution and yield headline metrics, a 90-mark
-  pass/fail matrix, prominent paired gains, and 30 rows of three-site scores.
-  Use green checks and red crosses with struck failed readings; expand evidence
-  below the selected row and collapse methods by default. Retain the V2
-  palette, fonts, responsive controls and reduced-motion behavior. Frozen data,
-  publication fields and verification: [site comparison](docs/site-benchmark.md).
-- Service status uses a bounded reading area, a quiet tinted current-status banner,
-  a single component list and the seven-day hourly history. The palette in
-  `src/pages/v2/pages/service-status.css` consistently maps normal to emerald,
-  expanding capacity to blue, slower processing to ochre, congestion to orange,
-  excessive queuing to vermilion and unavailable to crimson; unknown periods are
-  neutral and hatched. Excessive queuing has diagonal stripes and unavailable
-  periods use crosshatching. Keep text and distinct badge icons alongside color.
-  History cells share the legend palette,
-  scroll locally on narrow screens and expose details on click or keyboard focus.
-  Use one Tab stop in the grid, arrow keys between hours/days and Home/End within
-  the day (Ctrl for the full week). Preserve real samples, missing-data states,
-  refresh recovery and incident updates. OpenAI's [status page](https://status.openai.com/)
-  and DeepSeek's [status page](https://status.deepseek.com/) informed the restrained
-  surfaces, status hierarchy and continuous history marks; retain the V2 shell,
-  typography and real seven-day data contract.
-- Page coverage and verification: [V2 workspace redesign](docs/v2-workspace-redesign.md).
+## Motion and loading
 
-### Management console (`/admin`)
+Use motion for navigation, a changed value or the object being used. Reuse existing
+motion components and timing tokens. Avoid bounce, overshoot, parallax and nested
+stagger cascades.
 
-- Use the V2 mist, slate and copper palette with the canonical fonts and spacing.
-  `.admin-app` and `.admin-dialog` map V2 values to the shared semantic tokens;
-  admin dropdown and popover portals inherit the same palette.
-- Audience: administrators locating accounts, issuing entitlements, reviewing risk
-  and monitoring services. Group the existing routes by operation, entitlements,
-  service and security, and site configuration. Keep the account setup entry.
-- `AdminShell.tsx` owns navigation, headings, theme and current-page refresh.
-  `AdminDashboardView.tsx` composes domain sections. Load user and CDK records
-  only in their respective sections; keep visited sections mounted for drafts.
-- User maintenance leads with search, common filters and records. Expand advanced
-  filters on demand. Select a user to enter the detail workspace, then select
-  one profile; password reset belongs to that user context.
-- CDK opens with records; generation and distribution analysis are separate
-  tasks. Show batch actions only after selecting records on the current page.
-- Configuration and monitoring use keyboard-accessible task tabs. Risk pairs a
-  case index with one evidence region. Queue monitoring separates waiting,
-  running and recent tasks from service history and dead-letter handling.
-- Profile edits collect values and an audit reason in one dialog. Failed
-  submissions preserve inputs; explicit refresh updates the target version
-  before retry. Keep profile and workspace versions distinct.
-- `src/pages/admin/admin.css` owns layout beneath the admin shell and dialogs.
-  Collapse the rail and selection columns below 60rem and dense controls below
-  40rem. Tables scroll locally; page and portal controls retain visible focus,
-  44px targets and shared reduced-motion behavior.
-- Page coverage and verification: [Admin workspace redesign](docs/admin-workspace-redesign.md).
+- Navigation keeps the rail and top bar still. Scoped page snapshots use a 90ms
+  departure and 220ms/6px entrance; the fallback starts at 72% opacity. Loading
+  stays live, deferred content restores scroll/focus after mounting, and newer
+  navigation cancels old transitions without discarding drafts.
+- Shift changes retain room shells and slots, crossfading occupants only.
+  Departing content leaves keyboard/accessibility navigation immediately. Room
+  geometry may transition over 280ms; text and portraits keep their native scale.
+- `SharedCardDialog` uses the existing damped morph with no bounce. Facility
+  details animate only expanded content height/opacity; material graphs reveal
+  the selected column before neighbors and connectors.
+- Stable list items reveal once per mounted list, inside virtual positioning
+  shells. Search results show immediately; focus and large scroll jumps skip
+  reveals. Shared geometry updates on selection, not virtual scrolling.
+- Data refresh keeps readable results and drafts. Use row-shaped placeholders on
+  first read and pagination, a compact copper status ring, and a longer-wait
+  message after eight seconds. Confirm success only for a completed new revision;
+  failures, partial updates and cancellation retain their actual state.
+- Changed readings interpolate in place; unchanged cards do not replay. Fresh
+  generated results may settle metrics and room groups once. Income bars remember
+  their reveal per result. Keep accessible final values and units stable.
+- Generation progress follows actual stages. Waiting, running, saving,
+  reconnecting and terminal states remain distinct; confirmed completion reaches
+  100% before the card collapses. Timers remain still and terminal states stop loops.
+- Pricing amounts use the configured value. Headline benchmark counters may reveal
+  once; evidence, units, denominators and dense readings stay stable. Pointer-only
+  tilt/spotlights stay off touch devices; pause loops in hidden pages.
+- Update prompts use published release notes. Returning-build summaries load on
+  demand; first visits stay quiet. Record a refresh target before reload to avoid
+  duplicate prompts. Keep theme and the update surface continuous across reload.
+- Admin motion previews require a server-confirmed session. The inspector also
+  requires an explicit per-user browser preference, off by default. Disabled
+  inspection installs no observers; disabling it, switching users, session loss
+  or navigation tears down the recorder and preview. Replay uses inert detached
+  copies and never runs business callbacks, writes
+  refresh markers, submits jobs or affects billing. Hide it while a modal owns focus.
 
-## CTA voice
+App and system reduced-motion settings show final content directly, removing
+translation, scaling, layout/ink effects and chart drawing. Any retained opacity
+transition is at most 150ms. Admin replays stay local to the preview.
 
-- Primary · accent fill · 7px radius · compact 12px/18px rhythm · concrete verb
-- Secondary · transparent or paper fill with visible rule · same radius and height
-- Destructive · reserved semantic red; never reuse the brand accent
+## Responsive and accessibility checks
 
-## Motion stance
+Collapse secondary columns below 80rem, rails/selection columns below 60rem, and
+dense controls below 40rem. Verify 320, 375, 414 and 768px, both themes, keyboard
+navigation, enlarged text and reduced motion. Interactive targets are at least
+44×44px. Root overflow clipping must not hide component defects.
 
-- Keep workspace motion short and tied to navigation, state, or the object being used.
-- Pricing changes roll the exact configured amount over 300ms. Benchmark headline,
-  pass-rate and median metrics count once on entering the viewport over 750ms;
-  units, denominators, evidence and dense comparison readings remain stable.
-- Pointer hover may lift item tiles by 2px and move directory arrows by 3px.
-  Pricing cards use border emphasis while their controls stay in place.
-- Pricing and capability demonstrations use contained reveal and scroll storytelling;
-  keep native scrolling and immediate access to prices and actions. The desktop capability
-  illustration follows a fine pointer with a low-opacity copper spotlight and at most 2deg
-  tilt per axis, returning to rest on leave. The lifetime card automatically traces its edge
-  every eight seconds on desktop and touch. Light mode uses a 2px muted gold band and
-  champagne core on a lightly tinted surface; dark mode uses a 3px copper band with a bright core.
-  Its purchase action sweeps once on hover or focus. Pointer tilt and spotlight stay off
-  on touch; reduced motion keeps the card and illustration static.
-- V2 data waits use a 16px copper ring beside the readable status, with a longer-wait message
-  after eight seconds. Pause loops in hidden pages; system or app reduced motion keeps the ring
-  static. Full-screen startup centers the brand, readable status and a short moving line on
-  one axis. Section loads retain navigation and the column heading, with a compact centered wait
-  inside the content region. Known first-read layouts use static, lightly tinted placeholders;
-  generic lazy sections use the status alone.
-  Refreshes retain readable data. Confirm completion only after a pending request returns a new
-  revision without errors; failed, partial or cancelled refreshes keep their existing error state.
-  Changed readings interpolate from the old value and outline their own card for 600ms without
-  remounting the content or replaying unchanged cards. Cultivation waits follow the actual snapshot
-  refresh and cultivation request, preserving saved targets, input drafts and expanded material
-  details. Cultivation status stays below the source controls in a reserved feedback row, so refreshes
-  do not insert a separate loading panel or shift the results. First visits reserve the unknown results;
-  returned materials and dates update in place.
-  Other V2 lists use row-shaped placeholders on first read and at the pagination tail. Existing
-  results remain readable during refresh. Busy controls carry `aria-busy` and a quiet bottom-edge
-  light; small operations keep feedback inside their own control. Shared notification, feedback,
-  binding and training tools use compact status lines within V2, including portalled surfaces.
-  Skland binding keeps credentials, the QR code, account selection and preview available during requests,
-  with the actual request message beside a small ring.
-  The V2 root scopes these enhancements so shared V1 screens retain their existing presentation.
-- Operator, tool, inventory and benchmark lists reveal each stable item once per
-  mounted list: 8px travel, 240ms duration, up to eight items at 25ms intervals, or 50ms for
-  operator cards and V2 manual/cultivation operator candidates. Candidate pickers observe their own
-  scroll viewport; newly reached batches reveal once during each opening. Animate operator contents
-  inside the virtual positioning shell. Searches show
-  immediately; prepare each unseen item's initial state before paint to prevent a full-opacity
-  flash. Jumps exceeding 80% of the scrolling viewport skip reveals; focusing cancels the item's
-  animation. Shared card geometry updates on selection changes rather than virtual scrolling.
-- `SharedCardDialog` provides card-to-detail transitions with shared layout IDs and the morph
-  spring (320ms, no bounce) for both opening and return. Keep the close target at 44px and the
-  scrolling content at its natural size throughout the transition; track the scroll offset for
-  nested shared elements. Mark the dialog and decorative return portals as Motion projection
-  roots so they do not inherit the drawer's scroll coordinates through the React tree.
-  Keep the original card mounted and explicitly hidden throughout the modal's
-  lifetime, including changes to motion preferences, and restore it on dismissal for the return.
-  Facility cards use it for their background, icon and title. Facility
-  details put product, efficiency and shift production first, then compact operator rows with
-  identity beside a mood track on wide surfaces and stacked on narrow ones. Keep exact
-  starting and ending mood readings beside the track; its filled level represents ending mood,
-  a lighter segment shows the change, and a marker identifies starting mood. Scale to the selected
-  plan's maximum mood, defaulting to 24. Clamp drawing only; retain actual numeric readings and
-  show missing values as unavailable without drawing a change. Recovery uses the positive token.
-  Operator rows share their column widths, keeping mood tracks aligned when skill icon counts vary.
-  The skill trigger, icons and mood track keep their columns while skill details expand below the row;
-  animate only the details height and opacity, and apply changes immediately with reduced motion.
-  Keep collapsed skill content inert and hidden from assistive technology. Full calculation details
-  expand on demand. The heading retains facility level and shows the selected shift and duration. Keep text in its own shared element or fade it
-  into the destination; do not stretch long descriptions. Use `layoutScroll` on the scroll host.
-  Dismissal unmounts the modal immediately, releasing its overlay, focus trap and scroll lock.
-  Facility source cards handle their return morph. Operator details return through a decorative,
-  inert portal above the drawer and its search toolbar, starting at the detail's current visual bounds
-  and ending at the source card's untransformed bounds within its virtual row. Crossfade the detail
-  and compact content without scaling their text. Keep the shared geometry on the inner return surface
-  so reopening continues from its current bounds. Opening another card, changing the list, scrolling,
-  resizing or enabling reduced motion cancels the return immediately. Keep the most recently opened
-  source card and its virtual row above neighbouring cards. The decorative return stays above the
-  search toolbar while ordinary scrolling keeps the toolbar above the list. Opening another card transfers this priority. Keep background scrolling
-  locked only while the modal is open. Skill previews on dialog triggers respond to pointer hover;
-  keyboard users read skills in the dialog, and returning focus does not reopen a preview.
-- Cultivation projects use a compact goal queue and a separate resource-plan tab. Keep the tab
-  navigation and add action available while scrolling; adding or editing opens a focused dialog.
-  Lead each goal with the actual level or selected-skill improvement, keeping fulfilled training
-  secondary. Reveal materials and priority actions on demand. Keep plan settings collapsed when
-  valid, preserve their state across tabs and start each workspace at its heading when switching.
-  Give acquisition, synthesis and daily arrangements their own plan views so a long list of
-  material steps does not put the calendar out of reach.
-- Cultivation material routes share only the card background, heading artwork and name with the
-  source. Use `SharedCardDialog`'s `stationaryContent` mode so the route graph stays at its final
-  coordinates while the background morphs. Reveal the selected column first with opacity alone,
-  then neighbouring columns with at most 90ms of stagger; draw connectors after the initial reveal.
-  Keep source focus restoration and direct rendering under reduced motion.
-- Overview production numbers interpolate from their displayed value when a result changes, keeping
-  the final accessible value and units stable. Fresh generated results settle metrics and room groups
-  in order over roughly half a second; navigation back and ordinary data refreshes do not replay it.
-- Shift changes briefly outline incoming occupants; unchanged seats remain still. Income contribution
-  and capacity bars grow to their real proportions when entering view. Remember seen bars per result
-  across analysis-tab visits; new result IDs start a fresh reveal. Reduced motion shows final bars.
-- V2 generation progress uses a compact SVG state symbol: waiting dots, a running arc, a
-  closed ring while saving, and a drawn completion check. Reconnection, cancellation and failure
-  stay visually distinct and stop activity. Step connectors fill when the real stage advances,
-  vertically on small cards and horizontally on wide cards. Once the result is available,
-  collapse the card 620ms after confirmed completion, giving its meter and number time to settle;
-  reduced motion shows the result directly. Only V2 enables these stage effects. The percentage
-  uses the shared numeric tween with a stable three-digit width; timer readings remain still.
-  Backend completion targets 100% immediately so both meter and number finish before dismissal.
-  Transition stage titles and descriptions only when the stage changes. On narrow cards, animate
-  the active step's description height with the morph spring; wide cards keep all descriptions
-  visible. A short copper tail and bright leading edge follow the existing meter value, stopping
-  on paused or terminal states. Reduced motion removes the leading edge and moving text.
-  Generation and appearance settings offer a local progress preview after `/api/admin/session`
-  confirms an administrator session. Hide it until confirmed, on failed checks or session expiration,
-  and recheck when the window regains focus. Its normal, quick, reconnection, failure and
-  cancellation scenarios use the same component and support replay and stepping;
-  closing the dialog stops its timers. Preview state stays outside the optimization workflow,
-  account storage and billing, and its completion message is explicitly a demonstration.
-  The animation inspector additionally requires an explicit switch in Settings → Preferences,
-  off by default and stored per website user in the current browser. A server-confirmed admin session
-  is still required. Disabled inspection installs no observer or native instrumentation; switching users,
-  disabling inspection or losing the admin session tears down the recorder and preview.
-  When enabled, the bottom-right inspector records native animations, CSS transitions, sampled layout changes and numeric tweens from
-  the current page, retaining the latest 24 effects in memory until navigation. A detached,
-  inert copy inside a shadow root replays each effect once at 0.1×–4× with pause and replay
-  controls; global page selectors, business events, original animation callbacks and page data
-  stay outside the preview. Preserve SVG references
-  with distinct snapshot IDs. Snapshot roots freeze immediately; descendant styles copy in 4ms batches
-  with a 16ms yield. Pending effects with the same identity coalesce. Large snapshots retain at most
-  80 elements and show a simplified-preview notice; mutation batches sample each changed element once.
-  Hide the inspector while a page modal owns focus; captured effects
-  remain available after it closes. Session expiration stops observation and clears the preview.
-  Reduced-motion settings determine which page effects exist to capture; explicit replay stays
-  local to the inspector. Route, pending timers and native instrumentation clean up on departure.
-- No nested stagger cascades, bounce, overshoot, or parallax in workspaces.
-- Reduced-motion fallback · final numbers and content immediately; no transform;
-  retained opacity transitions at or below 150ms.
-
-## Responsive contract
-
-- Layout collapse at 60rem; phone typography and interaction rules at 40rem.
-- Verify 320, 375, 414, and 768px; all phone hit targets are at least 44×44px.
-- `html` and `body` clip accidental horizontal overflow without masking component-level defects.
-
-## Exports
-
-Runtime styles use `tokens.css`. The portable exports below mirror its light
-theme; dark theme values are defined under `.dark` in `tokens.css`.
-
-### V2 exports
-
-CSS source: the `--color-v2-*` token blocks and `.v2-app, .v2-drawer` mappings
-in `tokens.css`, shared by `.admin-app` and `.admin-dialog` for the management
-console. Fonts, spacing, type scale, and easing use the canonical
-exports below. The variant's portable core follows.
-
-```css
-/* Tailwind v4 */
-@theme {
-  --color-v2-canvas: oklch(0.967 0.007 75);
-  --color-v2-surface: oklch(0.993 0.003 75);
-  --color-v2-inset: oklch(0.953 0.006 75);
-  --color-v2-ink: oklch(0.265 0.025 255);
-  --color-v2-secondary: oklch(0.440 0.018 255);
-  --color-v2-muted: oklch(0.495 0.012 255);
-  --color-v2-accent: oklch(0.490 0.120 45);
-  --color-v2-accent-ink: oklch(0.993 0.003 75);
-  --color-v2-line: oklch(0.865 0.008 75);
-  --color-v2-control: oklch(0.665 0.012 255);
-  --color-v2-focus: oklch(0.490 0.120 45);
-}
-```
-
-```json
-{
-  "v2": {
-    "canvas": { "$type": "color", "$value": "oklch(0.967 0.007 75)" },
-    "surface": { "$type": "color", "$value": "oklch(0.993 0.003 75)" },
-    "inset": { "$type": "color", "$value": "oklch(0.953 0.006 75)" },
-    "ink": { "$type": "color", "$value": "oklch(0.265 0.025 255)" },
-    "secondary": { "$type": "color", "$value": "oklch(0.440 0.018 255)" },
-    "muted": { "$type": "color", "$value": "oklch(0.495 0.012 255)" },
-    "accent": { "$type": "color", "$value": "oklch(0.490 0.120 45)" },
-    "accent-ink": { "$type": "color", "$value": "oklch(0.993 0.003 75)" },
-    "line": { "$type": "color", "$value": "oklch(0.865 0.008 75)" },
-    "control": { "$type": "color", "$value": "oklch(0.665 0.012 255)" },
-    "focus": { "$type": "color", "$value": "oklch(0.490 0.120 45)" }
-  }
-}
-```
-
-```css
-/* shadcn/ui */
-.v2-app, .v2-drawer {
-  --background: var(--color-v2-canvas);
-  --foreground: var(--color-v2-ink);
-  --card: var(--color-v2-surface);
-  --card-foreground: var(--color-v2-ink);
-  --popover: var(--color-v2-surface);
-  --popover-foreground: var(--color-v2-ink);
-  --primary: var(--color-v2-accent);
-  --primary-foreground: var(--color-v2-accent-ink);
-  --secondary: var(--color-v2-inset);
-  --secondary-foreground: var(--color-v2-ink);
-  --muted: var(--color-v2-inset);
-  --muted-foreground: var(--color-v2-muted);
-  --accent: var(--color-v2-hover);
-  --accent-foreground: var(--color-v2-ink);
-  --border: var(--color-v2-line);
-  --input: var(--color-v2-control);
-  --ring: var(--color-v2-focus);
-}
-```
-
-### Tailwind v4
-
-```css
-@theme {
-  --color-paper: oklch(98.5% 0.008 285);
-  --color-paper-2: oklch(95.8% 0.012 285);
-  --color-paper-3: oklch(92.5% 0.014 285);
-  --color-rule: oklch(82% 0.016 285);
-  --color-rule-2: oklch(88.5% 0.014 285);
-  --color-muted: oklch(45.5% 0.018 285);
-  --color-ink-2: oklch(39% 0.016 285);
-  --color-ink: oklch(20.5% 0.018 285);
-  --color-accent: oklch(47% 0.185 285);
-  --color-accent-ink: oklch(98.5% 0.008 285);
-  --color-focus: oklch(55% 0.220 285);
-  --font-display: "Noto Sans SC Variable", "Microsoft YaHei", sans-serif;
-  --font-body: "Geist Variable", "PingFang SC", "Microsoft YaHei", sans-serif;
-  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  --spacing-3xs: 0.25rem;
-  --spacing-2xs: 0.5rem;
-  --spacing-xs: 0.75rem;
-  --spacing-sm: 1rem;
-  --spacing-md: 1.5rem;
-  --spacing-lg: 2rem;
-  --spacing-xl: 3rem;
-  --spacing-2xl: 4rem;
-  --radius-card: 10px;
-  --radius-pill: 999px;
-  --radius-input: 7px;
-  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-}
-```
-
-### DTCG
-
-```json
-{
-  "$schema": "https://design-tokens.github.io/community-group/format/",
-  "color": {
-    "paper": { "$value": "oklch(98.5% 0.008 285)", "$type": "color" },
-    "paper-2": { "$value": "oklch(95.8% 0.012 285)", "$type": "color" },
-    "paper-3": { "$value": "oklch(92.5% 0.014 285)", "$type": "color" },
-    "rule": { "$value": "oklch(82% 0.016 285)", "$type": "color" },
-    "rule-2": { "$value": "oklch(88.5% 0.014 285)", "$type": "color" },
-    "muted": { "$value": "oklch(45.5% 0.018 285)", "$type": "color" },
-    "ink-2": { "$value": "oklch(39% 0.016 285)", "$type": "color" },
-    "ink": { "$value": "oklch(20.5% 0.018 285)", "$type": "color" },
-    "accent": { "$value": "oklch(47% 0.185 285)", "$type": "color" },
-    "accent-ink": { "$value": "oklch(98.5% 0.008 285)", "$type": "color" },
-    "focus": { "$value": "oklch(55% 0.220 285)", "$type": "color" }
-  },
-  "font": {
-    "display": { "$value": "Noto Sans SC Variable, Microsoft YaHei, sans-serif", "$type": "fontFamily" },
-    "body": { "$value": "Geist Variable, PingFang SC, Microsoft YaHei, sans-serif", "$type": "fontFamily" },
-    "mono": { "$value": "SFMono-Regular, Consolas, Liberation Mono, monospace", "$type": "fontFamily" }
-  },
-  "space": {
-    "3xs": { "$value": "0.25rem", "$type": "dimension" },
-    "2xs": { "$value": "0.5rem", "$type": "dimension" },
-    "xs": { "$value": "0.75rem", "$type": "dimension" },
-    "sm": { "$value": "1rem", "$type": "dimension" },
-    "md": { "$value": "1.5rem", "$type": "dimension" },
-    "lg": { "$value": "2rem", "$type": "dimension" },
-    "xl": { "$value": "3rem", "$type": "dimension" },
-    "2xl": { "$value": "4rem", "$type": "dimension" }
-  },
-  "duration": {
-    "fast": { "$value": "160ms", "$type": "duration" },
-    "base": { "$value": "220ms", "$type": "duration" },
-    "slow": { "$value": "300ms", "$type": "duration" }
-  }
-}
-```
-
-### shadcn/ui
-
-```css
-:root {
-  --background: var(--color-paper);
-  --foreground: var(--color-ink);
-  --card: var(--color-paper-2);
-  --card-foreground: var(--color-ink);
-  --popover: var(--color-paper-2);
-  --popover-foreground: var(--color-ink);
-  --primary: var(--color-accent);
-  --primary-foreground: var(--color-accent-ink);
-  --secondary: var(--color-paper-3);
-  --secondary-foreground: var(--color-ink);
-  --muted: var(--color-paper-3);
-  --muted-foreground: var(--color-muted);
-  --accent: var(--color-rule-2);
-  --accent-foreground: var(--color-ink);
-  --border: var(--color-rule-2);
-  --input: var(--color-rule);
-  --ring: var(--color-focus);
-  --radius: var(--radius-card);
-}
-```
+Use actual loading, empty, unavailable, error and populated states. Feature and
+permission behavior remain owned by their implementation and topic documents;
+validation requirements are in [agent validation](docs/agent-validation.md).

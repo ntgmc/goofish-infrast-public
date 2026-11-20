@@ -140,6 +140,15 @@
   --color-v2-error: oklch(0.475 0.140 25);
   --color-v2-error-soft: oklch(0.953 0.016 25);
   --color-v2-scrim: oklch(0.200 0.020 255 / 0.55);
+
+  --color-rating-sss: #f8d779;
+  --color-rating-s: #ff9d9c;
+  --color-rating-a: #d3b3ff;
+  --color-rating-b: #8ed9ff;
+  --color-rating-c: #96d9bb;
+  --color-rating-d: #bbc5d1;
+  --color-rating-plate: #17212d;
+  --color-rating-glint: #fff9e9;
   --radius-v2-panel: 8px;
   --radius-v2-control: 6px;
   --text-v2-title: clamp(1.5rem, 2.2vw, 2rem);

@@ -166,7 +166,7 @@ export const workspaceCopy = {
   // src/hooks/useSklandBinding.ts
   hooks_useSklandBinding_012: "生成森空岛二维码失败",
   // src/hooks/useSklandBinding.ts
-  hooks_useSklandBinding_013: "请使用森空岛 App 扫码确认。确认后会先展示昵称和 UID，不会立即保存。",
+  hooks_useSklandBinding_013: "扫码授权后，请核对游戏昵称和 UID。",
   // src/hooks/useSklandBinding.ts
   hooks_useSklandBinding_014: "二维码生成失败，请稍后重试，或改用粘贴凭据。",
   // src/hooks/useSklandBinding.ts

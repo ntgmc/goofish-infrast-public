@@ -62,7 +62,7 @@ export function useAdminController(section: AdminSection = 'overview', search = 
 
   const [permission, setPermission] = useState<GeneratedPermission>('advanced')
   const [cdkType, setCdkType] = useState<CdkType>('profile')
-  const [balanceAmount, setBalanceAmount] = useState('100.00')
+  const [balanceAmount, setBalanceAmount] = useState('100')
 
   const [orderNote, setOrderNote] = useState('')
 

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { adminAiSettingsUpdateSchema } from '../../src/lib/ai-settings'
+import { aiAcceptedPointsSchema } from '../../src/lib/ai-credits'
 import { accountDeletionSurveySchema } from '../../src/lib/account-deletion-contracts'
 import { feedbackRequestSchema, feedbackReplySchema, adminFeedbackUpdateSchema, optimizationFailureFeedbackRequestSchema } from '../../src/lib/feedback-contracts'
 import { giftPackOpeningRuleSchema } from '../../src/lib/admin-inventory-contracts'
@@ -147,7 +148,7 @@ export const requestSchemas = {
   }).optional() }).refine((body) => !body.training || body.projects === undefined && body.recommendation === undefined, '培养目标读取不能同时指定养成项目或推荐条件。'),
   depotValue: depotValueRequestSchema,
   adminPublicContentImage: imageUploadSchema,
-  scheduleExplanation: strict({ profile_id: shortString(128), result_id: shortString(128) }),
+  scheduleExplanation: strict({ profile_id: shortString(128), result_id: shortString(128), accepted_points: aiAcceptedPointsSchema }),
   workspaceAssistant: workspaceAssistantRequestSchema,
   userFeedback: z.union([feedbackRequestSchema, optimizationFailureFeedbackRequestSchema]),
   userFeedbackReply: feedbackReplySchema,

@@ -65,6 +65,22 @@ beforeEach(() => {
   mocks.baseline.mockResolvedValue({ id: 'history-1', result: source, config, archived_at: null })
 })
 describe('manual schedule admission', () => {
+  it('admits main scheduling and incremental recompute without a balance quote', async () => {
+    for (const billing_operation of ['main_schedule', 'incremental_recompute']) {
+      const result = await prepareOptimizeJob(request({ manualSchedule: undefined, billing_operation, baseline_history_id: 'history-1' }))
+      expect(result.ok).toBe(true)
+      if (!result.ok) throw new Error('Expected scheduling admission')
+      expect(result.prepared.billing).toBeUndefined()
+    }
+  })
+
+  it('rejects obsolete point confirmations before creating a billable schedule', async () => {
+    const result = await prepareOptimizeJob(request({ manualSchedule: undefined, billing_quote_id: 'old-quote', pricing_version: 'old', accepted_max_points: '700.00' }))
+    expect(result.ok).toBe(false)
+    if (result.ok) throw new Error('Expected obsolete quote rejection')
+    await expect(result.response.json()).resolves.toMatchObject({ error: { code: 'billing_not_applicable' } })
+  })
+
   it('queues expired paid profiles with free limits and personal-use confirmation', async () => {
     mocks.profile.mockResolvedValue({ id: 'profile-1', kind: 'cdk', permission: 'advanced', expires_at: '2020-01-01', skland_binding: { uid: '123' } })
     mocks.authorization.mockResolvedValue({ ok: true, permission: 'recommended', cdkRecord: null,
