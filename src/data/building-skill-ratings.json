@@ -10,11 +10,6 @@
       "label": "游戏基建技能快照",
       "url": "https://github.com/Kengxxiao/ArknightsGameData/tree/63c7cec73c3858d0ae913f85cc89af3cef4d744f/zh_CN/gamedata/excel",
       "use": "技能效果与解锁条件"
-    },
-    {
-      "label": "RIIC Autos 培养建议",
-      "url": "https://riic.autos/training",
-      "use": "用途与入口参考；本站评分依据机制独立判断"
     }
   ],
   "reviews": [
