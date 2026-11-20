@@ -1096,13 +1096,33 @@ describe('V2 results-first workspace', () => {
     expect(screen.getByTestId('route-location')).not.toHaveTextContent('panel=')
   })
 
+  it('shows actual roster training in operator management while the schedule uses a simulated promotion', async () => {
+    const workflow = connect()
+    const actual = SAMPLE_OPERATORS.map((operator) => operator.name === '但书' ? { ...operator, elite: 0, level: 1 } : operator)
+    session.workspace = { operators: actual, config: SAMPLE_CONFIG } as V2Session['workspace']
+    workflow.mergedOperators = SAMPLE_OPERATORS
+    const user = userEvent.setup()
+    mount('/v2?profile_id=profile-1&panel=operators')
+    const drawer = within(await screen.findByRole('dialog'))
+    await user.type(drawer.getByRole('textbox', { name: copy.v2.searchOperators }), '但书')
+    await user.click(drawer.getByRole('button', { name: copy.v2.operatorManagement.details('但书') }))
+    const details = within(await screen.findByRole('dialog', { name: '但书' }))
+    const stage = details.getByRole('combobox', { name: copy.v2.operatorManagement.ratingStage('贸易站') })
+    expect(stage).toHaveValue('0')
+    expect(details.queryByText('违约索赔·β')).not.toBeInTheDocument()
+    await user.selectOptions(stage, '1')
+    expect(details.getByText('违约索赔·β').closest('.v2-skill')).toHaveClass('v2-skill-locked')
+    expect(session.persistWorkspacePatch).not.toHaveBeenCalled()
+    expect(workflow.handleGenerate).not.toHaveBeenCalled()
+  })
+
   it('closes both operator dialogs when a skill link opens the public ratings section', async () => {
     connect()
     const user = userEvent.setup()
     mount('/v2?profile_id=profile-1&panel=operators')
     const drawer = within(await screen.findByRole('dialog'))
     await user.type(drawer.getByRole('textbox', { name: copy.v2.searchOperators }), '但书')
-    await user.click(drawer.getByRole('button', { name: copy.v2.operatorManagement.skills('但书') }))
+    await user.click(drawer.getByRole('button', { name: copy.v2.operatorManagement.details('但书') }))
     const details = within(await screen.findByRole('dialog', { name: '但书' }))
     await user.click(details.getByRole('link', { name: copy.buildingRatings.detailsLink }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
@@ -1136,11 +1156,13 @@ describe('V2 results-first workspace', () => {
     const dialog = within(await screen.findByRole('dialog'))
     await user.type(dialog.getByRole('textbox', { name: copy.v2.searchOperators }), '但书')
     expect(dialog.queryByText('违约索赔·β')).not.toBeInTheDocument()
-    await user.click(dialog.getByRole('button', { name: copy.v2.operatorManagement.skills('但书') }))
+    await user.click(dialog.getByRole('button', { name: copy.v2.operatorManagement.details('但书') }))
     const skillDetails = within(await screen.findByRole('dialog', { name: '但书' }))
+    await user.click(skillDetails.getByRole('tab', { name: copy.v2.operatorManagement.skillTab }))
     expect((await skillDetails.findByText('违约索赔·β')).closest('.v2-skill')).toHaveClass('v2-skill-active')
 
     workflow.mergedOperators = SAMPLE_OPERATORS.map((operator) => operator.name === '但书' ? { ...operator, elite: 0, level: 1 } : operator)
+    session.license = { ...session.license!, operators: workflow.mergedOperators }
     const nextResult = structuredClone(SAMPLE_RESULT)
     nextResult.plans[0].rooms.trading[0].level = 2
     workflow.historyItem = { result: nextResult }
@@ -1607,7 +1629,7 @@ describe('V2 results-first workspace', () => {
     expect(within(dialog).queryByRole('checkbox')).not.toBeInTheDocument()
     expect(within(dialog).queryByRole('combobox')).not.toBeInTheDocument()
     await user.tab()
-    expect(within(dialog).getByRole('button', { name: copy.v2.operatorManagement.skills('但书') })).toHaveFocus()
+    expect(within(dialog).getByRole('button', { name: copy.v2.operatorManagement.details('但书') })).toHaveFocus()
     await dismissDrawer(user)
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
     expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('51,745')).toBeInTheDocument()
@@ -1798,6 +1820,7 @@ describe('V2 results-first workspace', () => {
       { ...SAMPLE_OPERATORS[0], own: true, elite: 2, level: 90 },
       { ...SAMPLE_OPERATORS[1], own: false, elite: 0, level: 0 },
     ]
+    session.license = { ...session.license!, operators: workflow.mergedOperators }
     const user = userEvent.setup()
     mount()
     await user.click(screen.getByRole('button', { name: copy.v2.sidebar.editOperators }))

@@ -456,7 +456,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
         onRecover={(action) => { setExportOpen(false); if (action === 'login') void navigate(authPath('login', returnTo)); else navigateSection(action) }}
         onDownloadMaa={!sample && features.maa_export ? onExport : undefined} onDownloadSample={sample ? downloadSample : undefined}
         onDownloadFullResult={!sample && canViewAnalysis && !result.preview_limit && features.full_result_export && workflow?.userCanDownloadFullResult ? workflow.handleDownloadFullResult : undefined} />
-      <OptionsDrawer panel={panel} onClose={closePanel} onOpenProfile={openProfile} onNavigate={navigateSection} session={guardedSession} config={config} operators={sortedOperators}
+      <OptionsDrawer panel={panel} onClose={closePanel} onOpenProfile={openProfile} onNavigate={navigateSection} session={guardedSession} config={config} operators={session.workspace?.operators ?? session.license?.operators ?? operators}
         onUpdateConfig={onUpdateConfig} permission={permission} canEditConfig={canEditConfig} canUseIntermediateConfig={canUseIntermediateConfig}
         sample={sample} busy={busy} configReadOnly={workflow?.loading} onImportOperators={onImportOperators} configDiffRows={workflow?.configDiffRows} hasPreviousResult={Boolean(workflow?.latestWorkspaceResult)}
         onAccount={() => openPanel('account')} error={navigationError ?? error}

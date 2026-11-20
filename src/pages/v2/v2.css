@@ -2071,7 +2071,7 @@ html:has(.v2-page-transition[data-page-entering="native"]) {
 .v2-operator-entry [data-reveal-content] > .v2-muted { display: flex; align-items: center; min-height: 44px; margin-top: auto; font-size: var(--text-xs); }
 .v2-operator-detail .shared-card-scroll > header { display: flex; align-items: center; gap: var(--space-sm); padding-right: 40px; margin-bottom: var(--space-md); }
 .v2-operator-detail .v2-operator-portrait { flex: none; width: 80px; }
-.v2-operator-detail .v2-avatar { display: block; width: 100%; height: auto; aspect-ratio: 1; }
+.v2-operator-detail .v2-operator-portrait .v2-avatar { display: block; width: 100%; height: auto; aspect-ratio: 1; }
 .v2-operator-detail h2 { font-size: var(--text-lg); font-weight: 600; overflow-wrap: anywhere; }
 .v2-operator-detail [data-slot="dialog-description"] { margin-top: var(--space-xs); color: var(--v2-secondary); font-size: var(--text-sm); }
 .v2-room-detail .shared-card-scroll { container: room-detail / inline-size; padding: var(--space-md); }

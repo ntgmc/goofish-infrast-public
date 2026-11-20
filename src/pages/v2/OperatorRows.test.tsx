@@ -95,6 +95,7 @@ it('keeps grid rows compact while details open separately and retains keyboard f
   const trigger = row(0)!.querySelector('button')!
   await user.click(trigger)
   const dialog = page.getByRole('dialog')
+  await user.click(within(dialog).getByRole('tab', { name: '全部技能' }))
   expect(dialog.querySelector('.v2-skill-list')).toBeInTheDocument()
   expect(row(0)!.querySelector('.v2-skill-list')).not.toBeInTheDocument()
   expect(parseFloat(list.style.height)).toBe(collapsedHeight)
