@@ -93,10 +93,12 @@ it.each([false, true])('finishes automatic calculation when entering with a cach
   mocks.api.mockResolvedValue({ ...data([goal]), snapshotVersion: 'cached' })
   const page = <MemoryRouter><CultivationProjects session={session()} onConfig={vi.fn()} /></MemoryRouter>
   renderUi(strict ? <StrictMode><QueryProvider>{page}</QueryProvider></StrictMode> : <QueryProvider>{page}</QueryProvider>)
-  await waitFor(() => expect(screen.getByRole('button', { name: text.refresh })).toBeEnabled())
-  expect(screen.getByRole('heading', { name: /测试干员/ })).toBeInTheDocument()
+  await waitFor(() => {
+    expect(screen.getByRole('heading', { name: /测试干员/ })).toBeInTheDocument()
+    expect(mocks.api).toHaveBeenCalledOnce()
+  })
+  expect(screen.getByRole('button', { name: text.refresh })).toBeEnabled()
   expect(screen.queryByRole('status', { name: copy.v2.dataActivity.calculating })).not.toBeInTheDocument()
-  expect(mocks.api).toHaveBeenCalledOnce()
   expect(mocks.api.mock.calls[0][1].signal.aborted).toBe(false)
   expect(mocks.refresh).not.toHaveBeenCalled()
 })
