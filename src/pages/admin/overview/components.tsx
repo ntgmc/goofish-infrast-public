@@ -2,7 +2,7 @@ import type { AnnouncementStats as AnnouncementReachStats } from '../../../lib/t
 import { type AdminCdkRecord, type RiskReasonStats, type RiskTrendDay, type CdkOpsSummary, permissionLabels } from '../contracts'
 import { StatusPill, SmallButton, formatDate } from '../shared/helpers'
 import { Metric } from '../cdk/components'
-import { METERED_BILLING_AVAILABLE } from '../../../lib/site-features'
+import { copy } from '../../../copy'
 
 export function AnnouncementReachMetrics({ stats }: { stats: AnnouncementReachStats }) {
   return (
@@ -29,7 +29,7 @@ export function AnnouncementReachMetrics({ stats }: { stats: AnnouncementReachSt
 }
 
 export function CdkRecordDistributionPanel({ summary }: { summary: CdkOpsSummary }) {
-  const typeLabels = { profile: '档案兑换', balance: '余额兑换', item: '道具' } as const
+  const typeLabels = { profile: '档案兑换', balance: copy.balance.cdk_type, item: '道具' } as const
   return (
     <section className="tool-panel p-5">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
@@ -37,7 +37,7 @@ export function CdkRecordDistributionPanel({ summary }: { summary: CdkOpsSummary
         <span className="text-xs text-ink-muted">基于当前 CDK 记录</span>
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        {summary.type_distribution.filter((item) => item.cdk_type !== 'balance' || METERED_BILLING_AVAILABLE).map((item) => (
+        {summary.type_distribution.map((item) => (
           <div key={item.cdk_type} className="tool-inset flex items-center justify-between gap-3 p-3">
             <span className="text-sm text-ink-secondary">{typeLabels[item.cdk_type]}</span>
             <span className="text-lg font-semibold text-ink-primary">{item.total}</span>

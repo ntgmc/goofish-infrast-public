@@ -110,8 +110,8 @@ describe('API client boundary', () => {
     const cancel = vi.fn()
     vi.stubGlobal('fetch', vi.fn(async () => new Response(new ReadableStream({ cancel }), { headers: { 'Content-Type': 'text/event-stream' } })))
     await expect(apiStream('/api/user/schedule-explanation', { method: 'POST' }, async () => {
-      throw new ApiError('未扣除次数。', 502, { code: 'ai_generation_failed' }, '/api/user/schedule-explanation')
-    })).rejects.toMatchObject({ message: '未扣除次数。', code: 'ai_generation_failed' })
+      throw new ApiError('未扣除积分。', 502, { code: 'ai_generation_failed' }, '/api/user/schedule-explanation')
+    })).rejects.toMatchObject({ message: '未扣除积分。', code: 'ai_generation_failed' })
     expect(cancel).toHaveBeenCalledOnce()
   })
 

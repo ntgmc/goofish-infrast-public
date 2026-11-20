@@ -6,7 +6,7 @@ import type { BalancePage, AdminBalanceTransaction } from '../../../lib/balance-
 
 const api = vi.hoisted(() => vi.fn())
 vi.mock('../../../lib/admin-api-client', () => ({ adminApiJson: api }))
-vi.mock('../../../lib/site-features', () => ({ METERED_BILLING_AVAILABLE: true }))
+vi.mock('../../../lib/site-feature-context', () => ({ useSiteFeatures: () => ({ features: { ai_credits: true } }) }))
 beforeEach(() => { api.mockReset() })
 afterEach(cleanup)
 const page = { balance: { available: '12.00' }, transactions: [], next_cursor: null, as_of: '2026-10-27T00:00:00Z' } as unknown as BalancePage<AdminBalanceTransaction>

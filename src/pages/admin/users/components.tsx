@@ -13,6 +13,8 @@ import { useAdminDraftQuery } from '../../../lib/admin-draft-query'
 import { adminApiJson } from '../../../lib/admin-api-client'
 import { WorkspaceExportDialog } from './WorkspaceExportDialog'
 import { METERED_BILLING_AVAILABLE } from '../../../lib/site-features'
+import { useSiteFeatures } from '../../../lib/site-feature-context'
+import { copy } from '../../../copy'
 
 export interface UserDetailPanelProps {
   inline?: boolean;
@@ -44,9 +46,10 @@ export interface UserDetailPanelProps {
 }
 
 export function UserDetailDialog(props: UserDetailPanelProps) {
+  const { features } = useSiteFeatures()
   if (props.inline) return <UserDetailPanel key={props.detail.user.id} {...props} />
   return (
-    <AdminDetailDialog labelledBy="admin-user-detail-title" onClose={props.onClose} preventOutsideDismiss={METERED_BILLING_AVAILABLE}>
+    <AdminDetailDialog labelledBy="admin-user-detail-title" onClose={props.onClose} preventOutsideDismiss={features.ai_credits}>
       <UserDetailPanel {...props} />
     </AdminDetailDialog>
   )
@@ -79,6 +82,7 @@ function UserDetailPanel({
   onUnfreezeUser,
   onDeleteUser,
 }: UserDetailPanelProps) {
+  const { features } = useSiteFeatures()
   const [workspaceExportOpen, setWorkspaceExportOpen] = useState(false)
   const [view, setView] = useState('profiles')
   const [profileId, setProfileId] = useState(initialProfileId ?? detail.profiles[0]?.id ?? '')
@@ -141,9 +145,9 @@ function UserDetailPanel({
 
         <div className="mt-5"><AdminTabs label="用户详情任务" value={view} onChange={setView} items={[
           { id: 'profiles', label: '账号档案' }, { id: 'declarations', label: '使用声明' },
-          ...(METERED_BILLING_AVAILABLE ? [{ id: 'balance', label: '积分记录' }] : []),
+          ...(features.ai_credits ? [{ id: 'balance', label: '积分记录' }] : []),
         ]} /></div>
-        {METERED_BILLING_AVAILABLE && <div hidden={view !== 'balance'}><UserBalanceCard
+        {features.ai_credits && <div hidden={view !== 'balance'}><UserBalanceCard
           userId={user.id}
           balance={balance}
           loading={balanceLoading}
@@ -260,8 +264,8 @@ function UserBalanceCard({
       <div className="border-t border-surface-3 p-4">
         <div>
           <p className="text-3xl font-semibold tabular-nums text-ink-primary">{balance?.balance.available ?? '0.00'}</p>
-          <p className="mt-1 text-xs text-ink-muted">可用 {balance?.balance.available ?? '0.00'} · 计算中暂扣 {balance?.balance.reserved ?? '0.00'} · 待补扣 {balance?.balance.debt ?? '0.00'}</p>
-          <p className="mt-1 text-xs text-ink-muted">累计获得 {balance?.balance.lifetime_credited ?? '0.00'} · 已撤销发放 {balance?.balance.qualification_reversed ?? '0.00'} · {balance?.balance.commercial?.eligible ? `商用 Lv${balance.balance.commercial.level}` : '商用未生效'}</p>
+          <p className="mt-1 text-xs text-ink-muted">可用 {balance?.balance.available ?? '0.00'} · 使用中暂扣 {balance?.balance.reserved ?? '0.00'} · 待补扣 {balance?.balance.debt ?? '0.00'}</p>
+          <p className="mt-1 text-xs text-ink-muted">累计获得 {balance?.balance.lifetime_credited ?? '0.00'} · 已撤销发放 {balance?.balance.qualification_reversed ?? '0.00'}</p>
         </div>
 
         <form onSubmit={submit} className="mt-4 grid gap-3 lg:grid-cols-[140px_180px_1fr_180px_auto]" noValidate>
@@ -326,7 +330,7 @@ function UserBalanceCard({
             <tbody className="divide-y divide-surface-3">
               {(balance?.transactions ?? []).map((transaction) => (
                 <tr key={transaction.id}>
-                  <td className="px-2 py-2">{adminBalanceKindLabel(transaction.kind)}</td>
+                  <td className="px-2 py-2">{transaction.service ? copy.balance.services[transaction.service] : adminBalanceKindLabel(transaction.kind)}</td>
                   <td className={`px-2 py-2 font-mono font-medium ${transaction.amount.startsWith('-') ? 'text-error' : 'text-success'}`}>{transaction.amount.startsWith('-') ? transaction.amount : `+${transaction.amount}`}</td>
                   <td className="px-2 py-2 font-mono">{transaction.balance_after}</td>
                   <td className="max-w-72 px-2 py-2"><div>{transaction.admin_username ?? '-'}{transaction.approved_by ? ` / ${transaction.approved_by} 审批` : ''}</div><div className="truncate text-ink-muted" title={transaction.reason ?? undefined}>{transaction.reason ?? '-'}</div></td>
@@ -343,10 +347,10 @@ function UserBalanceCard({
             {loading ? '加载中…' : '加载更多'}
           </button>
         )}
-        <CommercialAdminControls
+        {METERED_BILLING_AVAILABLE && <CommercialAdminControls
           userId={userId}
           eligible={balance?.balance.commercial.eligible === true}
-        />
+        />}
       </div>
     </details>
   )
@@ -450,7 +454,8 @@ function EffectiveCommercialAdminControls({ userId }: { userId: string }) {
 function adminBalanceKindLabel(kind: AdminBalanceTransaction['kind']): string {
   if (kind === 'cdk_credit') return '积分 CDK'
   if (kind === 'admin_debit') return '管理员扣减'
-  if (kind === 'schedule_debit') return '排班成功扣费'
+  if (kind === 'schedule_debit') return copy.balance.schedule_debit
+  if (kind === 'ai_debit') return copy.balance.ai_debit
   if (kind === 'admin_credit_reversal') return '撤销发放'
   if (kind === 'debt_repayment') return '补扣积分'
   return '管理员发放'

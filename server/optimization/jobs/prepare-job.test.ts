@@ -1,16 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { CdkRecord, ProfileCdkDuration } from '../../handlers/license-utils'
-import { getScenarioComparisonQueuePriority, includesCdkIncrementalRecompute } from './prepare-job'
-
-describe('CDK incremental recompute entitlement', () => {
-  it.each(['month', 'half_year', 'year', 'lifetime'] as const)('includes recompute for %s cards', (duration) => {
-    expect(includesCdkIncrementalRecompute(profileCdk(duration))).toBe(true)
-  })
-
-  it('does not apply to balance CDKs', () => {
-    expect(includesCdkIncrementalRecompute({ cdk_type: 'balance' } as CdkRecord)).toBe(false)
-  })
-})
+import { getScenarioComparisonQueuePriority } from './prepare-job'
 
 describe('scenario comparison queue priority', () => {
   it('uses standard queue weight for the free advanced preview trial', () => {
@@ -31,7 +20,3 @@ describe('scenario comparison queue priority', () => {
     })
   })
 })
-
-function profileCdk(profileDuration: ProfileCdkDuration): CdkRecord {
-  return { cdk_type: 'profile', profile_duration: profileDuration } as CdkRecord
-}

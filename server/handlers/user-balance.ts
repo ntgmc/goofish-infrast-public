@@ -1,4 +1,5 @@
 import { normalizePointsAmount } from '../../src/lib/balance-contracts'
+import { getAiCreditPrices } from '../storage/ai-settings-store'
 import {
   applyBalanceChangeInTransaction,
   BalanceError,
@@ -58,7 +59,11 @@ export default async function userBalanceHandler(req: Request): Promise<Response
     if (req.method !== 'GET') return jsonResponse({ error: 'Method not allowed' }, 405)
     const rawLimit = url.searchParams.get('limit')
     const limit = rawLimit === null ? undefined : Number(rawLimit)
-    return jsonResponse(await getPublicBalancePage(auth.user.id, { cursor: url.searchParams.get('cursor'), limit }))
+    const [page, prices] = await Promise.all([
+      getPublicBalancePage(auth.user.id, { cursor: url.searchParams.get('cursor'), limit }),
+      getAiCreditPrices(),
+    ])
+    return jsonResponse({ ...page, ai_prices: prices })
   } catch (error) {
     if (error instanceof BalanceError) return jsonResponse({ error: error.message, code: error.code }, error.status)
     if (error instanceof CdkAlreadyRedeemedError) return jsonResponse({ error: 'CDK 已被兑换或正在兑换。', code: 'cdk_already_redeemed' }, 409)

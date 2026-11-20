@@ -1216,6 +1216,7 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
     reconcileBilling: async () => {
       await ensureSchema()
       return withTransaction(async (client) => {
+        await client.query("select pg_advisory_xact_lock(hashtext('schedule-explanation-budget'))")
         const now = new Date().toISOString()
         const pending = await client.query<{ job_id: string; status: OptimizeJobStatus }>(
           `select reservation.job_id, job.status
@@ -1281,8 +1282,11 @@ export function createPostgresOptimizeJobStore(): OptimizeJobStore {
                   coalesce(projection.expected, 0)::text as expected
              from user_balance_accounts account
              left join (
-               select user_id, sum(amount) as expected from user_balance_reservations
-                where status = 'reserved' group by user_id
+               select user_id, sum(amount) as expected from (
+                 select user_id, amount from user_balance_reservations where status = 'reserved'
+                 union all
+                 select user_id, points_amount as amount from ai_schedule_usage where status = 'pending'
+               ) reservations group by user_id
              ) projection on projection.user_id = account.user_id
             where account.reserved <> coalesce(projection.expected, 0)
             order by account.user_id limit 100 for update of account skip locked`,

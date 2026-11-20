@@ -1,4 +1,5 @@
 import type { QueryClient } from './postgres'
+import { AI_CREDIT_SERVICES } from '../../src/lib/ai-credits'
 import { createHash, randomUUID } from 'node:crypto'
 import {
   POINTS_CURRENCY,
@@ -190,7 +191,7 @@ export async function applyBalanceChangeInTransaction(
   }
 
   await ensureBalanceAccountInTransaction(client, input.userId)
-  const negativeKind = input.kind === 'admin_debit' || input.kind === 'schedule_debit'
+  const negativeKind = input.kind === 'admin_debit' || input.kind === 'schedule_debit' || input.kind === 'ai_debit'
     || input.kind === 'admin_credit_reversal' || input.kind === 'debt_repayment'
   const signedAmount = negativeKind ? `-${input.amount}` : input.amount
   const qualificationCredit = input.kind === 'cdk_credit' || input.kind === 'admin_credit'
@@ -563,7 +564,8 @@ function formatPointsMinor(value: bigint): string {
 }
 
 export function toPublicBalanceTransaction(row: StoredBalanceTransaction): PublicBalanceTransaction {
-  return { id: row.id, kind: row.kind, amount: row.amount, balance_after: row.balance_after, created_at: row.created_at }
+  const service = row.kind === 'ai_debit' ? AI_CREDIT_SERVICES.find((service) => service === row.reason) : undefined
+  return { id: row.id, kind: row.kind, ...(service && { service }), amount: row.amount, balance_after: row.balance_after, created_at: row.created_at }
 }
 
 function toAdminTransaction(row: StoredBalanceTransaction): AdminBalanceTransaction {

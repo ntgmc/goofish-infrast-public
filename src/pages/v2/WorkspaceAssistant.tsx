@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { GenerateIcon } from '../../components/icons'
+import { useInternalHref } from '../../components/InternalLink'
 import { copy } from '../../copy'
 import { askWorkspaceAssistant, readWorkspaceAssistant } from '../../lib/workspace-assistant-client'
 import { useSiteFeatures } from '../../lib/site-feature-context'
@@ -38,6 +39,7 @@ export default function WorkspaceAssistant(props: Props) {
 
 function AssistantPanel({ task, title, userId, profileId, description, example, fixedQuestion, disabled, revision, renderControls, buildRequest, renderReply }: Props) {
   const id = useId()
+  const resolveHref = useInternalHref()
   const client = useQueryClient()
   const [open, setOpen] = useState(false)
   const [question, setQuestion] = useState('')
@@ -61,7 +63,7 @@ function AssistantPanel({ task, title, userId, profileId, description, example, 
     setError(null)
     setResponse(null)
     try {
-      const result = await askWorkspaceAssistant(buildRequest(input), controller.signal)
+      const result = await askWorkspaceAssistant({ ...buildRequest(input), accepted_points: state.credits.charge ?? '0.00' }, controller.signal)
       if (!controller.signal.aborted) {
         if (result.reply) setResponse({ reply: result.reply, revision })
         client.setQueryData(queryKey, result.state)
@@ -72,7 +74,7 @@ function AssistantPanel({ task, title, userId, profileId, description, example, 
       if (!controller.signal.aborted) {
         request.current = null
         setBusy(false)
-        void client.invalidateQueries({ predicate: ({ queryKey: key }) => key[0] === 'user' && key[1] === userId && ['workspace-assistant', 'schedule-explanation'].includes(String(key[3])) })
+        void client.invalidateQueries({ predicate: ({ queryKey: key }) => key[0] === 'user' && key[1] === userId && ['workspace-assistant', 'schedule-explanation', 'balance'].includes(String(key[3])) })
       }
     }
   }
@@ -87,9 +89,9 @@ function AssistantPanel({ task, title, userId, profileId, description, example, 
         <div id={id} className="v2-workspace-assistant-status" aria-live="polite">
           {availability.isLoading && text.loading}
           {availability.isError && <>{text.failed} <button type="button" className="v2-text-button" onClick={() => void availability.refetch()}>{copy.v2.retry}</button></>}
-          {state && <><p>{text.quota(state.quota.remaining, state.quota.limit)}</p>{state.available && state.provider && <p>{text.disclosure(state.provider)}</p>}{state.reason && <p>{text.unavailable[state.reason]}{state.reason === 'busy' && <button type="button" className="v2-text-button" onClick={() => void availability.refetch()}>{copy.v2.retry}</button>}</p>}</>}
+          {state && <>{state.credits.price && <p>{copy.balance.cost(state.credits.charge, state.credits.available)}</p>}{state.available && state.provider && <p>{text.disclosure(state.provider)}</p>}{state.reason && <p>{text.unavailable[state.reason]}{(state.reason === 'busy' || state.reason === 'pricing_changed' || state.reason === 'balance' || state.reason === 'debt') && <button type="button" className="v2-text-button" onClick={() => void availability.refetch()}>{copy.v2.retry}</button>}{(state.reason === 'balance' || state.reason === 'debt') && <a className="v2-text-button" href={resolveHref('/tool/balance')}>{copy.balance.go_to_points}</a>}</p>}</>}
         </div>
-        <button type="submit" className="v2-button v2-button-secondary" disabled={disabled || busy || !input || !state?.available || availability.isError} aria-busy={busy}>{busy ? text.asking : fixedQuestion ? text.summarize : text.ask}</button>
+        <button type="submit" className="v2-button v2-button-secondary" disabled={disabled || busy || !input || !state?.available || availability.isError} aria-busy={busy}>{busy ? text.asking : state && state.credits.charge !== '0.00' ? copy.balance.paid_action(fixedQuestion ? text.summarize : text.ask, state.credits.charge) : fixedQuestion ? text.summarize : text.ask}</button>
       </form>
       <Notice error>{error}</Notice>
       {reply && <div className="v2-workspace-assistant-result" aria-live="polite">{renderReply(reply)}</div>}

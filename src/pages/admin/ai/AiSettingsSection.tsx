@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { copy } from '../../../copy'
+import { AI_CREDIT_SERVICES } from '../../../lib/ai-credits'
 import { AI_PROTOCOLS, adminAiSettingsUpdateSchema, aiConfigurationIssues, aiSettingsSchema, type AdminAiSettings, type AiSettings } from '../../../lib/ai-settings'
 import { adminApiJson } from '../../../lib/admin-api-client'
 import { useAdminDraftQuery } from '../../../lib/admin-draft-query'
@@ -13,7 +14,7 @@ import { inputClassName } from '../shared/helpers'
 const text = copy.aiSettings
 const numberGroups = [
   { title: text.pricing, help: text.pricing_help, fields: ['inputPrice', 'outputPrice', 'requestCap', 'dailyBudget', 'monthlyBudget'] },
-  { title: text.quota, help: text.quota_help, fields: ['trialLimit', 'monthlyLimit', 'dailyAttemptLimit', 'concurrencyLimit'] },
+  { title: text.requests, help: text.requests_help, fields: ['dailyAttemptLimit', 'concurrencyLimit'] },
   { title: text.bounds, help: text.bounds_help, fields: ['maxInputTokens', 'maxOutputTokens', 'timeoutMs'] },
 ] as const
 
@@ -93,6 +94,16 @@ export default function AiSettingsSection() {
       </div>
     </fieldset>
     {numberGroups.map((group) => <fieldset key={group.title} disabled={saving} className="tool-panel p-5 sm:p-6"><legend className="text-base font-semibold">{group.title}</legend><p className="text-sm leading-6 text-ink-secondary">{group.help}</p><div className="admin-settings-fields mt-4">{group.fields.map((name) => <div key={name}><label className="mb-2 block text-sm" htmlFor={`ai-${name}`}>{text.fields[name]}</label><input id={`ai-${name}`} name={name} type="number" step={aiSettingsSchema.shape[name].isInt ? 1 : 'any'} min={aiSettingsSchema.shape[name].minValue ?? undefined} max={aiSettingsSchema.shape[name].maxValue ?? undefined} value={data.settings[name]} onChange={(event) => update(name, Number(event.currentTarget.value))} className={inputClassName(Boolean(issues[`settings.${name}`]))} {...a11y(`settings.${name}`)} />{fieldError(`settings.${name}`)}</div>)}</div>{group.title === text.pricing && <div className="admin-settings-fields mt-4">{(['cachedInputPrice', 'cacheWritePrice', 'cacheWrite1hPrice'] as const).map((name) => <div key={name}><label className="mb-2 block text-sm" htmlFor={`ai-${name}`}>{text.fields[name]}</label><input id={`ai-${name}`} name={name} type="number" step="any" min={0} max={10000} value={data.settings[name] ?? ''} onChange={(event) => update(name, event.currentTarget.value === '' ? null : Number(event.currentTarget.value))} className={inputClassName(Boolean(issues[`settings.${name}`]))} {...a11y(`settings.${name}`)} />{fieldError(`settings.${name}`)}</div>)}</div>}</fieldset>)}
+    <fieldset disabled={saving} className="tool-panel p-5 sm:p-6"><legend className="text-base font-semibold">{text.credits}</legend>
+      <p id="ai-credits-help" className="text-sm leading-6 text-ink-secondary">{text.credits_help}</p>
+      <div className="admin-settings-fields mt-4">{AI_CREDIT_SERVICES.map((service) => {
+        const path = `settings.creditPrices.${service}`
+        return <div key={service}><label className="mb-2 block text-sm" htmlFor={`ai-credit-${service}`}>{copy.balance.services[service]}</label>
+          <input id={`ai-credit-${service}`} name={`creditPrices.${service}`} inputMode="decimal" maxLength={10} value={data.settings.creditPrices[service] ?? ''}
+            onChange={(event) => { update('creditPrices', { ...data.settings.creditPrices, [service]: event.currentTarget.value === '' ? null : event.currentTarget.value }); change(path) }}
+            className={inputClassName(Boolean(issues[path]))} {...a11y(path, 'ai-credits-help')} />{fieldError(path)}</div>
+      })}</div>
+    </fieldset>
     <section className="tool-panel p-5 sm:p-6"><label className="block" htmlFor="ai-reason"><span className="mb-2 block text-sm">{text.reason}</span></label><input id="ai-reason" name="reason" value={reason} disabled={saving} onChange={(event) => { setReason(event.currentTarget.value); change('reason') }} minLength={2} maxLength={500} required className={inputClassName(Boolean(issues.reason))} {...a11y('reason')} /><span className="mt-1 block text-xs text-ink-muted">{text.reason_help}</span>{fieldError('reason')}</section>
     <div className="admin-savebar"><span className="text-sm text-ink-muted">{dirty ? '有待保存的修改' : '已与线上配置同步'}</span><button type="submit" disabled={saving} className="tool-primary-action">{saving ? text.saving : text.save}</button><button type="button" disabled={saving} onClick={reload} className="tool-secondary-action">{text.reload}</button></div>
   </form>

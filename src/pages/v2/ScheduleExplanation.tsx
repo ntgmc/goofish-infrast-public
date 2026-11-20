@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { animate } from 'motion/react'
 import { CloseIcon, GenerateIcon } from '../../components/icons'
+import { useInternalHref } from '../../components/InternalLink'
 import { Dialog, DialogClose, DialogContent, DialogTitle } from '../../components/ui/dialog'
 import { copy } from '../../copy'
 import { apiJson, apiStream } from '../../lib/api-client'
@@ -33,6 +34,7 @@ export default function ScheduleExplanation({ userId, profileId, resultId, sampl
 
 function PersonalExplanation({ userId, profileId, resultId, generationEnabled, pause }: { userId: string; profileId: string; resultId: string; generationEnabled: boolean; pause?: string }) {
   const client = useQueryClient()
+  const resolveHref = useInternalHref()
   const active = useRef(true)
   const streamAbort = useRef<AbortController | null>(null)
   const [draft, setDraft] = useState('')
@@ -48,7 +50,7 @@ function PersonalExplanation({ userId, profileId, resultId, generationEnabled, p
     mutationFn: () => {
       streamAbort.current = new AbortController()
       return apiStream('/api/user/schedule-explanation', {
-        method: 'POST', json: { profile_id: profileId, result_id: resultId }, headers: { Accept: 'text/event-stream' },
+        method: 'POST', json: { profile_id: profileId, result_id: resultId, accepted_points: query.data?.credits.charge ?? '0.00' }, headers: { Accept: 'text/event-stream' },
         signal: streamAbort.current.signal, timeoutMs: 105000, fallbackMessage: text.failed,
       }, (response) => readScheduleExplanationResponse(response, (delta) => { if (active.current) setDraft((value) => value + delta) }))
     },
@@ -58,7 +60,7 @@ function PersonalExplanation({ userId, profileId, resultId, generationEnabled, p
       if (!active.current || !client.getQueryState(key)) return
       setDraft('')
       client.setQueryData(key, data)
-      await client.invalidateQueries({ predicate: ({ queryKey }) => queryKey[0] === 'user' && queryKey[1] === userId && (queryKey[3] === 'schedule-explanation' || queryKey[3] === 'workspace-assistant') })
+      await client.invalidateQueries({ predicate: ({ queryKey }) => queryKey[0] === 'user' && queryKey[1] === userId && ['schedule-explanation', 'workspace-assistant', 'balance'].includes(String(queryKey[3])) })
     },
     onError: () => { if (active.current) { setDraft(''); void query.refetch({ cancelRefetch: false }) } },
     onSettled: () => { streamAbort.current = null },
@@ -80,11 +82,12 @@ function PersonalExplanation({ userId, profileId, resultId, generationEnabled, p
       {draft && <ExplanationMarkdown revealed={revealed}>{draft}</ExplanationMarkdown>}
       {!pending && <>
         <div className="v2-explanation-heading"><p>{text.description}</p>
-          {available && <button className="v2-explanation-generate" type="button" onClick={() => mutation.mutate()}><GenerateIcon size={16} aria-hidden="true" />{text.generate}</button>}
+          {available && <button className="v2-explanation-generate" type="button" onClick={() => mutation.mutate()}><GenerateIcon size={16} aria-hidden="true" />{state && state.credits.charge !== '0.00' ? copy.balance.paid_action(text.generate, state.credits.charge) : text.generate}</button>}
         </div>
-        {state && <div className="v2-explanation-notes"><p>{text.quota(state.quota.remaining, state.quota.limit, state.quota.kind === 'monthly')}</p>
-          {state.quota.resets_at && <p>{text.reset(new Date(state.quota.resets_at).toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai' }))}</p>}
-          {available && state.provider && <p>{text.disclosure(state.provider)}</p>}</div>}
+        {state && <div className="v2-explanation-notes">{state.credits.price && <p>{copy.balance.cost(state.credits.charge, state.credits.available)}</p>}
+          {available && state.provider && <p>{text.disclosure(state.provider)}</p>}
+          {(reason === 'balance' || reason === 'debt' || reason === 'pricing_changed') && <button type="button" className="v2-text-button" onClick={() => void query.refetch({ cancelRefetch: false })}>{text.retry}</button>}
+          {(reason === 'balance' || reason === 'debt') && <a className="v2-text-button" href={resolveHref('/tool/balance')}>{copy.balance.go_to_points}</a>}</div>}
       </>}
     </>}
     {error && <div role="alert" className="v2-explanation-error"><p>{error.message}</p><button type="button" className="v2-text-button" onClick={() => { mutation.reset(); void query.refetch({ cancelRefetch: false }) }}>{text.retry}</button></div>}

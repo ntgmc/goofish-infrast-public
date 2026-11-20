@@ -104,10 +104,9 @@ export const v2Copy = {
     applyHelp: '应用后可继续调整配置，点击“重新排班”生成排班。',
   },
   workspaceAssistant: {
-    question: '你想完成什么？', asking: '正在整理…', ask: '获取建议', summarize: '提炼重点', loading: '正在读取 AI 次数…', failed: '助手暂时不可用，请稍后重试。',
-    quota: (remaining: number, limit: number) => `AI 剩余 ${remaining} / ${limit} 次，与排班解读共用。`,
-    disclosure: (provider: string) => `提交会将问题及本页相关摘要发送给 ${provider}，成功消耗 1 次 AI 次数。请勿输入凭据或订单信息。`,
-    unavailable: { disabled: 'AI 助手暂未开放。', quota: 'AI 次数已用完。', budget: 'AI 服务额度暂已用完，请稍后再试。', daily_limit: '今天的 AI 请求已达上限，请明天再试。', busy: '账号已有 AI 请求进行中，请稍后再试。' },
+    question: '你想完成什么？', asking: '正在整理…', ask: '获取建议', summarize: '提炼重点', loading: '正在读取积分价格与余额…', failed: '助手暂时不可用，请稍后重试。',
+    disclosure: (provider: string) => `提交会将问题及本页相关摘要发送给 ${provider}。请勿输入凭据或订单信息。`,
+    unavailable: { disabled: 'AI 助手暂未开放。', unpriced: '这项 AI 服务暂未开放积分消费。', budget: 'AI 服务额度暂已用完，请稍后再试。', daily_limit: '今天的 AI 请求已达上限，请明天再试。', busy: '账号已有 AI 请求进行中，请稍后再试。', balance: '积分不足，请兑换积分后重试。', debt: '账号有待补扣积分，请补足积分后重试。', pricing_changed: '本次费用已更新，请重新读取后确认。' },
     comparison: '按目标比较方案', comparisonHelp: '描述要比较的布局、产物、换班方式或无人机用途。整理完成后，可核对每个方案和费用再开始计算。',
     comparisonExample: '保持现在的布局，我最近缺龙门币，比较不同无人机策略。', applyComparison: '使用这些方案', confirmComparison: '核对方案与本次消耗',
     comparisonFocus: '关注指标', comparisonFirst: '首要指标', comparisonTooFew: '目前只能形成一个可计算的方案。请再指定一种布局、换班方式或无人机用途。',

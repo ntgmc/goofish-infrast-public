@@ -20,10 +20,15 @@ export async function getAdminAiSettings(): Promise<AdminAiSettings> {
     effective_enabled: computeEffectiveSiteFeatures(features).ai_schedule_explanation, feature_revision: features.revision }
 }
 
+export async function getAiCreditPrices() {
+  return (await readStoredSettings()).settings.creditPrices
+}
+
 export async function getScheduleExplanationConfig(feature: ModelFeature = 'ai_schedule_explanation') {
   const [stored, features] = await Promise.all([readStoredSettings(), getSiteFeatureSettings()])
   const enabled = computeEffectiveSiteFeatures(features)[feature] && aiConfigurationIssues(stored.settings, Boolean(stored.encrypted_api_key)).length === 0
-  return { ...stored.settings, enabled, apiKey: enabled ? decryptKey(stored.encrypted_api_key!) : '',
+  return { ...stored.settings, enabled, creditsEnabled: computeEffectiveSiteFeatures(features).ai_credits,
+    apiKey: enabled ? decryptKey(stored.encrypted_api_key!) : '',
     reservation: getAiRequestReservation(stored.settings),
     dailyBudget: Math.floor(stored.settings.dailyBudget * 1e6), monthlyBudget: Math.floor(stored.settings.monthlyBudget * 1e6) }
 }

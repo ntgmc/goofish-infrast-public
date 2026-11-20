@@ -3,7 +3,7 @@ import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import type { AdminBalanceTransaction, BalancePage } from '../../../lib/balance-contracts'
 import { adminApiJson as apiJson } from '../../../lib/admin-api-client'
 import type { AdminCapability } from '../contracts'
-import { METERED_BILLING_AVAILABLE } from '../../../lib/site-features'
+import { useSiteFeatures } from '../../../lib/site-feature-context'
 
 export function useAdminUserBalance(options: {
   username: string | null; capabilities: AdminCapability[]; userId: string | null; active: boolean
@@ -14,7 +14,8 @@ export function useAdminUserBalance(options: {
 }) {
   const client = useQueryClient()
   const [saving, setSaving] = useState(false)
-  const enabled = METERED_BILLING_AVAILABLE && options.active && Boolean(options.username && options.userId)
+  const { features } = useSiteFeatures()
+  const enabled = features.ai_credits && options.active && Boolean(options.username && options.userId)
   const owner = JSON.stringify([options.username, options.capabilities, options.userId, enabled])
   const current = useRef(owner)
   current.current = owner

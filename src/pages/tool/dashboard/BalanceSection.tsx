@@ -76,7 +76,7 @@ export function useBalance(userId: string, profileId: string | null) {
       setPending(null)
       setNotice(`${copy.balance.redeem_success}：+${formatPoints(response.cdk.amount)} ${copy.balance.unit}`)
       await queryClient.invalidateQueries({
-        predicate: ({ queryKey }) => queryKey[0] === 'user' && queryKey[1] === userId && queryKey[3] === 'balance',
+        predicate: ({ queryKey }) => queryKey[0] === 'user' && queryKey[1] === userId && ['balance', 'schedule-explanation', 'workspace-assistant'].includes(String(queryKey[3])),
       })
     } catch (caught) {
       setError(getApiErrorMessage(caught, copy.metered.balance.redeem_retry))

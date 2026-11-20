@@ -260,7 +260,7 @@ async function exportData(userId: string): Promise<Response> {
              from user_feedback where user_id = $1 order by created_at asc, id asc`, [userId]),
     query('select uid, version::text, record_json, updated_at from skland_snapshots where user_id = $1 order by uid', [userId]),
     query('select profile_id, result_id, explanation, created_at from ai_schedule_explanations where user_id = $1 order by created_at', [userId]),
-    query('select id, quota_period, status, created_at from ai_schedule_usage where user_id = $1 order by created_at', [userId]),
+    query('select id, status, credit_service, points_amount::text, created_at from ai_schedule_usage where user_id = $1 order by created_at', [userId]),
   ])
 
   const safeProfiles = profiles.map((profile) => {

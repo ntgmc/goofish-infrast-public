@@ -18,11 +18,12 @@ vi.mock('../../lib/api-client', async (original) => ({ ...await original<object>
   },
 }))
 const text = copy.scheduleExplanation
+const generateLabel = copy.balance.paid_action(text.generate, '1.50')
 const paragraph = (value: string) => (_text: string, element: Element | null) => element?.tagName === 'P' && element.textContent === value
 const report: OptimizeResult = { author: 'test', title: 'test', description: '', buildingType: 243, planTimes: '', plans: [], raw_results: [],
   daily_production: { trading: { LMD: 50000 }, manufacturing: { 'Battle Record': 30 } } }
 const initial: ScheduleExplanationState = { explanation: null, pending: false, available: true, reason: null,
-  quota: { kind: 'monthly', limit: 10, remaining: 10, resets_at: '2026-11-30T16:00:00.000Z' }, provider: '测试服务商' }
+  credits: { service: 'schedule_explanation', price: '1.50', charge: '1.50', available: '5.00' }, provider: '测试服务商' }
 let state: ScheduleExplanationState
 const clients: QueryClient[] = []
 beforeEach(() => {
@@ -50,13 +51,13 @@ it('reads state without generating, then creates one answer only after an explic
   const mounted = mount()
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: text.title }))
-  const generate = await screen.findByRole('button', { name: text.generate })
+  const generate = await screen.findByRole('button', { name: generateLabel })
   expect(mocks.api.mock.calls.every((call) => call[1].method !== 'POST')).toBe(true)
   expect(screen.getByText(text.disclosure('测试服务商'))).toBeVisible()
   fireEvent.click(generate)
   expect(await screen.findByText(paragraph('第一段解读。'))).toBeVisible()
   expect(screen.getByText(paragraph('第二段解读。'))).toBeVisible()
-  expect(screen.queryByRole('button', { name: text.generate })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: generateLabel })).not.toBeInTheDocument()
   mounted.unmount()
   render(mounted.tree('u1'))
   fireEvent.click(screen.getByRole('button', { name: text.title }))
@@ -64,12 +65,27 @@ it('reads state without generating, then creates one answer only after an explic
   expect(mocks.api.mock.calls.filter((call) => call[1].method === 'POST')).toHaveLength(1)
 })
 
-it.each(['quota', 'budget', 'disabled', 'daily_limit', 'busy'] as const)('explains %s without allowing a new charge', async (reason) => {
+it('shows the point cost before sending the accepted maximum and refreshes the wallet after success', async () => {
+  const mounted = mount()
+  const walletKey = ['user', 'u1', null, 'balance']
+  mounted.client.setQueryData(walletKey, { available: '5.00' })
+  fireEvent.click(screen.getByRole('button', { name: text.title }))
+  const button = await screen.findByRole('button', { name: generateLabel })
+  expect(screen.getByText(copy.balance.cost('1.50', '5.00'))).toBeVisible()
+  fireEvent.click(button)
+  expect(await screen.findByText(paragraph('第一段解读。'))).toBeVisible()
+  expect(mocks.api).toHaveBeenCalledWith('/api/user/schedule-explanation', expect.objectContaining({ json: {
+    profile_id: 'p1', result_id: 'r1', accepted_points: '1.50',
+  } }))
+  await waitFor(() => expect(mounted.client.getQueryState(walletKey)?.isInvalidated).toBe(true))
+})
+
+it.each(['unpriced', 'budget', 'disabled', 'daily_limit', 'busy', 'balance', 'debt', 'pricing_changed'] as const)('explains %s without allowing a new charge', async (reason) => {
   state = { ...state, available: false, reason }
   mount()
   fireEvent.click(screen.getByRole('button', { name: text.title }))
   expect(await screen.findByText(text.reason[reason])).toBeVisible()
-  expect(screen.queryByRole('button', { name: text.generate })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: generateLabel })).not.toBeInTheDocument()
 })
 
 it('hides the paused avatar by request and preserves view access when the avatar is kept', async () => {
@@ -82,22 +98,22 @@ it('hides the paused avatar by request and preserves view access when the avatar
   mounted.rerender(mounted.tree('u1'))
   fireEvent.click(screen.getByRole('button', { name: text.title }))
   expect(await screen.findByText(text.reason.disabled)).toBeVisible()
-  expect(screen.queryByRole('button', { name: text.generate })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: generateLabel })).not.toBeInTheDocument()
 
   mocks.features.mockReturnValue({ ...DEFAULT_SITE_FEATURES, schedule_explanation_avatar: false, ai_schedule_explanation: true })
   mounted.rerender(mounted.tree('u1'))
-  expect(await screen.findByRole('button', { name: text.generate })).toBeVisible()
+  expect(await screen.findByRole('button', { name: generateLabel })).toBeVisible()
 })
 
 it('recovers a failed generation by reading its status without automatically resubmitting', async () => {
   mocks.api.mockImplementation(async (_url: string, options: { method?: string }) => {
-    if (options.method === 'POST') throw new Error('生成失败，未扣次数。')
+    if (options.method === 'POST') throw new Error('生成失败，未扣积分。')
     return state
   })
   mount()
   fireEvent.click(screen.getByRole('button', { name: text.title }))
-  fireEvent.click(await screen.findByRole('button', { name: text.generate }))
-  expect(await screen.findByRole('alert')).toHaveTextContent('未扣次数')
+  fireEvent.click(await screen.findByRole('button', { name: generateLabel }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('未扣积分')
   fireEvent.click(screen.getByRole('button', { name: text.retry }))
   await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
   expect(mocks.api.mock.calls.filter((call) => call[1].method === 'POST')).toHaveLength(1)
@@ -108,10 +124,10 @@ it('shows a recoverable error for an incomplete API response', async () => {
   mount()
   fireEvent.click(screen.getByRole('button', { name: text.title }))
   expect(await screen.findByRole('alert')).toHaveTextContent(text.failed)
-  expect(screen.queryByRole('button', { name: text.generate })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: generateLabel })).not.toBeInTheDocument()
   mocks.api.mockResolvedValue(state)
   fireEvent.click(screen.getByRole('button', { name: text.retry }))
-  expect(await screen.findByRole('button', { name: text.generate })).toBeVisible()
+  expect(await screen.findByRole('button', { name: generateLabel })).toBeVisible()
 })
 
 it('keeps an in-flight generation across closing and reopening without submitting again', async () => {
@@ -121,14 +137,14 @@ it('keeps an in-flight generation across closing and reopening without submittin
     ? new Promise<ScheduleExplanationState>((resolve) => { finish = resolve }) : state)
   mount()
   await user.click(screen.getByRole('button', { name: text.title }))
-  await user.click(await screen.findByRole('button', { name: text.generate }))
+  await user.click(await screen.findByRole('button', { name: generateLabel }))
   await waitFor(() => expect(finish).toBeDefined())
   await user.keyboard('{Escape}')
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   expect(screen.getByRole('button', { name: text.title })).toHaveFocus()
   await user.click(screen.getByRole('button', { name: text.title }))
   expect(screen.getByRole('status')).toHaveTextContent(text.pending)
-  expect(screen.queryByRole('button', { name: text.generate })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: generateLabel })).not.toBeInTheDocument()
   state = { ...state, available: false, explanation: { text: '收起后完成的解读', created_at: new Date().toISOString() } }
   await act(async () => finish(state))
   expect(await screen.findByText(paragraph('收起后完成的解读'))).toBeVisible()
@@ -142,7 +158,7 @@ it('renders streaming Markdown before settlement and preserves it across closing
     ? new Response(new ReadableStream({ start(controller) { producer = controller } }), { headers: { 'Content-Type': 'text/event-stream' } }) : state)
   mount()
   await user.click(screen.getByRole('button', { name: text.title }))
-  await user.click(await screen.findByRole('button', { name: text.generate }))
+  await user.click(await screen.findByRole('button', { name: generateLabel }))
   const emit = (event: unknown) => producer.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(event)}\n\n`))
   await act(async () => emit({ type: 'delta', text: '**先看库存**\n\n- 核对赤金' }))
   await waitFor(() => expect(document.querySelector('.v2-explanation-body strong')).toHaveTextContent('先看库存'))
@@ -165,7 +181,7 @@ it('recovers a disconnected stream by reading the saved result without keeping p
     ? new Response(new ReadableStream({ start(controller) { producer = controller } }), { headers: { 'Content-Type': 'text/event-stream' } }) : state)
   mount()
   fireEvent.click(screen.getByRole('button', { name: text.title }))
-  fireEvent.click(await screen.findByRole('button', { name: text.generate }))
+  fireEvent.click(await screen.findByRole('button', { name: generateLabel }))
   await waitFor(() => expect(producer).toBeDefined())
   await act(async () => producer.enqueue(new TextEncoder().encode('data: {"type":"delta","text":"未完成的片段"}\n\n')))
   await waitFor(() => expect(document.querySelector('.v2-explanation-body')).toHaveTextContent('未完成的片段'))
@@ -240,7 +256,7 @@ it('does not restore a prior account cache after switching identity during gener
     ? new Promise<ScheduleExplanationState>((resolve) => { finish = resolve }) : state)
   const mounted = mount()
   fireEvent.click(screen.getByRole('button', { name: text.title }))
-  fireEvent.click(await screen.findByRole('button', { name: text.generate }))
+  fireEvent.click(await screen.findByRole('button', { name: generateLabel }))
   await waitFor(() => expect(finish).toBeDefined())
   mounted.rerender(mounted.tree('u2'))
   mounted.client.removeQueries({ queryKey: ['user', 'u1'] })

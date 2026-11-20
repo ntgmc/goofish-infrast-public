@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { aiSettingsCopy } from '../copy/zh-CN/ai-settings'
+import { aiCreditPricesSchema, DEFAULT_AI_CREDIT_PRICES } from './ai-credits'
 const messages = aiSettingsCopy.validation
 
 export const AI_PROTOCOLS = ['openai_chat', 'openai_responses', 'anthropic_messages'] as const
@@ -24,8 +25,7 @@ export const aiSettingsSchema = z.strictObject({
   requestCap: z.number().positive().max(100),
   dailyBudget: z.number().positive().max(100000),
   monthlyBudget: z.number().positive().max(1000000),
-  trialLimit: z.number().int().min(0).max(100),
-  monthlyLimit: z.number().int().min(0).max(1000),
+  creditPrices: aiCreditPricesSchema.default(DEFAULT_AI_CREDIT_PRICES),
   dailyAttemptLimit: z.number().int().min(1).max(1000),
   concurrencyLimit: z.number().int().min(1).max(10),
   maxInputTokens: z.number().int().min(2048).max(128000),
@@ -36,7 +36,7 @@ export type AiSettings = z.infer<typeof aiSettingsSchema>
 export const DEFAULT_AI_SETTINGS: AiSettings = {
   provider: '', protocol: 'openai_chat', baseURL: '', model: '', inputPrice: 0, outputPrice: 0,
   cachedInputPrice: null, cacheWritePrice: null, cacheWrite1hPrice: null,
-  requestCap: 0.05, dailyBudget: 10, monthlyBudget: 200, trialLimit: 3, monthlyLimit: 10,
+  requestCap: 0.05, dailyBudget: 10, monthlyBudget: 200, creditPrices: DEFAULT_AI_CREDIT_PRICES,
   dailyAttemptLimit: 20, concurrencyLimit: 1, maxInputTokens: 8000, maxOutputTokens: 800, timeoutMs: 45000,
 }
 export interface AdminAiSettings {

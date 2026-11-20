@@ -47,7 +47,8 @@ export function v2SectionAvailable(section: V2Section, features: SiteFeatures): 
     case 'generation': case 'plans': return features.site && features.profiles
     case 'skland': return features.site && features.profiles && features.skland
     case 'inventory': return features.site && features.inventory
-    case 'commercial': case 'balance': return features.site && METERED_BILLING_AVAILABLE && features.metered_billing
+    case 'commercial': return features.site && METERED_BILLING_AVAILABLE && features.metered_billing
+    case 'balance': return features.ai_credits
     case 'announcements': return features.announcements
     case 'settings': return features.site
     case 'status': return features.service_status
