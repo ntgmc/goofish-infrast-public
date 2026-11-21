@@ -77,6 +77,23 @@ describe('published building skill ratings', () => {
     expect(pair.variants.map((variant) => variant.score)).toEqual([78, 68])
   })
 
+  it('keeps automation away from warehouse conversion and includes both manufacturing partners', () => {
+    const converters = ['char_190_clour', 'char_381_bubble']
+    const automation = new Set(['manu_prod_spd&manu[000]', 'manu_prod_spd&manu[100]', 'manu_prod_spd&power[000]', 'manu_prod_spd&power[010]', 'manu_prod_spd&power[020]'])
+    for (const combo of buildingRatingCombos) for (const variant of combo.variants) {
+      const automated = variant.members.filter((member) => member.room === 'manufacture').some((member) => {
+        const active = new Map<number, string>()
+        for (const skill of characters[member.id].skills) if (skill.elite <= member.elite) active.set(skill.slot, skill.id)
+        return [...active.values()].some((id) => automation.has(id))
+      })
+      if (automated) expect(variant.members.some((member) => converters.includes(member.id)), combo.id).toBe(false)
+    }
+    for (const id of ['char_416_zumama', 'char_4208_wintim']) {
+      expect(buildingRatingCombos.some((combo) => combo.variants.some((variant) =>
+        ['char_400_weedy', 'char_385_finlpp', id].every((operatorId) => variant.members.some((member) => member.id === operatorId && member.room === 'manufacture'))))).toBe(true)
+    }
+  })
+
   it('keeps the four required tailor variants together and preserves Peper in control as an independent use', () => {
     expect(shamare.variants.slice(0, 4).map((variant) => variant.members.map((member) => characters[member.id].name))).toEqual([
       ['巫恋', '龙舌兰', '柏喙'], ['巫恋', '龙舌兰', '卡夫卡'], ['巫恋', '龙舌兰', '折光'], ['巫恋', '龙舌兰', '明椒'],

@@ -1,6 +1,6 @@
 {
-  "version": "2026-11-20.2",
-  "evaluatedAt": "2026-11-20",
+  "version": "2026-11-22.1",
+  "evaluatedAt": "2026-11-22",
   "snapshot": {
     "game": "63c7cec73c3858d0ae913f85cc89af3cef4d744f",
     "assets": "3fc3d11079a66f30c19f919ed78c53d0fcd527db"
@@ -4464,10 +4464,10 @@
       "skills": [
         "trade_ord_closure[000]"
       ],
-      "score": 70,
+      "score": 96,
       "usage": "特别订单",
-      "reason": "锁定可露希尔特别订单，需要按订单价值与耗时评价，不能只看10%订单速度。",
-      "conditions": "特别订单收益分布需同版本实测，暂定评价。",
+      "reason": "固定获取消耗2赤金、交付1200龙门币的特别订单，额外收益随队友和无人机的订单加速一起放大，是高优先级贸易站核心。",
+      "conditions": "精二解锁；搭配高订单效率干员，保持赤金供应并及时交付。特别订单不属于违约订单，与但书的违约收益分开评价。",
       "provisional": true
     },
     {
@@ -8195,9 +8195,9 @@
     },
     {
       "id": "winter",
-      "title": "冬时与仓库转换",
+      "title": "冬时与温蒂清流",
       "room": "manufacture",
-      "usage": "通用生产",
+      "usage": "赤金",
       "variants": [
         {
           "members": [
@@ -8209,9 +8209,9 @@
               "station": "main"
             },
             {
-              "id": "char_190_clour",
+              "id": "char_400_weedy",
               "room": "manufacture",
-              "elite": 1,
+              "elite": 2,
               "level": 1,
               "station": "main"
             },
@@ -8223,10 +8223,11 @@
               "station": "main"
             }
           ],
-          "score": 83,
-          "reason": "冬时清除普通生产力但增加仓库，红云或泡泡按仓库转化；清流的设施数量型生产力可保留。",
-          "conditions": "两贸易站、三级制造站；必须核对生产力覆盖规则。",
+          "score": 91,
+          "reason": "温蒂按发电站、清流按贸易站、精一冬时按同站人数提供加成，三类数量型生产力可共存。两发电站时合计100%赤金生产力，冬时另提供15格仓库。",
+          "conditions": "两发电站、两贸易站、三级制造站，生产赤金；仓库转换类生产力会被归零，不能用红云或泡泡替代温蒂。",
           "requirements": {
+            "powerCount": 2,
             "tradingCount": 2,
             "manufactureLevel": 3
           },
@@ -8242,9 +8243,9 @@
               "station": "main"
             },
             {
-              "id": "char_381_bubble",
+              "id": "char_400_weedy",
               "room": "manufacture",
-              "elite": 1,
+              "elite": 2,
               "level": 1,
               "station": "main"
             },
@@ -8256,10 +8257,11 @@
               "station": "main"
             }
           ],
-          "score": 75,
-          "reason": "冬时清除普通生产力但增加仓库，红云或泡泡按仓库转化；清流的设施数量型生产力可保留。",
-          "conditions": "两贸易站、三级制造站；必须核对生产力覆盖规则。",
+          "score": 94,
+          "reason": "三发电站下温蒂提供45%、清流在两贸易站提供40%、精一冬时提供30%，合计115%赤金生产力；冬时仓库仍是每人5格，共15格。",
+          "conditions": "三发电站、两贸易站、三级制造站，生产赤金；不叠加普通或仓库转换类生产力。",
           "requirements": {
+            "powerCount": 3,
             "tradingCount": 2,
             "manufactureLevel": 3
           },
@@ -8275,9 +8277,9 @@
               "station": "main"
             },
             {
-              "id": "char_190_clour",
+              "id": "char_400_weedy",
               "room": "manufacture",
-              "elite": 1,
+              "elite": 2,
               "level": 1,
               "station": "main"
             },
@@ -8289,10 +8291,11 @@
               "station": "main"
             }
           ],
-          "score": 76,
-          "reason": "初始冬时每人只加5格仓库，低于强化10格；红云转化仓库并保留清流数量型赤金生产力。",
-          "conditions": "两贸易站、三级制造站、赤金配方。",
+          "score": 78,
+          "reason": "初始冬时只增加仓库，没有精一的同站人数生产力。温蒂与清流在两发电站、两贸易站下提供70%赤金生产力，冬时补15格仓库。",
+          "conditions": "两发电站、两贸易站、三级制造站，生产赤金；冬时精一可再增加30%生产力。",
           "requirements": {
+            "powerCount": 2,
             "tradingCount": 2,
             "manufactureLevel": 3
           },
@@ -8440,6 +8443,50 @@
             "tradingCount": 2,
             "manufactureLevel": 3
           },
+          "provisional": true
+        }
+      ]
+    },
+    {
+      "id": "weedy-eunectes",
+      "title": "温蒂清流与森蚺制造",
+      "room": "manufacture",
+      "usage": "赤金",
+      "variants": [
+        {
+          "members": [
+            { "id": "char_400_weedy", "room": "manufacture", "elite": 2, "level": 1, "station": "main" },
+            { "id": "char_385_finlpp", "room": "manufacture", "elite": 1, "level": 1, "station": "main" },
+            { "id": "char_416_zumama", "room": "manufacture", "elite": 2, "level": 1, "station": "main" }
+          ],
+          "score": 94,
+          "reason": "温蒂45%、清流40%、森蚺30%的设施数量型加成共存，合计115%赤金生产力；森蚺在制造站，无需占用中枢或安排Lancet-2。",
+          "conditions": "三发电站、两贸易站、三级制造站，生产赤金。",
+          "requirements": { "powerCount": 3, "tradingCount": 2, "manufactureLevel": 3 },
+          "provisional": true
+        },
+        {
+          "members": [
+            { "id": "char_400_weedy", "room": "manufacture", "elite": 2, "level": 1, "station": "main" },
+            { "id": "char_385_finlpp", "room": "manufacture", "elite": 1, "level": 1, "station": "main" },
+            { "id": "char_416_zumama", "room": "manufacture", "elite": 2, "level": 1, "station": "main" }
+          ],
+          "score": 88,
+          "reason": "两发电站下温蒂30%、清流40%、森蚺20%，合计90%赤金生产力；森蚺只在制造站提供加成。",
+          "conditions": "两发电站、两贸易站、三级制造站，生产赤金。",
+          "requirements": { "powerCount": 2, "tradingCount": 2, "manufactureLevel": 3 },
+          "provisional": true
+        },
+        {
+          "members": [
+            { "id": "char_400_weedy", "room": "manufacture", "elite": 0, "level": 1, "station": "main" },
+            { "id": "char_385_finlpp", "room": "manufacture", "elite": 1, "level": 1, "station": "main" },
+            { "id": "char_416_zumama", "room": "manufacture", "elite": 0, "level": 1, "station": "main" }
+          ],
+          "score": 78,
+          "reason": "初始温蒂每发电站10%、初始森蚺每发电站5%，两发电站加清流40%，合计70%赤金生产力。",
+          "conditions": "两发电站、两贸易站、三级制造站，生产赤金；两名六星均无需精二即可过渡。",
+          "requirements": { "powerCount": 2, "tradingCount": 2, "manufactureLevel": 3 },
           "provisional": true
         }
       ]
