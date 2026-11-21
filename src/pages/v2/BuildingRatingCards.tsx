@@ -121,7 +121,7 @@ export function BuildingRatingDialog({ entry, initialVariant, source, roster, co
     </header>
     {combo ? <div className="v2-rating-dialog-body">
       <BuildingRatingVariantPicker combo={entry} index={variantIndex} onChange={setVariantIndex} roster={roster} />
-      <RatingVariantDetails variant={entry.variants[variantIndex]} index={!entry.partnerSlots && entry.variants.length > 1 ? variantIndex : undefined} roster={roster} config={config} />
+      <RatingVariantDetails variant={entry.variants[variantIndex]} room={entry.room} index={!entry.partnerSlots && entry.variants.length > 1 ? variantIndex : undefined} roster={roster} config={config} />
     </div> : <RatingStageDetails stages={entry.stages} member={{ id: entry.operatorId, room: entry.room, elite: entry.stage.elite, level: entry.stage.level, station: 'main' }} profileId={profileId} />}
   </SharedCardDialog>
 }

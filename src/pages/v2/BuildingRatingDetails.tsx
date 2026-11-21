@@ -4,6 +4,8 @@ import { copy } from '../../copy'
 import { ROOM_LABELS } from '../../components/result-panel/labels'
 import { buildingRatingCharacter, buildingRatingGrade, buildingRatingSkill, ratingMemberStatus, ratingVariantStatus, relatedBuildingCombos, type RatingMember, type RatingRoster, type RatingStage, type RatingVariant } from '../../lib/building-skill-ratings'
 import type { LicenseConfig } from '../../lib/types'
+import { buildingRatingFactors } from '../../lib/building-rating-factors'
+import BuildingRatingFactors from './BuildingRatingFactors'
 import { v2Path } from './navigation'
 import { Avatar } from './ScheduleBoard'
 
@@ -46,6 +48,7 @@ export function RatingStageDetails({ stages, member, profileId }: { stages: Rati
     <p><strong>{text.reason}：</strong>{assessment.reason}</p>
     {assessment.conditions && <p><strong>{text.conditions}：</strong>{assessment.conditions}</p>}
     {related.length > 0 && <p className="v2-muted">{text.independent}</p>}
+    <BuildingRatingFactors room={member.room} series={stages.map((item) => ({ id: `${item.elite}.${item.level}`, label: unlock(item.elite, item.level, buildingRatingCharacter(member.id).rarity <= 2), factors: buildingRatingFactors(member.room, item.skills).factors }))} />
     <RatingSkills ids={stage.skills} />
     {stages.length > 1 && <div><h3>{text.stages}</h3><ol className="v2-rating-stages">{stages.map((item) => <li key={`${item.elite}.${item.level}`}><span>{unlock(item.elite, item.level, buildingRatingCharacter(member.id).rarity <= 2)}</span><RatingBadge score={item.assessment.score!} /><p>{item.assessment.reason}</p></li>)}</ol></div>}
     {assessment.scenarios?.length ? <div><h3>{text.scenarios}</h3><ul className="v2-rating-scenarios">{assessment.scenarios.map((scenario) => <li key={scenario.label}><span>{scenario.label}</span><RatingBadge score={scenario.score} /><p>{scenario.reason}</p></li>)}</ul></div> : null}
@@ -53,7 +56,7 @@ export function RatingStageDetails({ stages, member, profileId }: { stages: Rati
   </div>
 }
 
-export function RatingVariantDetails({ variant, index, roster, config }: { variant: RatingVariant; index?: number; roster: RatingRoster | null; config: LicenseConfig | null }) {
+export function RatingVariantDetails({ variant, room, index, roster, config }: { variant: RatingVariant; room: string; index?: number; roster: RatingRoster | null; config: LicenseConfig | null }) {
   const match = ratingVariantStatus(variant, roster, config)
   const skillIds = variant.members.flatMap((member) => {
     const active = new Map<number, string>()
@@ -68,6 +71,7 @@ export function RatingVariantDetails({ variant, index, roster, config }: { varia
     {variant.production !== undefined && <p className="v2-rating-production">{text.production(variant.production)}{variant.capacity !== undefined && ` · ${text.capacity(variant.capacity)}`}</p>}
     <p><strong>{text.reason}：</strong>{variant.reason}</p>
     {variant.conditions && <p><strong>{text.conditions}：</strong>{variant.conditions}</p>}
+    <BuildingRatingFactors room={room} series={[{ id: 'variant', label: text.factors.combination, factors: buildingRatingFactors(room, skillIds, variant).factors }]} />
     {roster && <p className="v2-rating-state" data-state={match.state}>{match.membersOwned ? text.membersOwned : text.membersMissing} · {text.states[match.state]}</p>}
     {match.conditions.length > 0 && <ul className="v2-rating-conditions">{match.conditions.map((condition) => <li key={condition.key}>
       <span>{text.requirement[condition.key]}{typeof condition.required === 'number' && ` ${condition.required}`}</span><span data-state={condition.state}>{text.conditionStates[condition.state]}</span>

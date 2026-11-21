@@ -8,6 +8,8 @@ import { buildingRatingCharacter, buildingRatingRoster, ratingMemberStatus, rati
 import type { LicenseConfig, LicenseOperator } from '../../lib/types'
 import { BuildingSkillList } from './BuildingSkills'
 import { RatingBadge, RatingVariantDetails } from './BuildingRatingDetails'
+import { buildingRatingFactors } from '../../lib/building-rating-factors'
+import BuildingRatingFactors from './BuildingRatingFactors'
 import BuildingRatingVariantPicker from './BuildingRatingVariantPicker'
 import { Avatar } from './ScheduleBoard'
 import { v2Path } from './navigation'
@@ -68,6 +70,7 @@ function OperatorRating({ entry, operator, roster }: { entry: SingleBuildingRati
     <p>{assessment.reason}</p>
     {assessment.conditions && <p className="v2-operator-rating-condition"><strong>{text.conditions}：</strong>{assessment.conditions}</p>}
     {assessment.scenarios?.length ? <ul className="v2-rating-scenarios">{assessment.scenarios.map((scenario) => <li key={scenario.label}><span>{scenario.label}</span><RatingBadge score={scenario.score} /><p>{scenario.reason}</p></li>)}</ul> : null}
+    <BuildingRatingFactors room={entry.room} current={index} series={entry.stages.map((item) => ({ id: `${item.elite}.${item.level}`, label: unlock(item.elite, item.level, buildingRatingCharacter(entry.operatorId).rarity <= 2), factors: buildingRatingFactors(entry.room, item.skills).factors }))} />
     <BuildingSkillList skills={skills} owned={operator.own} levelBased={buildingRatingCharacter(entry.operatorId).rarity <= 2} />
   </section>
 }
@@ -83,7 +86,7 @@ function OperatorCombo({ combo, operatorId, roster, config }: { combo: RatingCom
     <summary><span className="v2-operator-combo-heading"><strong>{combo.title}</strong><span>{ROOM_LABELS[combo.room]} · {combo.usage}</span><span className="v2-rating-state" data-state={states[index].state}>{states[index].membersOwned ? text.membersOwned : text.membersMissing} · {text.states[states[index].state]}</span><span className="v2-operator-combo-portraits">{members.slice(0, 4).map((member) => <Avatar key={member.id} operator={{ id: member.id, name: buildingRatingCharacter(member.id).name }} small />)}{members.length > 4 && <span>+{members.length - 4}</span>}</span></span><RatingBadge score={variant.score} /></summary>
     <div className="v2-operator-combo-body">
       <BuildingRatingVariantPicker combo={combo} index={index} onChange={setIndex} roster={roster} />
-      <RatingVariantDetails variant={variant} roster={roster} config={config} />
+      <RatingVariantDetails variant={variant} room={combo.room} roster={roster} config={config} />
     </div>
   </details>
 }
