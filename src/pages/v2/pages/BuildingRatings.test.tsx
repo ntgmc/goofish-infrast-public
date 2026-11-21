@@ -126,6 +126,26 @@ it('keeps every loaded result and restores focus when opening the last card and 
   }
 })
 
+it('selects warehouse partners by recipe and training without duplicating a member', async () => {
+  const user = userEvent.setup()
+  render(<MemoryRouter initialEntries={['/v2?section=building-ratings&kind=combo&q=红云']}><BuildingRatings session={session} /></MemoryRouter>)
+  await user.click(screen.getByRole('button', { name: '查看红云仓库组的评级详情' }))
+  expect(screen.getByText('固定核心：')).toHaveTextContent('红云')
+  await user.selectOptions(screen.getByRole('combobox', { name: '生产配方' }), 'gold')
+  await user.selectOptions(screen.getByRole('combobox', { name: '搭档 1' }), 'char_500_noirc:0:1')
+  await user.selectOptions(screen.getByRole('combobox', { name: '搭档 2' }), 'char_150_snakek:0:1')
+  expect(screen.getByText('干员生产力 +76% · 仓库 +28 格')).toBeInTheDocument()
+  expect(within(screen.getByRole('combobox', { name: '搭档 2' })).getByRole('option', { name: /黑角/ })).toBeDisabled()
+  await user.selectOptions(screen.getByRole('combobox', { name: '搭档 2' }), '')
+  expect(screen.getByText('干员生产力 +46% · 仓库 +18 格')).toBeInTheDocument()
+  expect(screen.getByRole('dialog').querySelectorAll('.v2-rating-member')).toHaveLength(2)
+  await user.selectOptions(screen.getByRole('combobox', { name: '生产配方' }), 'exp')
+  await user.selectOptions(screen.getByRole('combobox', { name: '搭档 1' }), 'char_328_cammou:1:1')
+  await user.selectOptions(screen.getByRole('combobox', { name: '搭档 2' }), 'char_336_folivo:2:1')
+  expect(screen.getByText('干员生产力 +91.25% · 仓库 +35 格')).toBeInTheDocument()
+  expect(screen.getByRole('dialog').querySelectorAll('.v2-rating-member')).toHaveLength(3)
+})
+
 it('opens the matching variant and releases the modal before another card is opened', async () => {
   const user = userEvent.setup()
   render(<MemoryRouter initialEntries={['/v2?section=building-ratings&kind=combo&q=巫恋&grade=SSS&owned=ready']}><BuildingRatings session={session} /></MemoryRouter>)

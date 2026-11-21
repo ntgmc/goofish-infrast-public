@@ -51,6 +51,24 @@ it('uses the full roster for combo readiness while restricting every variant to 
   }
 })
 
+it('keeps the inspected warehouse partner in the team while changing their companion', async () => {
+  const user = userEvent.setup()
+  const snake: LicenseOperator = { id: 'char_150_snakek', name: '蛇屠箱', own: true, elite: 0, level: 1, rarity: 4 }
+  render(<MemoryRouter><OperatorSkillDetails operator={snake} operators={[snake]} config={SAMPLE_CONFIG} /></MemoryRouter>)
+  await user.click(screen.getByRole('tab', { name: copy.buildingRatings.combo }))
+  const combo = screen.getByText('红云仓库组').closest('details')!
+  await user.click(within(combo).getByText('红云仓库组'))
+  expect(within(combo).getByText('固定核心：')).toHaveTextContent('红云')
+  const selectors = within(combo).getAllByRole('combobox', { name: /搭档/ })
+  for (const selector of selectors) {
+    const noir = within(selector).queryByRole('option', { name: /黑角/ })
+    if (noir && !noir.hasAttribute('disabled')) { await user.selectOptions(selector, noir); break }
+  }
+  expect(within(combo).getByText('干员生产力 +76% · 仓库 +28 格')).toBeInTheDocument()
+  expect(combo.querySelectorAll('.v2-rating-member')).toHaveLength(3)
+  expect(within(combo).getAllByText('蛇屠箱').length).toBeGreaterThan(0)
+})
+
 it('does not label an unowned operator’s skills as unlocked and keeps missing level distinct from locked', async () => {
   const user = userEvent.setup()
   const missing = { ...provs, own: false, elite: 2 }

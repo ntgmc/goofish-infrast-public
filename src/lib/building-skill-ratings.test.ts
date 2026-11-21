@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import catalog from '../data/building-skills.json'
 import published from '../data/building-skill-ratings.json'
+import warehousePartners from '../data/building-rating-warehouse-partners.json'
 import { canonicalJson } from './crypto'
 import { CONFIG_PRESETS } from './config'
 import { buildingRatingCombos, buildingRatingRoster, buildingRatingTrainingCost, ratingMemberStatus, ratingVariantStatus, singleBuildingRatings, type RatingMember } from './building-skill-ratings'
@@ -100,6 +101,45 @@ describe('published building skill ratings', () => {
     ])
     expect(singleBuildingRatings.some((entry) => entry.name === '明椒' && entry.room === 'control')).toBe(true)
     expect(singleBuildingRatings.some((entry) => entry.name === '巫恋' && entry.room === 'trading')).toBe(false)
+  })
+})
+
+describe('warehouse partner combinations', () => {
+  const variant = (comboId: string, recipe: 'gold' | 'exp', members: [string, number][]) => buildingRatingCombos.find((combo) => combo.id === comboId)!.variants.find((item) => item.recipe === recipe && item.members.filter((member) => member.room === 'manufacture').length === members.length + 1 && members.every(([id, elite]) => item.members.some((member) => member.id === id && member.elite === elite)))!
+
+  it.each([
+    ['redcloud', 'gold', [['char_500_noirc', 0], ['char_150_snakek', 0]], 76, 28],
+    ['redcloud', 'exp', [['char_336_folivo', 2], ['char_452_bstalk', 1]], 92.25, 28],
+    ['redcloud', 'gold', [['char_336_folivo', 2], ['char_452_bstalk', 1]], 68.25, 16],
+    ['redcloud', 'gold', [['char_4171_wulfen', 2]], 52, 16],
+    ['redcloud', 'gold', [['char_1047_halo2', 2], ['char_128_plosis', 2]], 86, 18],
+    ['redcloud', 'gold', [['char_1047_halo2', 2], ['char_4048_doroth', 2]], 96, 18],
+    ['redcloud', 'exp', [['char_4198_christ', 2], ['char_1042_phatm2', 2]], 101, 18],
+    ['bubble', 'gold', [['char_163_hpsts', 2], ['char_369_bena', 0]], 93, 46],
+    ['bubble', 'gold', [['char_163_hpsts', 0], ['char_369_bena', 0]], 52, 43],
+    ['bubble', 'gold', [['char_378_asbest', 2]], 39, 14],
+  ] as [string, 'gold' | 'exp', [string, number][], number, number][])('evaluates %s %s with %j using net capacity, per-member thresholds and active recipe', (comboId, recipe, members, production, capacity) => {
+    expect(variant(comboId, recipe, members)).toMatchObject({ production, capacity, requirements: { manufactureLevel: members.length + 1 } })
+  })
+
+  it('includes every compatible warehouse provider without repeating a member or losing their minimum unlock', () => {
+    const redcloud = buildingRatingCombos.find((combo) => combo.id === 'redcloud')!
+    const represented = new Set(redcloud.variants.flatMap((item) => item.members.map((member) => member.id)))
+    for (const partner of warehousePartners) expect(represented.has(partner.id), partner.id).toBe(true)
+    for (const [id, operator] of Object.entries(catalog.operators)) {
+      if (['char_381_bubble', 'char_4208_wintim'].includes(id)) continue
+      if (operator.skills.some((skill) => /仓库(?:容量)?(?:上限)?\+/.test(catalog.skills[skill.id as keyof typeof catalog.skills].description))) expect(represented.has(id), operator.name).toBe(true)
+    }
+  })
+
+  it('requires real external support and keeps live mood and dormitory conditions unknown', () => {
+    for (const members of [[['char_4126_fuze', 2]], [['char_4062_totter', 1]], [['char_4138_narant', 2]]] as [string, number][][]) {
+      const item = variant('redcloud', 'gold', members)
+      expect(item).toBeDefined()
+      const match = ratingVariantStatus(item, buildingRatingRoster(item.members.map((member) => owned(member))), config)
+      if (members[0][0] === 'char_4126_fuze') expect(item.members.filter((member) => member.room === 'control')).toHaveLength(5)
+      else expect(match.state).toBe('unknown')
+    }
   })
 })
 

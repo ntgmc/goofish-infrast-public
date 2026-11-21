@@ -65,6 +65,7 @@ export function RatingVariantDetails({ variant, index, roster, config }: { varia
   return <section className="v2-rating-variant" aria-label={index === undefined ? undefined : text.variant(index)}>
     {index !== undefined && <header><h3>{text.variant(index)}</h3><RatingBadge score={variant.score} />{variant.provisional && <span className="v2-rating-provisional">{text.provisional}</span>}</header>}
     <div className="v2-rating-members">{variant.members.map((member) => <RatingMemberView member={member} roster={roster} key={member.id} />)}</div>
+    {variant.production !== undefined && <p className="v2-rating-production">{text.production(variant.production)} · {text.capacity(variant.capacity!)}</p>}
     <p><strong>{text.reason}：</strong>{variant.reason}</p>
     {variant.conditions && <p><strong>{text.conditions}：</strong>{variant.conditions}</p>}
     {roster && <p className="v2-rating-state" data-state={match.state}>{match.membersOwned ? text.membersOwned : text.membersMissing} · {text.states[match.state]}</p>}

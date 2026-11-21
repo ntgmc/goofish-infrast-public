@@ -1,5 +1,5 @@
 {
-  "version": "2026-11-22.1",
+  "version": "2026-11-22.2",
   "evaluatedAt": "2026-11-22",
   "snapshot": {
     "game": "63c7cec73c3858d0ae913f85cc89af3cef4d744f",
@@ -7957,241 +7957,19 @@
       "id": "redcloud",
       "title": "红云仓库组",
       "room": "manufacture",
-      "usage": "通用生产",
-      "variants": [
-        {
-          "members": [
-            {
-              "id": "char_190_clour",
-              "room": "manufacture",
-              "elite": 1,
-              "level": 1,
-              "station": "main"
-            },
-            {
-              "id": "char_336_folivo",
-              "room": "manufacture",
-              "elite": 2,
-              "level": 1,
-              "station": "main"
-            },
-            {
-              "id": "char_452_bstalk",
-              "room": "manufacture",
-              "elite": 1,
-              "level": 1,
-              "station": "main"
-            }
-          ],
-          "score": 84,
-          "reason": "红云把全站增加的仓库容量转成生产力，队友的普通生产力和净容量一起保留。",
-          "conditions": "三级制造站；不与泡泡同时使用。",
-          "requirements": {
-            "manufactureLevel": 3
-          },
-          "provisional": true
-        },
-        {
-          "members": [
-            {
-              "id": "char_190_clour",
-              "room": "manufacture",
-              "elite": 1,
-              "level": 1,
-              "station": "main"
-            },
-            {
-              "id": "char_336_folivo",
-              "room": "manufacture",
-              "elite": 2,
-              "level": 1,
-              "station": "main"
-            },
-            {
-              "id": "char_2013_cerber",
-              "room": "manufacture",
-              "elite": 2,
-              "level": 1,
-              "station": "main"
-            }
-          ],
-          "score": 87,
-          "reason": "红云把全站增加的仓库容量转成生产力，队友的普通生产力和净容量一起保留。",
-          "conditions": "三级制造站；不与泡泡同时使用。",
-          "requirements": {
-            "manufactureLevel": 3
-          },
-          "provisional": true
-        },
-        {
-          "members": [
-            {
-              "id": "char_190_clour",
-              "room": "manufacture",
-              "elite": 1,
-              "level": 1,
-              "station": "main"
-            },
-            {
-              "id": "char_336_folivo",
-              "room": "manufacture",
-              "elite": 2,
-              "level": 1,
-              "station": "main"
-            },
-            {
-              "id": "char_4171_wulfen",
-              "room": "manufacture",
-              "elite": 2,
-              "level": 1,
-              "station": "main"
-            }
-          ],
-          "score": 82,
-          "reason": "红云把全站增加的仓库容量转成生产力，队友的普通生产力和净容量一起保留。",
-          "conditions": "三级制造站；不与泡泡同时使用。",
-          "requirements": {
-            "manufactureLevel": 3
-          },
-          "provisional": true
-        },
-        {
-          "members": [
-            {
-              "id": "char_190_clour",
-              "room": "manufacture",
-              "elite": 1,
-              "level": 1,
-              "station": "main"
-            },
-            {
-              "id": "char_1047_halo2",
-              "room": "manufacture",
-              "elite": 2,
-              "level": 1,
-              "station": "main"
-            },
-            {
-              "id": "char_108_silent",
-              "room": "manufacture",
-              "elite": 2,
-              "level": 1,
-              "station": "main"
-            }
-          ],
-          "score": 90,
-          "reason": "红云把全站增加的仓库容量转成生产力，队友的普通生产力和净容量一起保留。",
-          "conditions": "三级制造站；不与泡泡同时使用。",
-          "requirements": {
-            "manufactureLevel": 3
-          },
-          "provisional": true
-        }
-      ]
+      "usage": "仓库联动",
+      "core": ["char_190_clour"],
+      "partnerSlots": 2,
+      "variants": []
     },
     {
       "id": "bubble",
       "title": "泡泡大仓库组",
       "room": "manufacture",
-      "usage": "通用生产",
-      "variants": [
-        {
-          "members": [
-            {
-              "id": "char_381_bubble",
-              "room": "manufacture",
-              "elite": 1,
-              "level": 1,
-              "station": "main"
-            },
-            {
-              "id": "char_163_hpsts",
-              "room": "manufacture",
-              "elite": 2,
-              "level": 1,
-              "station": "main"
-            },
-            {
-              "id": "char_369_bena",
-              "room": "manufacture",
-              "elite": 0,
-              "level": 1,
-              "station": "main"
-            }
-          ],
-          "score": 85,
-          "reason": "火神精二增加19格仓库跨过16格阈值，泡泡按高倍率转换，第三人补仓库及生产力。",
-          "conditions": "三级制造站，火神精二是关键；火神精零16格不能享受同样倍率。",
-          "requirements": {
-            "manufactureLevel": 3
-          },
-          "provisional": true
-        },
-        {
-          "members": [
-            {
-              "id": "char_381_bubble",
-              "room": "manufacture",
-              "elite": 1,
-              "level": 1,
-              "station": "main"
-            },
-            {
-              "id": "char_163_hpsts",
-              "room": "manufacture",
-              "elite": 2,
-              "level": 1,
-              "station": "main"
-            },
-            {
-              "id": "char_378_asbest",
-              "room": "manufacture",
-              "elite": 2,
-              "level": 1,
-              "station": "main"
-            }
-          ],
-          "score": 88,
-          "reason": "火神精二增加19格仓库跨过16格阈值，泡泡按高倍率转换，第三人补仓库及生产力。",
-          "conditions": "三级制造站，火神精二是关键；火神精零16格不能享受同样倍率。",
-          "requirements": {
-            "manufactureLevel": 3
-          },
-          "provisional": true
-        },
-        {
-          "members": [
-            {
-              "id": "char_381_bubble",
-              "room": "manufacture",
-              "elite": 1,
-              "level": 1,
-              "station": "main"
-            },
-            {
-              "id": "char_163_hpsts",
-              "room": "manufacture",
-              "elite": 2,
-              "level": 1,
-              "station": "main"
-            },
-            {
-              "id": "char_4171_wulfen",
-              "room": "manufacture",
-              "elite": 2,
-              "level": 1,
-              "station": "main"
-            }
-          ],
-          "score": 90,
-          "reason": "火神精二增加19格仓库跨过16格阈值，泡泡按高倍率转换，第三人补仓库及生产力。",
-          "conditions": "三级制造站，火神精二是关键；火神精零16格不能享受同样倍率。",
-          "requirements": {
-            "manufactureLevel": 3
-          },
-          "provisional": true
-        }
-      ]
+      "usage": "仓库联动",
+      "core": ["char_381_bubble"],
+      "partnerSlots": 2,
+      "variants": []
     },
     {
       "id": "winter",

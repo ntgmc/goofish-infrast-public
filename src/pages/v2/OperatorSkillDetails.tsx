@@ -8,6 +8,7 @@ import { buildingRatingCharacter, buildingRatingRoster, ratingMemberStatus, rati
 import type { LicenseConfig, LicenseOperator } from '../../lib/types'
 import { BuildingSkillList } from './BuildingSkills'
 import { RatingBadge, RatingVariantDetails } from './BuildingRatingDetails'
+import BuildingRatingVariantPicker from './BuildingRatingVariantPicker'
 import { Avatar } from './ScheduleBoard'
 import { v2Path } from './navigation'
 import './building-ratings.css'
@@ -81,9 +82,7 @@ function OperatorCombo({ combo, operatorId, roster, config }: { combo: RatingCom
   return <details className="v2-operator-combo">
     <summary><span className="v2-operator-combo-heading"><strong>{combo.title}</strong><span>{ROOM_LABELS[combo.room]} · {combo.usage}</span><span className="v2-rating-state" data-state={states[index].state}>{states[index].membersOwned ? text.membersOwned : text.membersMissing} · {text.states[states[index].state]}</span><span className="v2-operator-combo-portraits">{members.slice(0, 4).map((member) => <Avatar key={member.id} operator={{ id: member.id, name: buildingRatingCharacter(member.id).name }} small />)}{members.length > 4 && <span>+{members.length - 4}</span>}</span></span><RatingBadge score={variant.score} /></summary>
     <div className="v2-operator-combo-body">
-      {combo.variants.length > 1 && <label className="v2-field v2-rating-variant-picker"><span>{text.chooseVariant}</span><select className="v2-input" value={index} onChange={(event) => setIndex(Number(event.target.value))}>
-        {combo.variants.map((item, itemIndex) => <option key={itemIndex} value={itemIndex}>{text.variantOption(itemIndex, item.score, item.members.filter((member) => member.room === combo.room).map((member) => buildingRatingCharacter(member.id).name).join(' / '))}</option>)}
-      </select></label>}
+      <BuildingRatingVariantPicker combo={combo} index={index} onChange={setIndex} roster={roster} />
       <RatingVariantDetails variant={variant} roster={roster} config={config} />
     </div>
   </details>
