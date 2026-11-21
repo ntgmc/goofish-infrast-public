@@ -96,6 +96,22 @@ describe('published building skill ratings', () => {
     }
   })
 
+  it('values workshop coverage above reduced mood costs and one-recipe peak bonuses', () => {
+    const processing = singleBuildingRatings.filter((entry) => entry.room === 'processing')
+    const nian = processing.find((entry) => entry.name === '年')!.stage.assessment.score!
+    const general = processing.find((entry) => entry.name === '苏苏洛')!.stage.assessment.score!
+    expect(nian).toBeGreaterThanOrEqual(95)
+    expect(nian).toBeGreaterThan(general)
+    const targeted = new Set(Object.keys(catalog.skills).filter((id) => id.startsWith('workshop_formula_device[')))
+    const restricted = processing.filter((entry) => entry.stage.skills.some((id) => targeted.has(id)))
+    expect(restricted.map((entry) => entry.name)).toContain('号角')
+    for (const entry of restricted) expect(entry.stage.assessment.score!, entry.name).toBeLessThan(general)
+    for (const name of ['休谟斯', '罗小黑']) expect(processing.find((entry) => entry.name === name)!.stage.assessment.score!, name).toBeLessThan(general)
+    const horn = processing.find((entry) => entry.name === '号角')!
+    expect(horn.stage.assessment.reason).toContain('仅限炽合金块')
+    expect(horn.stage.skills).toEqual(expect.arrayContaining(['workshop_formula_cost3[112]', 'workshop_formula_device[111]']))
+  })
+
   it('keeps automation away from warehouse conversion and includes both manufacturing partners', () => {
     const converters = ['char_190_clour', 'char_381_bubble']
     const automation = new Set(['manu_prod_spd&manu[000]', 'manu_prod_spd&manu[100]', 'manu_prod_spd&power[000]', 'manu_prod_spd&power[010]', 'manu_prod_spd&power[020]'])

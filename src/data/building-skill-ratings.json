@@ -1,5 +1,5 @@
 {
-  "version": "2026-11-22.4",
+  "version": "2026-11-22.5",
   "evaluatedAt": "2026-11-22",
   "snapshot": {
     "game": "63c7cec73c3858d0ae913f85cc89af3cef4d744f",
@@ -2506,9 +2506,9 @@
       "skills": [
         "workshop_formula_rub[000]"
       ],
-      "score": 90,
+      "score": 82,
       "usage": "低级精英材料",
-      "reason": "原始2心情精英配方额外40%与自身50%合计90%，适合大量低级材料加工。",
+      "reason": "原始2心情精英配方额外40%与自身50%合计90%，适合大量低级材料；其余配方仍只有50%，日常覆盖受限。",
       "conditions": "",
       "provisional": false
     },
@@ -2616,9 +2616,9 @@
       "skills": [
         "workshop_formula_device[060]"
       ],
-      "score": 80,
+      "score": 72,
       "usage": "定向材料",
-      "reason": "指定材料的高副产品率，适合该材料需求集中时使用；覆盖范围小于通用加工技能。",
+      "reason": "酮凝集类配方副产品加成80%，适合集中加工该类材料；日常评分计入其余精英配方无加成的限制。",
       "conditions": "仅限技能描述指定材料。",
       "provisional": false
     },
@@ -2646,9 +2646,9 @@
       "skills": [
         "workshop_formula_device[000]"
       ],
-      "score": 85,
+      "score": 80,
       "usage": "定向材料",
-      "reason": "指定材料的高副产品率，适合该材料需求集中时使用；覆盖范围小于通用加工技能。",
+      "reason": "装置类配方副产品加成90%，适合集中加工装置；覆盖范围小于全部精英材料80%的选择。",
       "conditions": "仅限技能描述指定材料。",
       "provisional": false
     },
@@ -2756,9 +2756,9 @@
       "skills": [
         "workshop_formula_device[030]"
       ],
-      "score": 85,
+      "score": 80,
       "usage": "定向材料",
-      "reason": "指定材料的高副产品率，适合该材料需求集中时使用；覆盖范围小于通用加工技能。",
+      "reason": "聚酸酯类配方副产品加成90%，适合集中加工聚酸酯；覆盖范围小于全部精英材料80%的选择。",
       "conditions": "仅限技能描述指定材料。",
       "provisional": false
     },
@@ -2906,9 +2906,9 @@
       "skills": [
         "workshop_formula_device[070]"
       ],
-      "score": 80,
+      "score": 72,
       "usage": "定向材料",
-      "reason": "指定材料的高副产品率，适合该材料需求集中时使用；覆盖范围小于通用加工技能。",
+      "reason": "晶体类配方副产品加成80%，适合集中加工晶体；日常评分计入其余精英配方无加成的限制。",
       "conditions": "仅限技能描述指定材料。",
       "provisional": false
     },
@@ -3086,9 +3086,9 @@
       "skills": [
         "workshop_formula_device[021]"
       ],
-      "score": 85,
+      "score": 75,
       "usage": "定向材料",
-      "reason": "指定材料的高副产品率，适合该材料需求集中时使用；覆盖范围小于通用加工技能。",
+      "reason": "90%副产品加成只限异铁组这一配方，适合集中需求；材料覆盖比整个异铁系列更窄。",
       "conditions": "仅限技能描述指定材料。",
       "provisional": false
     },
@@ -3163,9 +3163,9 @@
       "skills": [
         "workshop_formula_device[020]"
       ],
-      "score": 85,
+      "score": 80,
       "usage": "定向材料",
-      "reason": "指定材料的高副产品率，适合该材料需求集中时使用；覆盖范围小于通用加工技能。",
+      "reason": "异铁类配方副产品加成90%，适合集中加工异铁；覆盖范围小于全部精英材料80%的选择。",
       "conditions": "仅限技能描述指定材料。",
       "provisional": false
     },
@@ -3543,9 +3543,9 @@
       "skills": [
         "workshop_formula_device[080]"
       ],
-      "score": 85,
+      "score": 77,
       "usage": "定向材料",
-      "reason": "指定材料的高副产品率，适合该材料需求集中时使用；覆盖范围小于通用加工技能。",
+      "reason": "90%副产品加成仅限手性屈光体、重相位对映体两种配方；集中加工实用，日常覆盖较窄。",
       "conditions": "仅限技能描述指定材料。",
       "provisional": false
     },
@@ -3720,9 +3720,9 @@
       "skills": [
         "workshop_formula_device[050]"
       ],
-      "score": 85,
+      "score": 80,
       "usage": "定向材料",
-      "reason": "指定材料的高副产品率，适合该材料需求集中时使用；覆盖范围小于通用加工技能。",
+      "reason": "源岩类配方副产品加成90%，适合集中加工源岩；覆盖范围小于全部精英材料80%的选择。",
       "conditions": "仅限技能描述指定材料。",
       "provisional": false
     },
@@ -4007,9 +4007,9 @@
       "skills": [
         "workshop_formula_device[111]"
       ],
-      "score": 90,
+      "score": 78,
       "usage": "定向材料",
-      "reason": "指定材料的高副产品率，适合该材料需求集中时使用；覆盖范围小于通用加工技能。",
+      "reason": "100%副产品加成仅限炽合金块这一配方；集中需求时高效，日常评级计入其余材料无加成的限制。",
       "conditions": "仅限技能描述指定材料。",
       "provisional": false
     },
@@ -6445,9 +6445,9 @@
         "workshop_formula_lolxh[000]",
         "workshop_proc_cost[000]"
       ],
-      "score": 72,
+      "score": 60,
       "usage": "高心情配方",
-      "reason": "原始8心情配方得到50%副产品率和显著减耗，批量处理更方便；低消耗配方不享有同等收益。",
+      "reason": "原始8心情配方得到50%副产品加成，减耗便于批量处理；日常材料收益与覆盖均有限，便利性不抵消低副产品率。",
       "conditions": "只影响符合描述的配方，和副产品技能一起生效时合并评价。",
       "provisional": false
     },
@@ -6456,9 +6456,9 @@
         "workshop_formula_rub[000]",
         "workshop_proc_probability[013]"
       ],
-      "score": 90,
+      "score": 82,
       "usage": "低级精英材料",
-      "reason": "原始2心情精英配方的副产品加成合计90%，其他配方只有50%。",
+      "reason": "原始2心情精英配方副产品加成90%，适合集中加工低级材料；其他配方仅50%，按日常覆盖保留折减。",
       "conditions": "加成作用于基础副产品概率；不是直接获得相同比例的材料。",
       "provisional": false,
       "scenarios": [
@@ -6536,10 +6536,10 @@
         "workshop_formula_cost3[101]",
         "workshop_formula_device[060]"
       ],
-      "score": 82,
+      "score": 74,
       "usage": "酮凝集材料",
-      "reason": "酮凝集副产品率80%兼有部分精英配方减耗，需按配方确认减耗。",
-      "conditions": "只影响符合描述的配方，和副产品技能一起生效时合并评价。；仅限技能描述指定材料。",
+      "reason": "酮凝集类副产品加成80%，部分精英配方减耗只增加批量便利，日常评级仍计入材料覆盖限制。",
+      "conditions": "副产品加成仅限酮凝集类；原始消耗2心情的精英配方减1心情。",
       "provisional": false
     },
     {
@@ -6558,10 +6558,10 @@
         "workshop_formula_cost3[110]",
         "workshop_formula_device[000]"
       ],
-      "score": 87,
+      "score": 82,
       "usage": "装置材料",
-      "reason": "装置90%副产品率与精英材料减耗同人兼有，按具体配方使用。",
-      "conditions": "只影响符合描述的配方，和副产品技能一起生效时合并评价。；仅限技能描述指定材料。",
+      "reason": "装置类副产品加成90%，精英材料减耗便于分批加工；其他材料没有副产品加成，日常评分保留覆盖折减。",
+      "conditions": "副产品加成仅限装置类；原始消耗4心情的精英配方减1心情。",
       "provisional": false
     },
     {
@@ -6686,10 +6686,10 @@
         "workshop_formula_cost3[110]",
         "workshop_formula_device[030]"
       ],
-      "score": 87,
+      "score": 82,
       "usage": "聚酸酯材料",
-      "reason": "聚酸酯90%副产品率兼有精英配方减耗，按对应配方评价。",
-      "conditions": "只影响符合描述的配方，和副产品技能一起生效时合并评价。；仅限技能描述指定材料。",
+      "reason": "聚酸酯类副产品加成90%，精英材料减耗便于分批加工；其他材料没有副产品加成，日常评分保留覆盖折减。",
+      "conditions": "副产品加成仅限聚酸酯类；原始消耗4心情的精英配方减1心情。",
       "provisional": false
     },
     {
@@ -6785,10 +6785,10 @@
         "workshop_formula_cost5[000]",
         "workshop_formula_device[070]"
       ],
-      "score": 84,
+      "score": 76,
       "usage": "晶体材料",
-      "reason": "晶体80%副产品率配合心情减耗，适合连续加工晶体。",
-      "conditions": "只影响符合描述的配方，和副产品技能一起生效时合并评价。；仅限技能描述指定材料。",
+      "reason": "晶体类副产品加成80%兼有减耗，适合集中加工晶体；减耗便利不抵消配方覆盖限制。",
+      "conditions": "副产品加成与减耗仅限晶体类配方。",
       "provisional": false
     },
     {
@@ -6847,10 +6847,10 @@
         "workshop_formula_cost5[100]",
         "workshop_formula_device[021]"
       ],
-      "score": 89,
+      "score": 78,
       "usage": "异铁组材料",
-      "reason": "异铁组90%副产品率兼有对应低消耗配方减耗，材料与心情利用均优秀。",
-      "conditions": "只影响符合描述的配方，和副产品技能一起生效时合并评价。；仅限技能描述指定材料。",
+      "reason": "异铁组这一配方副产品加成90%兼有减耗，适合集中需求；单配方覆盖较窄，日常评分低于整个材料系列。",
+      "conditions": "副产品加成仅限异铁组；减耗按技能规定的原始心情消耗条件生效。",
       "provisional": false
     },
     {
@@ -6913,10 +6913,10 @@
         "workshop_formula_cost3[111]",
         "workshop_formula_device[020]"
       ],
-      "score": 87,
+      "score": 82,
       "usage": "异铁材料",
-      "reason": "异铁90%副产品率兼有精英材料减耗，按具体配方确认适用。",
-      "conditions": "只影响符合描述的配方，和副产品技能一起生效时合并评价。；仅限技能描述指定材料。",
+      "reason": "异铁类副产品加成90%兼有精英配方减耗；减耗便利只小幅加分，其他材料没有副产品加成。",
+      "conditions": "副产品加成仅限异铁类；原始消耗4心情的精英配方减1心情。",
       "provisional": false
     },
     {
@@ -7298,10 +7298,10 @@
         "workshop_formula_cost[010]",
         "workshop_formula_probability[160]"
       ],
-      "score": 93,
+      "score": 95,
       "usage": "精英材料",
-      "reason": "100%副产品率突出，但每配方额外消耗2心情，需频繁恢复或分批加工。",
-      "conditions": "加成作用于基础副产品概率；不是直接获得相同比例的材料。",
+      "reason": "全部精英材料配方均获100%副产品加成，覆盖广、材料收益高；额外2心情需要恢复或分批加工，主要影响操作便利。",
+      "conditions": "副产品加成作用于基础概率；每次精英材料加工额外消耗2心情。",
       "provisional": false
     },
     {
@@ -7309,10 +7309,10 @@
         "workshop_formula_cost4[000]",
         "workshop_formula_device[050]"
       ],
-      "score": 91,
+      "score": 84,
       "usage": "源岩材料",
-      "reason": "源岩90%副产品率配合精英材料恒定2心情，高阶源岩连续加工优秀。",
-      "conditions": "仅限技能描述指定材料。",
+      "reason": "源岩类副产品加成90%，精英材料恒定2心情便于高阶批量加工；日常评级仍计入副产品只覆盖源岩的限制。",
+      "conditions": "90%副产品加成仅限源岩类；其他精英材料仅享恒定2心情。",
       "provisional": false
     },
     {
@@ -7320,10 +7320,10 @@
         "workshop_formula_cost3[112]",
         "workshop_formula_device[111]"
       ],
-      "score": 96,
+      "score": 80,
       "usage": "炽合金块",
-      "reason": "指定炽合金块副产品加成100%，兼有部分精英材料减耗，限于对应配方。",
-      "conditions": "只影响符合描述的配方，和副产品技能一起生效时合并评价。；仅限技能描述指定材料。",
+      "reason": "100%副产品加成仅限炽合金块，集中加工时高效；4心情精英配方减耗只改善批量便利，不能抵消单配方覆盖限制。",
+      "conditions": "副产品加成仅限炽合金块；原始消耗4心情的精英配方减1心情。",
       "provisional": false
     },
     {

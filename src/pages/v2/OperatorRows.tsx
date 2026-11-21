@@ -171,7 +171,9 @@ function OperatorReturn({ returning: { operator, from, to, scrollTop }, operator
 function OperatorDetails({ operator, operators, config, decorative = false }: { operator: LicenseOperator; operators: LicenseOperator[]; config: LicenseConfig | null; decorative?: boolean }) {
   const reduced = useAppReducedMotion()
   const title = <motion.h2 layoutId={reduced ? undefined : `name-${operator.id}`} transition={motionTokens.morph}>{operator.name}</motion.h2>
-  const description = operator.own === false ? copy.v2.notOwnedLabel : <>{copy.v2.elite(operator.elite)} · {copy.v2.operatorLevel(typeof operator.level === 'number' || typeof operator.level === 'string' ? operator.level : undefined)}</>
+  const description = operator.own === false ? copy.v2.notOwnedLabel : operator.rarity <= 2
+    ? copy.v2.operatorLevel(typeof operator.level === 'number' || typeof operator.level === 'string' ? operator.level : undefined)
+    : copy.v2.elite(operator.elite)
   return <>
     <header>
       <motion.span className="v2-operator-portrait" layoutId={reduced ? undefined : `portrait-${operator.id}`} transition={motionTokens.morph}><Avatar operator={operator} /></motion.span>
