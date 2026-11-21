@@ -33,7 +33,7 @@ export function buildingRatingGrade(score: number): BuildingRatingGrade {
 }
 
 export function buildingRatingCharacter(id: string) {
-  return characters[id]
+  return { ...characters[id], rarity: rarities[id] }
 }
 
 export function buildingRatingSkill(id: string) {

@@ -1,5 +1,5 @@
 {
-  "version": "2026-11-22.3",
+  "version": "2026-11-22.4",
   "evaluatedAt": "2026-11-22",
   "snapshot": {
     "game": "63c7cec73c3858d0ae913f85cc89af3cef4d744f",
@@ -2596,9 +2596,9 @@
       "skills": [
         "hire_spd_cost[200]"
       ],
-      "score": 76,
+      "score": 86,
       "usage": "公开招募",
-      "reason": "联络速度与心情续航共同评价；额外消耗会缩短有效工作时长，减耗有利于长期值班。",
+      "reason": "45%联络速度属于高效主力，按8小时换班使用，额外心情消耗只小幅影响续航便利。",
       "conditions": "",
       "provisional": false
     },
@@ -2696,30 +2696,30 @@
       "skills": [
         "meet_spd&cost_condChar[001]"
       ],
-      "score": 15,
+      "score": 10,
       "usage": "独处线索",
-      "reason": "要求单人在会客室工作且消耗较高，需和双人正常值班比较，不能只看个人速度。",
-      "conditions": "只按独处场景评价；线索必得效果需满足额外连续工作条件。",
+      "reason": "15%加速要求另一工作位空置，损失第二人的搜集贡献，整间会客室收益很低。",
+      "conditions": "仅自身处于工作状态时生效。",
       "provisional": false
     },
     {
       "skills": [
         "meet_spd&cost_condChar[011]"
       ],
-      "score": 45,
+      "score": 25,
       "usage": "独处线索",
-      "reason": "要求单人在会客室工作且消耗较高，需和双人正常值班比较，不能只看个人速度。",
-      "conditions": "只按独处场景评价；线索必得效果需满足额外连续工作条件。",
+      "reason": "35%加速要求另一工作位空置，不能叠加第二人的技能和自身搜集贡献，按整间会客室评价。",
+      "conditions": "仅自身处于工作状态时生效。",
       "provisional": false
     },
     {
       "skills": [
         "meet_spd&condChar_mustget[100]"
       ],
-      "score": 80,
+      "score": 35,
       "usage": "定向线索",
-      "reason": "满足连续消耗门槛后可定向补线索，解决指定线索短缺；周期长、需要独处。",
-      "conditions": "不能在8小时短班中默认触发；需连续消耗超过16心情。",
+      "reason": "可定向补罗德岛线索，但全过程须让出第二个工作位，所得单条线索不足以作为高效常驻方案。",
+      "conditions": "仅自身工作，连续消耗超过16点心情后，下一次线索必定为罗德岛。",
       "provisional": false
     },
     {
@@ -2816,30 +2816,30 @@
       "skills": [
         "meet_spd&cost_condChar[020]"
       ],
-      "score": 15,
+      "score": 10,
       "usage": "独处线索",
-      "reason": "要求单人在会客室工作且消耗较高，需和双人正常值班比较，不能只看个人速度。",
-      "conditions": "只按独处场景评价；线索必得效果需满足额外连续工作条件。",
+      "reason": "15%加速要求另一工作位空置，损失第二人的搜集贡献，整间会客室收益很低。",
+      "conditions": "仅自身处于工作状态时生效。",
       "provisional": false
     },
     {
       "skills": [
         "meet_spd&cost_condChar[021]"
       ],
-      "score": 45,
+      "score": 25,
       "usage": "独处线索",
-      "reason": "要求单人在会客室工作且消耗较高，需和双人正常值班比较，不能只看个人速度。",
-      "conditions": "只按独处场景评价；线索必得效果需满足额外连续工作条件。",
+      "reason": "35%加速要求另一工作位空置，不能叠加第二人的技能和自身搜集贡献，按整间会客室评价。",
+      "conditions": "仅自身处于工作状态时生效。",
       "provisional": false
     },
     {
       "skills": [
         "meet_spd&cost_condChar[000]"
       ],
-      "score": 50,
+      "score": 40,
       "usage": "独处线索",
-      "reason": "要求单人在会客室工作且消耗较高，需和双人正常值班比较，不能只看个人速度。",
-      "conditions": "只按独处场景评价；线索必得效果需满足额外连续工作条件。",
+      "reason": "50%加速须让出第二个工作位，损失另一人的技能和自身搜集贡献；高个人百分比不等于高整站收益。",
+      "conditions": "仅自身处于工作状态时生效。",
       "provisional": false
     },
     {
@@ -2866,9 +2866,9 @@
       "skills": [
         "manu_formula_spd&cost[001]"
       ],
-      "score": 54,
+      "score": 58,
       "usage": "赤金",
-      "reason": "生产力可用，但额外心情消耗降低持续工作表现，同档无代价技能更优。",
+      "reason": "25%赤金生产力适合正常轮班，额外0.25心情消耗只小幅影响续航。",
       "conditions": "",
       "provisional": false
     },
@@ -3036,9 +3036,9 @@
       "skills": [
         "manu_prod_spd&limit&cost[100]"
       ],
-      "score": 43,
+      "score": 46,
       "usage": "通用生产",
-      "reason": "生产力可用，但额外心情消耗降低持续工作表现，同档无代价技能更优。",
+      "reason": "20%生产力适合常规补班，额外0.25心情消耗只小幅影响续航。",
       "conditions": "",
       "provisional": false
     },
@@ -3133,9 +3133,9 @@
       "skills": [
         "manu_formula_spd&limit&cost[100]"
       ],
-      "score": 82,
+      "score": 85,
       "usage": "经验",
-      "reason": "35%经验生产力突出，额外心情消耗要求及时安排轮休。",
+      "reason": "35%经验生产力属于高效主力，正常轮休下，额外0.25心情消耗只小幅影响评级。",
       "conditions": "",
       "provisional": false
     },
@@ -3213,9 +3213,9 @@
       "skills": [
         "manu_prod_spd&limit&cost[101]"
       ],
-      "score": 43,
+      "score": 46,
       "usage": "通用生产",
-      "reason": "生产力可用，但额外心情消耗降低持续工作表现，同档无代价技能更优。",
+      "reason": "20%生产力适合常规补班，额外0.25心情消耗只小幅影响续航。",
       "conditions": "",
       "provisional": false
     },
@@ -3223,9 +3223,9 @@
       "skills": [
         "manu_prod_spd&limit&cost[110]"
       ],
-      "score": 68,
+      "score": 70,
       "usage": "通用生产",
-      "reason": "30%生产力是有效补班选择，额外心情消耗使续航略逊于无代价30%干员。",
+      "reason": "30%生产力可作为制造主力，额外0.25心情消耗只小幅影响续航。",
       "conditions": "",
       "provisional": false
     },
@@ -3233,9 +3233,9 @@
       "skills": [
         "hire_spd_cost[220]"
       ],
-      "score": 48,
+      "score": 53,
       "usage": "公开招募",
-      "reason": "联络速度与心情续航共同评价；额外消耗会缩短有效工作时长，减耗有利于长期值班。",
+      "reason": "30%联络速度接近常规同效率干员，额外心情消耗只小幅影响续航。",
       "conditions": "",
       "provisional": false
     },
@@ -3243,9 +3243,9 @@
       "skills": [
         "hire_spd_cost[230]"
       ],
-      "score": 81,
+      "score": 87,
       "usage": "公开招募",
-      "reason": "联络速度与心情续航共同评价；额外消耗会缩短有效工作时长，减耗有利于长期值班。",
+      "reason": "45%联络速度属于高效主力，额外心情消耗只小幅影响续航。",
       "conditions": "",
       "provisional": false
     },
@@ -3293,9 +3293,9 @@
       "skills": [
         "manu_formula_spd&cost[000]"
       ],
-      "score": 54,
+      "score": 58,
       "usage": "赤金",
-      "reason": "生产力可用，但额外心情消耗降低持续工作表现，同档无代价技能更优。",
+      "reason": "25%赤金生产力适合正常轮班，额外0.25心情消耗只小幅影响续航。",
       "conditions": "",
       "provisional": false
     },
@@ -3483,10 +3483,10 @@
       "skills": [
         "meet_spd&cost[100]"
       ],
-      "score": 53,
+      "score": 90,
       "usage": "线索搜集",
-      "reason": "个人线索速度高，但心情消耗很大，持续值班与轮休代价明显。",
-      "conditions": "",
+      "reason": "35%线索搜集速度可与另一名干员叠加，属于高效主力；按8小时换班使用，额外心情消耗只影响续航。",
+      "conditions": "安排正常轮休，避免心情耗尽后继续工作。",
       "provisional": false
     },
     {
@@ -3513,9 +3513,9 @@
       "skills": [
         "meet_spd_condChar[000]"
       ],
-      "score": 55,
+      "score": 20,
       "usage": "独处线索",
-      "reason": "单人工作额外提高速度，节省人手但未必胜过双人总搜集；按独处需求评价。",
+      "reason": "额外35%加速以空置另一工作位为代价，须扣除第二人的搜集贡献；与自身基础15%一起评价。",
       "conditions": "",
       "provisional": false
     },
@@ -3740,10 +3740,10 @@
       "skills": [
         "meet_spd&condChar_mustget[000]"
       ],
-      "score": 80,
+      "score": 35,
       "usage": "定向线索",
-      "reason": "满足连续消耗门槛后可定向补线索，解决指定线索短缺；周期长、需要独处。",
-      "conditions": "不能在8小时短班中默认触发；需连续消耗超过16心情。",
+      "reason": "可定向补莱茵线索，但全过程须让出第二个工作位，所得单条线索不足以作为高效常驻方案。",
+      "conditions": "仅自身工作，连续消耗超过16点心情后，下一次线索必定为莱茵。",
       "provisional": false
     },
     {
@@ -3907,10 +3907,10 @@
       "skills": [
         "meet_spd&cost_condChar[002]"
       ],
-      "score": 50,
+      "score": 40,
       "usage": "独处线索",
-      "reason": "要求单人在会客室工作且消耗较高，需和双人正常值班比较，不能只看个人速度。",
-      "conditions": "只按独处场景评价；线索必得效果需满足额外连续工作条件。",
+      "reason": "50%加速须让出第二个工作位，损失另一人的技能和自身搜集贡献；高个人百分比不等于高整站收益。",
+      "conditions": "仅自身处于工作状态时生效。",
       "provisional": false
     },
     {
@@ -4484,9 +4484,9 @@
       "skills": [
         "meet_spd&cost[110]"
       ],
-      "score": 48,
+      "score": 60,
       "usage": "线索搜集",
-      "reason": "20%搜集速度附带额外消耗，比无代价20%技能更难持续。",
+      "reason": "20%搜集速度可与队友叠加，接近常规20%干员；额外心情消耗只小幅影响轮休便利。",
       "conditions": "",
       "provisional": false
     },
@@ -4494,9 +4494,9 @@
       "skills": [
         "meet_spd&cost_char[000]"
       ],
-      "score": 40,
+      "score": 46,
       "usage": "线索搜集",
-      "reason": "有其他队友时额外加速，也增加心情消耗，与自身基础速度合并评价。",
+      "reason": "有队友时额外提供15%搜集速度，心情消耗只小幅影响续航；与自身基础20%合并评价。",
       "conditions": "",
       "provisional": false
     },
@@ -6664,10 +6664,10 @@
         "meet_spd&condChar_mustget[100]",
         "meet_spd&cost_condChar[011]"
       ],
-      "score": 82,
+      "score": 45,
       "usage": "罗德岛定向线索",
-      "reason": "独处速度与连续工作必得一并评价，适合特定线索短缺；普通短班未必触发。",
-      "conditions": "不能在8小时短班中默认触发；需连续消耗超过16心情。；只按独处场景评价；线索必得效果需满足额外连续工作条件。",
+      "reason": "独处35%加速与定向罗德岛线索共同生效，但占用整间会客室的工作机会；适合临时补缺，常驻收益有限。",
+      "conditions": "仅自身工作，连续消耗超过16点心情后，下一次线索必定为罗德岛；能否触发取决于实际消耗速度。",
       "provisional": false
     },
     {
@@ -7045,9 +7045,9 @@
         "meet_spd[010]",
         "meet_spd_condChar[000]"
       ],
-      "score": 78,
-      "usage": "独处线索",
-      "reason": "独处时基础15%与额外35%合计50%，无额外心情代价；双人时只保留15%。",
+      "score": 48,
+      "usage": "线索搜集",
+      "reason": "双人工作保留基础15%加速；独处虽达50%，但需空置另一工作位，整站收益不足以提高其常规评级。",
       "conditions": "线索收取、交流及线索类型需求会影响实际价值。",
       "provisional": false
     },
@@ -7133,10 +7133,10 @@
         "meet_spd&condChar_mustget[000]",
         "meet_spd&cost_condChar[011]"
       ],
-      "score": 82,
+      "score": 45,
       "usage": "莱茵定向线索",
-      "reason": "独处速度与连续工作必得莱茵线索合并，短班不能默认触发。",
-      "conditions": "不能在8小时短班中默认触发；需连续消耗超过16心情。；只按独处场景评价；线索必得效果需满足额外连续工作条件。",
+      "reason": "独处35%加速与定向莱茵线索共同生效，但占用整间会客室的工作机会；适合临时补缺，常驻收益有限。",
+      "conditions": "仅自身工作，连续消耗超过16点心情后，下一次线索必定为莱茵；能否触发取决于实际消耗速度。",
       "provisional": false
     },
     {
@@ -7254,10 +7254,10 @@
         "meet_spd&cost_condChar[002]",
         "meet_spd_notOwned[004]"
       ],
-      "score": 78,
-      "usage": "独处线索补缺",
-      "reason": "缺失线索倾向配合独处50%速度，但心情消耗高；需和双人常规班次比较。",
-      "conditions": "只按独处场景评价；线索必得效果需满足额外连续工作条件。；隐藏概率未公开，暂定评价。",
+      "score": 68,
+      "usage": "线索补缺",
+      "reason": "双人工作仍可偏向未拥有的线索；独处50%加速需让出第二工作位，不提高日常补缺评级。",
+      "conditions": "独处加速仅在自身工作时生效；补缺倾向的隐藏概率未公开。",
       "provisional": true
     },
     {
@@ -7459,9 +7459,9 @@
         "meet_spd&cost[110]",
         "meet_spd&cost_char[000]"
       ],
-      "score": 57,
+      "score": 90,
       "usage": "双人线索",
-      "reason": "有队友时合计35%线索速度，同时合计额外2心情消耗，长班续航代价较大。",
+      "reason": "有队友时合计35%线索搜集速度，可叠加队友自身加速；按8小时换班评价，与同效率的见行者同档。",
       "conditions": "",
       "provisional": false
     }

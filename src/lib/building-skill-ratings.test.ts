@@ -78,6 +78,24 @@ describe('published building skill ratings', () => {
     expect(pair.variants.map((variant) => variant.score)).toEqual([78, 68])
   })
 
+  it('keeps usable high-speed shifts above ordinary clue staff and charges solitary effects for both positions', () => {
+    const ordinary = singleBuildingRatings.find((entry) => entry.name === '远山' && entry.room === 'meeting')!.stage.assessment.score!
+    const forcer = singleBuildingRatings.find((entry) => entry.name === '见行者' && entry.room === 'meeting')!.stage.assessment.score!
+    const clem = singleBuildingRatings.find((entry) => entry.name === '克莱门莎' && entry.room === 'meeting')!.stage.assessment.score!
+    expect(forcer).toBeGreaterThan(ordinary)
+    expect(clem).toBe(forcer)
+    const solitary = new Set(Object.entries(catalog.skills).filter(([, skill]) => skill.description.includes('只有自身处于工作状态')).map(([id]) => id))
+    const affected = singleBuildingRatings.filter((entry) => entry.room === 'meeting' && entry.stage.skills.some((id) => solitary.has(id)))
+    expect(affected.map((entry) => entry.name).sort()).toEqual(['予愿安洁莉娜', '和弦', '复奏', '奥达', '霍尔海雅', '风丸'].sort())
+    for (const entry of affected) expect(entry.stage.assessment.score!, entry.name).toBeLessThan(ordinary)
+    for (const [penalized, baseline] of [['manu_prod_spd&limit&cost[110]', 'manu_prod_spd[020]'], ['manu_formula_spd&limit&cost[100]', 'manu_formula_spd[020]'], ['hire_spd_cost[200]', 'hire_spd[011]']]) {
+      const score = published.reviews.find((review) => review.skills.includes(penalized))!.score!
+      const reference = published.reviews.find((review) => review.skills.includes(baseline))!.score!
+      expect(reference - score, penalized).toBeGreaterThanOrEqual(0)
+      expect(reference - score, penalized).toBeLessThanOrEqual(3)
+    }
+  })
+
   it('keeps automation away from warehouse conversion and includes both manufacturing partners', () => {
     const converters = ['char_190_clour', 'char_381_bubble']
     const automation = new Set(['manu_prod_spd&manu[000]', 'manu_prod_spd&manu[100]', 'manu_prod_spd&power[000]', 'manu_prod_spd&power[010]', 'manu_prod_spd&power[020]'])

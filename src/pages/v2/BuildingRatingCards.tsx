@@ -104,7 +104,7 @@ const BuildingRatingCard = memo(function BuildingRatingCard({ entry, roster, act
     <button type="button" className="v2-rating-card-trigger" aria-haspopup="dialog" aria-label={text.openDetails(combo ? entry.title : entry.name)} />
     <RatingIdentity entry={entry} />
     <div className="v2-rating-card-meta">
-      {combo ? entry.partnerSlots ? <span>{text.flexiblePartners(entry.partnerSlots)}</span> : entry.variants.length > 1 && <span>{text.variants(entry.variants.length)}</span> : <span>{copy.domain.building_skills.unlock(entry.stage.elite, entry.stage.level)}</span>}
+      {combo ? entry.partnerSlots ? <span>{text.flexiblePartners(entry.partnerSlots)}</span> : entry.variants.length > 1 && <span>{text.variants(entry.variants.length)}</span> : <span>{copy.domain.building_skills.stage(entry.stage.elite, entry.stage.level, buildingRatingCharacter(entry.operatorId).rarity <= 2)}</span>}
       {roster && <span className="v2-rating-state" data-state={state ?? (owned ? 'ready' : 'missing')}>{combo ? owned ? text.membersOwned : text.membersMissing : text.memberStates[state!]}</span>}
     </div>
   </motion.article></LayoutGroup>
@@ -117,7 +117,7 @@ export function BuildingRatingDialog({ entry, initialVariant, source, roster, co
   const combo = 'variants' in entry
   return <SharedCardDialog layoutId={`rating-card-${entry.id}`} source={source} onClose={onClose} closeLabel={copy.v2.close} className="v2-rating-dialog">
     <header className="v2-rating-dialog-heading"><RatingIdentity entry={entry} detail variant={combo ? entry.variants[variantIndex] : undefined} />
-      <DialogDescription className="v2-rating-dialog-description">{ROOM_LABELS[entry.room] ?? entry.room}{combo ? entry.partnerSlots ? ` · ${text.corePartners}` : entry.variants.length > 1 && ` · ${text.variants(entry.variants.length)}` : ` · ${text.minimum} · ${copy.domain.building_skills.unlock(entry.stage.elite, entry.stage.level)}`}</DialogDescription>
+      <DialogDescription className="v2-rating-dialog-description">{ROOM_LABELS[entry.room] ?? entry.room}{combo ? entry.partnerSlots ? ` · ${text.corePartners}` : entry.variants.length > 1 && ` · ${text.variants(entry.variants.length)}` : ` · ${text.minimum} · ${copy.domain.building_skills.stage(entry.stage.elite, entry.stage.level, buildingRatingCharacter(entry.operatorId).rarity <= 2)}`}</DialogDescription>
     </header>
     {combo ? <div className="v2-rating-dialog-body">
       <BuildingRatingVariantPicker combo={entry} index={variantIndex} onChange={setVariantIndex} roster={roster} />

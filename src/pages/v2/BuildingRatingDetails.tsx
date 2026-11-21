@@ -8,7 +8,7 @@ import { v2Path } from './navigation'
 import { Avatar } from './ScheduleBoard'
 
 const text = copy.buildingRatings
-const unlock = copy.domain.building_skills.unlock
+const unlock = copy.domain.building_skills.stage
 const rankGlyphs: Record<string, string> = {
   S: 'M18 1H5L1 5V11L5 14H13V18H1V22H15L19 18V12L15 9H7V5H16Z',
   A: 'M6 1H16L21 22H15L14 17H7L5 22H0ZM9 6 7 13H13L12 6Z',
@@ -33,7 +33,7 @@ export function RatingMemberView({ member, roster }: { member: RatingMember; ros
   const character = buildingRatingCharacter(member.id)
   const state = ratingMemberStatus(member, roster)
   return <div className="v2-rating-member"><Avatar operator={{ id: member.id, name: character.name }} small /><div><strong>{character.name}</strong>
-    <p>{member.room === 'any' ? text.anyRoom : ROOM_LABELS[member.room] ?? member.room}{['trading', 'manufacture', 'dormitory', 'power'].includes(member.room) && `（${member.station === 'main' ? text.mainRoom : text.otherRoom}）`} · {unlock(member.elite, member.level)}</p>
+    <p>{member.room === 'any' ? text.anyRoom : ROOM_LABELS[member.room] ?? member.room}{['trading', 'manufacture', 'dormitory', 'power'].includes(member.room) && `（${member.station === 'main' ? text.mainRoom : text.otherRoom}）`} · {unlock(member.elite, member.level, character.rarity <= 2)}</p>
     {roster && <span className="v2-rating-state" data-state={state}>{text.memberStates[state]}</span>}
   </div></div>
 }
@@ -47,7 +47,7 @@ export function RatingStageDetails({ stages, member, profileId }: { stages: Rati
     {assessment.conditions && <p><strong>{text.conditions}：</strong>{assessment.conditions}</p>}
     {related.length > 0 && <p className="v2-muted">{text.independent}</p>}
     <RatingSkills ids={stage.skills} />
-    {stages.length > 1 && <div><h3>{text.stages}</h3><ol className="v2-rating-stages">{stages.map((item) => <li key={`${item.elite}.${item.level}`}><span>{unlock(item.elite, item.level)}</span><RatingBadge score={item.assessment.score!} /><p>{item.assessment.reason}</p></li>)}</ol></div>}
+    {stages.length > 1 && <div><h3>{text.stages}</h3><ol className="v2-rating-stages">{stages.map((item) => <li key={`${item.elite}.${item.level}`}><span>{unlock(item.elite, item.level, buildingRatingCharacter(member.id).rarity <= 2)}</span><RatingBadge score={item.assessment.score!} /><p>{item.assessment.reason}</p></li>)}</ol></div>}
     {assessment.scenarios?.length ? <div><h3>{text.scenarios}</h3><ul className="v2-rating-scenarios">{assessment.scenarios.map((scenario) => <li key={scenario.label}><span>{scenario.label}</span><RatingBadge score={scenario.score} /><p>{scenario.reason}</p></li>)}</ul></div> : null}
     {related.length > 0 && <div><h3>{text.related}</h3><div className="v2-rating-related">{related.map((combo) => <Link className="v2-text-button" key={combo.id} to={`${v2Path('building-ratings', profileId)}&kind=combo&q=${encodeURIComponent(combo.title)}`}>{combo.title}</Link>)}</div></div>}
   </div>

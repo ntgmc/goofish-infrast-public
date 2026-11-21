@@ -146,6 +146,7 @@ it('selects warehouse partners by recipe and training without duplicating a memb
   await user.selectOptions(screen.getByRole('combobox', { name: '搭档 1' }), 'char_500_noirc:0:1')
   await user.selectOptions(screen.getByRole('combobox', { name: '搭档 2' }), 'char_150_snakek:0:1')
   expect(screen.getByText('干员生产力 +76% · 仓库 +28 格')).toBeInTheDocument()
+  expect(within(screen.getByRole('combobox', { name: '搭档 2' })).getByRole('option', { name: /蛇屠箱/ })).toHaveTextContent('A 75分 · +76%')
   expect(within(screen.getByRole('combobox', { name: '搭档 2' })).getByRole('option', { name: /黑角/ })).toBeDisabled()
   await user.selectOptions(screen.getByRole('combobox', { name: '搭档 2' }), '')
   expect(screen.getByText('干员生产力 +46% · 仓库 +18 格')).toBeInTheDocument()
@@ -155,6 +156,14 @@ it('selects warehouse partners by recipe and training without duplicating a memb
   await user.selectOptions(screen.getByRole('combobox', { name: '搭档 2' }), 'char_336_folivo:2:1')
   expect(screen.getByText('干员生产力 +91.25% · 仓库 +35 格')).toBeInTheDocument()
   expect(screen.getByRole('dialog').querySelectorAll('.v2-rating-member')).toHaveLength(3)
+  expect(within(screen.getByRole('combobox', { name: '搭档 2' })).getByRole('option', { name: /稀音/ })).toHaveTextContent('S 85分 · +91.25%')
+  const dorothy = within(screen.getByRole('combobox', { name: '搭档 2' })).getByRole('option', { name: /多萝西（精英 2）/ })
+  expect(dorothy).toHaveTextContent('需换另一搭档')
+  const preview = dorothy.textContent!.match(/([\d.]+)%/)![1]
+  await user.selectOptions(screen.getByRole('combobox', { name: '搭档 2' }), 'char_4048_doroth:2:1')
+  expect(screen.getByRole('combobox', { name: '搭档 2' })).toHaveValue('char_4048_doroth:2:1')
+  expect(screen.getByRole('combobox', { name: '搭档 1' })).toHaveValue('char_1047_halo2:2:1')
+  expect(screen.getByText(new RegExp(`干员生产力 \\+${preview}%`))).toBeInTheDocument()
 })
 
 it('opens the matching variant and releases the modal before another card is opened', async () => {

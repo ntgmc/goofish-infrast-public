@@ -16,7 +16,7 @@ import './operator-skill-details.css'
 
 const text = copy.buildingRatings
 const detail = copy.v2.operatorManagement
-const unlock = copy.domain.building_skills.unlock
+const unlock = copy.domain.building_skills.stage
 
 export default function OperatorSkillDetails({ operator, operators, config }: { operator: LicenseOperator; operators: LicenseOperator[]; config: LicenseConfig | null }) {
   const [params] = useSearchParams()
@@ -62,13 +62,13 @@ function OperatorRating({ entry, operator, roster }: { entry: SingleBuildingRati
   return <section className="v2-operator-rating" aria-label={`${ROOM_LABELS[entry.room]} · ${assessment.usage}`}>
     <header><div><h3>{ROOM_LABELS[entry.room]}</h3><p>{assessment.usage}</p></div><RatingBadge score={assessment.score!} /></header>
     {entry.stages.length > 1 ? <label className="v2-field"><span>{detail.ratingStage(ROOM_LABELS[entry.room])}</span><select className="v2-input" value={index} onChange={(event) => setSelected(Number(event.target.value))}>
-      {entry.stages.map((item, itemIndex) => <option key={itemIndex} value={itemIndex}>{unlock(item.elite, item.level)} · {states[itemIndex] === 'ready' ? itemIndex === current ? detail.currentRating : detail.replacedRating : text.memberStates[states[itemIndex]]}</option>)}
-    </select></label> : <p className="v2-muted">{unlock(stage.elite, stage.level)}</p>}
+      {entry.stages.map((item, itemIndex) => <option key={itemIndex} value={itemIndex}>{unlock(item.elite, item.level, buildingRatingCharacter(entry.operatorId).rarity <= 2)} · {states[itemIndex] === 'ready' ? itemIndex === current ? detail.currentRating : detail.replacedRating : text.memberStates[states[itemIndex]]}</option>)}
+    </select></label> : <p className="v2-muted">{unlock(stage.elite, stage.level, buildingRatingCharacter(entry.operatorId).rarity <= 2)}</p>}
     {(entry.stages.length === 1 || assessment.provisional) && <div className="v2-operator-rating-status">{entry.stages.length === 1 && <span className="v2-rating-state" data-state={status}>{label}</span>}{assessment.provisional && <span className="v2-rating-provisional">{text.provisional}</span>}</div>}
     <p>{assessment.reason}</p>
     {assessment.conditions && <p className="v2-operator-rating-condition"><strong>{text.conditions}：</strong>{assessment.conditions}</p>}
     {assessment.scenarios?.length ? <ul className="v2-rating-scenarios">{assessment.scenarios.map((scenario) => <li key={scenario.label}><span>{scenario.label}</span><RatingBadge score={scenario.score} /><p>{scenario.reason}</p></li>)}</ul> : null}
-    <BuildingSkillList skills={skills} owned={operator.own} />
+    <BuildingSkillList skills={skills} owned={operator.own} levelBased={buildingRatingCharacter(entry.operatorId).rarity <= 2} />
   </section>
 }
 

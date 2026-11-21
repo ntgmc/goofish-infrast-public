@@ -30,6 +30,7 @@ export const domainCopy = {
     upgraded: "已被强化技能替换",
     training: "训练室",
     unlock: (elite: number, level: number) => elite === 0 ? `初始 Lv.${level}` : `精英 ${elite} · Lv.${level}`,
+    stage: (elite: number, level: number, levelBased: boolean) => levelBased ? `Lv.${level}` : elite === 0 ? '初始' : `精英 ${elite}`,
   },
   schedule_simulation: {
     submitting: '正在提交排班',
