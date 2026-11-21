@@ -117,7 +117,7 @@ export function BuildingRatingDialog({ entry, initialVariant, source, roster, co
   const combo = 'variants' in entry
   return <SharedCardDialog layoutId={`rating-card-${entry.id}`} source={source} onClose={onClose} closeLabel={copy.v2.close} className="v2-rating-dialog">
     <header className="v2-rating-dialog-heading"><RatingIdentity entry={entry} detail variant={combo ? entry.variants[variantIndex] : undefined} />
-      <DialogDescription className="v2-rating-dialog-description">{ROOM_LABELS[entry.room] ?? entry.room}{combo ? entry.partnerSlots ? ` · ${text.flexiblePartners(entry.partnerSlots)}` : entry.variants.length > 1 && ` · ${text.variants(entry.variants.length)}` : ` · ${text.minimum} · ${copy.domain.building_skills.unlock(entry.stage.elite, entry.stage.level)}`}</DialogDescription>
+      <DialogDescription className="v2-rating-dialog-description">{ROOM_LABELS[entry.room] ?? entry.room}{combo ? entry.partnerSlots ? ` · ${text.corePartners}` : entry.variants.length > 1 && ` · ${text.variants(entry.variants.length)}` : ` · ${text.minimum} · ${copy.domain.building_skills.unlock(entry.stage.elite, entry.stage.level)}`}</DialogDescription>
     </header>
     {combo ? <div className="v2-rating-dialog-body">
       <BuildingRatingVariantPicker combo={entry} index={variantIndex} onChange={setVariantIndex} roster={roster} />

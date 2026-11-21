@@ -10,9 +10,10 @@ export const buildingRatingsCopy = {
   chooseVariant: '组合变体',
   corePartners: '核心与搭档', fixedCore: '固定核心',
   partnerHelp: '选择搭档与练度，查看对应配方的组合效果。',
-  flexiblePartners: (count: number) => `固定核心 + 最多 ${count} 位搭档`,
+  flexiblePartners: (count: number) => `核心 + 1–${count} 位搭档`,
   partner: (index: number) => `搭档 ${index + 1}`, noPartner: '不安排第二位搭档',
   recipe: '生产配方', gold: '赤金', exp: '作战记录',
+  powerStations: (count: number) => `${count} 间发电站`,
   warehouseReasons: {
     bubble: '泡泡按每名干员的净增仓库分别转换，超过16格的成员按每格3%，其余按每格1%；保留队友生产力。',
     redcloud: '红云将每名干员增加的仓库按每格2%转为生产力，保留队友生产力；负容量不倒扣转换收益。',
@@ -44,7 +45,7 @@ export const buildingRatingsCopy = {
   memberStates: { ready: '已解锁', missing: '未拥有', locked: '练度不足', unknown: '练度待确认' },
   requirement: {
     tradingLevel: '贸易站等级至少', manufactureLevel: '制造站等级至少', meetingLevel: '会客室等级至少',
-    tradingCount: '贸易站数量至少', powerCount: '发电站数量至少', goldLines: '赤金生产线至少',
+    tradingCount: '贸易站数量至少', powerCount: '发电站数量至少', powerCountExact: '发电站数量为', goldLines: '赤金生产线至少',
     dormLevel: '指定宿舍等级至少', dormOccupants: '宿舍总入驻人数至少', recruitSlots: '已开放招募位至少',
     trainingTask: '有实际专精训练任务', processingTask: '有实际加工任务', workAssignments: '配套成员的有效工作位置已安排',
     mood: '成员处于指定心情区间', robotExclusion: '其余发电站未入驻作业平台', clueExchange: '正在线索交流',

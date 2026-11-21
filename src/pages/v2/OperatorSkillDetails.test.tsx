@@ -69,6 +69,19 @@ it('keeps the inspected warehouse partner in the team while changing their compa
   expect(within(combo).getAllByText('蛇屠箱').length).toBeGreaterThan(0)
 })
 
+it('offers only valid recipes when the inspected partner has a recipe-specific warehouse effect', async () => {
+  const user = userEvent.setup()
+  const click: LicenseOperator = { id: 'char_328_cammou', name: '卡达', own: true, elite: 1, level: 1, rarity: 4 }
+  render(<MemoryRouter><OperatorSkillDetails operator={click} operators={[click]} config={SAMPLE_CONFIG} /></MemoryRouter>)
+  await user.click(screen.getByRole('tab', { name: copy.buildingRatings.combo }))
+  const combo = screen.getByText('红云仓库组').closest('details')!
+  await user.click(within(combo).getByText('红云仓库组'))
+  const recipe = within(combo).getByRole('combobox', { name: '生产配方' })
+  expect(recipe).toHaveValue('exp')
+  expect(within(recipe).getAllByRole('option')).toHaveLength(1)
+  expect(within(recipe).getByRole('option')).toHaveTextContent('作战记录')
+})
+
 it('does not label an unowned operator’s skills as unlocked and keeps missing level distinct from locked', async () => {
   const user = userEvent.setup()
   const missing = { ...provs, own: false, elite: 2 }

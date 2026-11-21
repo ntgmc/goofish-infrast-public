@@ -126,6 +126,17 @@ it('keeps every loaded result and restores focus when opening the last card and 
   }
 })
 
+it('opens the automation phase that fits the current layout before a higher-scored blocked phase', async () => {
+  const user = userEvent.setup()
+  const winter = buildingRatingCombos.find((combo) => combo.id === 'winter')!
+  const matched = { ...session, workspace: { ...session.workspace!, config: { ...CONFIG_PRESETS['252'], manufacturing_station_levels: [3, 3, 3, 2, 2] }, operators: winter.variants[0].members.map((member) => ({ id: member.id, name: buildingRatingCharacter(member.id).name, own: true, elite: member.elite, level: member.level, rarity: 4 })) } }
+  render(<MemoryRouter initialEntries={['/v2?section=building-ratings&kind=combo&q=冬时与温蒂清流']}><BuildingRatings session={matched} /></MemoryRouter>)
+  await user.click(screen.getByRole('button', { name: '查看冬时与温蒂清流的评级详情' }))
+  expect(screen.getByText('干员生产力 +100% · 仓库 +15 格')).toBeInTheDocument()
+  expect(screen.getByRole('combobox', { name: '组合变体' })).toHaveValue('0')
+  expect(screen.queryByText('干员生产力 +115% · 仓库 +15 格')).not.toBeInTheDocument()
+})
+
 it('selects warehouse partners by recipe and training without duplicating a member', async () => {
   const user = userEvent.setup()
   render(<MemoryRouter initialEntries={['/v2?section=building-ratings&kind=combo&q=红云']}><BuildingRatings session={session} /></MemoryRouter>)

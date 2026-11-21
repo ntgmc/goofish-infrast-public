@@ -51,15 +51,22 @@ export default function BuildingRatings({ session }: { session: V2Session }) {
     void setParams(next, { replace: key === 'q', state: { preservePagePosition: true } })
   }
   const matchesVariant = useCallback((entry: RatingCombo, variant: RatingVariant) => {
-    const match = ratingVariantStatus(variant, roster, config)
+    if (grade && buildingRatingGrade(variant.score) !== grade) return false
     const search = `${entry.title} ${variant.members.map((item) => buildingRatingCharacter(item.id).name).join(' ')}`.toLocaleLowerCase('zh-CN')
-    return (!query || search.includes(query)) && (!grade || buildingRatingGrade(variant.score) === grade)
-      && (!own || own === 'owned' && match.membersOwned === true || own === 'ready' && match.state === 'ready')
+    if (query && !search.includes(query)) return false
+    if (!own) return true
+    const match = ratingVariantStatus(variant, roster, config)
+    return own === 'owned' && match.membersOwned === true || own === 'ready' && match.state === 'ready'
   }, [roster, config, query, grade, own])
   const openDetails = useCallback((entry: BuildingRatingEntry, source: HTMLElement) => {
     sourceCard.current = source
-    setSelected({ entry, variant: 'variants' in entry ? Math.max(0, entry.variants.findIndex((variant) => matchesVariant(entry, variant))) : 0 })
-  }, [matchesVariant])
+    let variant = 0
+    if ('variants' in entry) {
+      const candidates = entry.variants.flatMap((item, index) => matchesVariant(entry, item) ? [{ index, match: ratingVariantStatus(item, roster, config) }] : [])
+      variant = (candidates.find(({ match }) => match.state === 'ready') ?? candidates.find(({ match }) => match.state === 'unknown') ?? candidates[0])?.index ?? 0
+    }
+    setSelected({ entry, variant })
+  }, [matchesVariant, roster, config])
   const entries = useMemo(() => source.filter((entry) => {
     const entryUsage = 'stage' in entry ? entry.stage.assessment.usage : entry.usage
     if (room && entry.room !== room || usage && entryUsage !== usage) return false

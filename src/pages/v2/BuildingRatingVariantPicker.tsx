@@ -8,12 +8,13 @@ const key = (member: RatingMember) => `${member.id}:${member.elite}:${member.lev
 export default function BuildingRatingVariantPicker({ combo, index, onChange, roster }: { combo: RatingCombo; index: number; onChange: (index: number) => void; roster: RatingRoster | null }) {
   const [order, setOrder] = useState<string[]>([])
   if (!combo.partnerSlots) return combo.variants.length > 1 && <label className="v2-field v2-rating-variant-picker"><span>{text.chooseVariant}</span><select className="v2-input" value={index} onChange={(event) => onChange(Number(event.target.value))}>
-    {combo.variants.map((variant, variantIndex) => <option key={variantIndex} value={variantIndex}>{text.variantOption(variantIndex, variant.score, variant.members.filter((member) => member.room === combo.room).map((member) => buildingRatingCharacter(member.id).name).join(' / '))}</option>)}
+    {combo.variants.map((variant, variantIndex) => <option key={variantIndex} value={variantIndex}>{text.variantOption(variantIndex, variant.score, variant.members.filter((member) => member.room === combo.room).map((member) => `${buildingRatingCharacter(member.id).name}（${copy.domain.building_skills.unlock(member.elite, member.level)}）`).join(' / '))}{variant.requirements.powerCountExact !== undefined && ` · ${text.powerStations(Number(variant.requirements.powerCountExact))}`}</option>)}
   </select></label>
   const core = comboBuildingRatingCore(combo)
   const coreIds = new Set(core.map((member) => member.id))
   const partners = (variantIndex: number) => combo.variants[variantIndex].members.filter((member) => member.room === combo.room && !coreIds.has(member.id))
   const variant = combo.variants[index]
+  const recipes = [...new Set(combo.variants.map((item) => item.recipe).filter((recipe) => recipe !== undefined))]
   const currentKeys = partners(index).map(key)
   const selected = order.filter((value) => currentKeys.includes(value))
   for (const value of currentKeys) if (!selected.includes(value)) selected.push(value)
@@ -40,9 +41,9 @@ export default function BuildingRatingVariantPicker({ combo, index, onChange, ro
       const recipe = event.target.value
       const next = combo.variants.findIndex((item, candidate) => item.recipe === recipe && partners(candidate).map(key).sort().join('|') === [...currentKeys].sort().join('|'))
       onChange(next < 0 ? combo.variants.findIndex((item) => item.recipe === recipe) : next)
-    }}><option value="gold">{text.gold}</option><option value="exp">{text.exp}</option></select></label>
+    }}>{recipes.map((recipe) => <option key={recipe} value={recipe}>{text[recipe]}</option>)}</select></label>
     {Array.from({ length: combo.partnerSlots }, (_, slot) => <label className="v2-field" key={slot}><span>{text.partner(slot)}</span><select className="v2-input" value={selected[slot] ?? ''} onChange={(event) => choose(slot, event.target.value)}>
-      {slot > 0 && <option value="">{text.noPartner}</option>}
+      {slot > 0 && <option value="" disabled={!combo.variants.some((item, candidate) => item.recipe === variant.recipe && partners(candidate).length === 1 && key(partners(candidate)[0]) === selected[0])}>{text.noPartner}</option>}
       {options.map((member) => <option key={key(member)} value={key(member)} disabled={selected.some((value, otherSlot) => otherSlot !== slot && value.split(':')[0] === member.id)}>
         {buildingRatingCharacter(member.id).name} · {copy.domain.building_skills.unlock(member.elite, member.level)}{roster && ` · ${text.memberStates[ratingMemberStatus(member, roster)]}`}
       </option>)}

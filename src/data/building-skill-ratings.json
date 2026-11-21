@@ -1,5 +1,5 @@
 {
-  "version": "2026-11-22.2",
+  "version": "2026-11-22.3",
   "evaluatedAt": "2026-11-22",
   "snapshot": {
     "game": "63c7cec73c3858d0ae913f85cc89af3cef4d744f",
@@ -8004,8 +8004,10 @@
           "score": 91,
           "reason": "温蒂按发电站、清流按贸易站、精一冬时按同站人数提供加成，三类数量型生产力可共存。两发电站时合计100%赤金生产力，冬时另提供15格仓库。",
           "conditions": "两发电站、两贸易站、三级制造站，生产赤金；仓库转换类生产力会被归零，不能用红云或泡泡替代温蒂。",
+          "production": 100,
+          "capacity": 15,
           "requirements": {
-            "powerCount": 2,
+            "powerCountExact": 2,
             "tradingCount": 2,
             "manufactureLevel": 3
           },
@@ -8038,8 +8040,10 @@
           "score": 94,
           "reason": "三发电站下温蒂提供45%、清流在两贸易站提供40%、精一冬时提供30%，合计115%赤金生产力；冬时仓库仍是每人5格，共15格。",
           "conditions": "三发电站、两贸易站、三级制造站，生产赤金；不叠加普通或仓库转换类生产力。",
+          "production": 115,
+          "capacity": 15,
           "requirements": {
-            "powerCount": 3,
+            "powerCountExact": 3,
             "tradingCount": 2,
             "manufactureLevel": 3
           },
@@ -8072,11 +8076,73 @@
           "score": 78,
           "reason": "初始冬时只增加仓库，没有精一的同站人数生产力。温蒂与清流在两发电站、两贸易站下提供70%赤金生产力，冬时补15格仓库。",
           "conditions": "两发电站、两贸易站、三级制造站，生产赤金；冬时精一可再增加30%生产力。",
+          "production": 70,
+          "capacity": 15,
           "requirements": {
-            "powerCount": 2,
+            "powerCountExact": 2,
             "tradingCount": 2,
             "manufactureLevel": 3
           },
+          "provisional": true
+        },
+        {
+          "members": [
+            { "id": "char_4208_wintim", "room": "manufacture", "elite": 0, "level": 1, "station": "main" },
+            { "id": "char_400_weedy", "room": "manufacture", "elite": 2, "level": 1, "station": "main" },
+            { "id": "char_385_finlpp", "room": "manufacture", "elite": 1, "level": 1, "station": "main" }
+          ],
+          "score": 86, "production": 85, "capacity": 15,
+          "reason": "初始冬时只增加15格仓库；三发电站下温蒂45%与清流40%合计85%赤金生产力。",
+          "conditions": "三发电站、两贸易站、三级制造站，生产赤金。",
+          "requirements": { "powerCountExact": 3, "tradingCount": 2, "manufactureLevel": 3 },
+          "provisional": true
+        },
+        {
+          "members": [
+            { "id": "char_4208_wintim", "room": "manufacture", "elite": 1, "level": 1, "station": "main" },
+            { "id": "char_400_weedy", "room": "manufacture", "elite": 0, "level": 1, "station": "main" },
+            { "id": "char_385_finlpp", "room": "manufacture", "elite": 1, "level": 1, "station": "main" }
+          ],
+          "score": 88, "production": 90, "capacity": 15,
+          "reason": "初始温蒂20%、清流40%、精一冬时30%，合计90%赤金生产力，无需温蒂精二。",
+          "conditions": "两发电站、两贸易站、三级制造站，生产赤金。",
+          "requirements": { "powerCountExact": 2, "tradingCount": 2, "manufactureLevel": 3 },
+          "provisional": true
+        },
+        {
+          "members": [
+            { "id": "char_4208_wintim", "room": "manufacture", "elite": 1, "level": 1, "station": "main" },
+            { "id": "char_400_weedy", "room": "manufacture", "elite": 0, "level": 1, "station": "main" },
+            { "id": "char_385_finlpp", "room": "manufacture", "elite": 1, "level": 1, "station": "main" }
+          ],
+          "score": 91, "production": 100, "capacity": 15,
+          "reason": "初始温蒂30%、清流40%、精一冬时30%，合计100%赤金生产力。",
+          "conditions": "三发电站、两贸易站、三级制造站，生产赤金。",
+          "requirements": { "powerCountExact": 3, "tradingCount": 2, "manufactureLevel": 3 },
+          "provisional": true
+        },
+        {
+          "members": [
+            { "id": "char_4208_wintim", "room": "manufacture", "elite": 0, "level": 1, "station": "main" },
+            { "id": "char_400_weedy", "room": "manufacture", "elite": 0, "level": 1, "station": "main" },
+            { "id": "char_385_finlpp", "room": "manufacture", "elite": 1, "level": 1, "station": "main" }
+          ],
+          "score": 70, "production": 60, "capacity": 15,
+          "reason": "初始温蒂20%与清流40%合计60%赤金生产力；初始冬时仅提供仓库。",
+          "conditions": "两发电站、两贸易站、三级制造站，生产赤金。",
+          "requirements": { "powerCountExact": 2, "tradingCount": 2, "manufactureLevel": 3 },
+          "provisional": true
+        },
+        {
+          "members": [
+            { "id": "char_4208_wintim", "room": "manufacture", "elite": 0, "level": 1, "station": "main" },
+            { "id": "char_400_weedy", "room": "manufacture", "elite": 0, "level": 1, "station": "main" },
+            { "id": "char_385_finlpp", "room": "manufacture", "elite": 1, "level": 1, "station": "main" }
+          ],
+          "score": 78, "production": 70, "capacity": 15,
+          "reason": "初始温蒂30%与清流40%合计70%赤金生产力；初始冬时仅提供仓库。",
+          "conditions": "三发电站、两贸易站、三级制造站，生产赤金。",
+          "requirements": { "powerCountExact": 3, "tradingCount": 2, "manufactureLevel": 3 },
           "provisional": true
         }
       ]
@@ -8112,10 +8178,11 @@
             }
           ],
           "score": 91,
+          "production": 100,
           "reason": "温蒂与队友保留设施数量型生产力，清流按贸易站提供赤金加成；避免放入普通生产力队友。",
           "conditions": "243：三发电站、两贸易站，制造赤金。",
           "requirements": {
-            "powerCount": 3,
+            "powerCountExact": 3,
             "tradingCount": 2,
             "manufactureLevel": 3
           },
@@ -8146,10 +8213,11 @@
             }
           ],
           "score": 83,
+          "production": 80,
           "reason": "温蒂与队友保留设施数量型生产力，清流按贸易站提供赤金加成；避免放入普通生产力队友。",
           "conditions": "252：两发电站、两贸易站，制造赤金。",
           "requirements": {
-            "powerCount": 2,
+            "powerCountExact": 2,
             "tradingCount": 2,
             "manufactureLevel": 3
           },
@@ -8180,10 +8248,11 @@
             }
           ],
           "score": 91,
+          "production": 100,
           "reason": "温蒂与队友保留设施数量型生产力，清流按贸易站提供赤金加成；避免放入普通生产力队友。",
           "conditions": "243：三发电站、两贸易站，制造赤金。",
           "requirements": {
-            "powerCount": 3,
+            "powerCountExact": 3,
             "tradingCount": 2,
             "manufactureLevel": 3
           },
@@ -8216,11 +8285,60 @@
           "score": 83,
           "reason": "温蒂与队友保留设施数量型生产力，清流按贸易站提供赤金加成；避免放入普通生产力队友。",
           "conditions": "252：两发电站、两贸易站，制造赤金。",
+          "production": 80,
           "requirements": {
-            "powerCount": 2,
+            "powerCountExact": 2,
             "tradingCount": 2,
             "manufactureLevel": 3
           },
+          "provisional": true
+        },
+        {
+          "members": [
+            { "id": "char_400_weedy", "room": "manufacture", "elite": 0, "level": 1, "station": "main" },
+            { "id": "char_385_finlpp", "room": "manufacture", "elite": 1, "level": 1, "station": "main" },
+            { "id": "char_433_windft", "room": "manufacture", "elite": 2, "level": 1, "station": "main" }
+          ],
+          "score": 86, "production": 85,
+          "reason": "初始温蒂30%、清流40%、掠风15%，合计85%赤金生产力。",
+          "conditions": "三发电站、两贸易站、三级制造站，生产赤金。",
+          "requirements": { "powerCountExact": 3, "tradingCount": 2, "manufactureLevel": 3 },
+          "provisional": true
+        },
+        {
+          "members": [
+            { "id": "char_400_weedy", "room": "manufacture", "elite": 0, "level": 1, "station": "main" },
+            { "id": "char_385_finlpp", "room": "manufacture", "elite": 1, "level": 1, "station": "main" },
+            { "id": "char_433_windft", "room": "manufacture", "elite": 2, "level": 1, "station": "main" }
+          ],
+          "score": 78, "production": 70,
+          "reason": "初始温蒂20%、清流40%、掠风10%，合计70%赤金生产力。",
+          "conditions": "两发电站、两贸易站、三级制造站，生产赤金。",
+          "requirements": { "powerCountExact": 2, "tradingCount": 2, "manufactureLevel": 3 },
+          "provisional": true
+        },
+        {
+          "members": [
+            { "id": "char_400_weedy", "room": "manufacture", "elite": 0, "level": 1, "station": "main" },
+            { "id": "char_385_finlpp", "room": "manufacture", "elite": 1, "level": 1, "station": "main" },
+            { "id": "char_472_pasngr", "room": "manufacture", "elite": 2, "level": 1, "station": "main" }
+          ],
+          "score": 86, "production": 85,
+          "reason": "初始温蒂30%、清流40%、异客15%，合计85%赤金生产力。",
+          "conditions": "三发电站、两贸易站、三级制造站，生产赤金。",
+          "requirements": { "powerCountExact": 3, "tradingCount": 2, "manufactureLevel": 3 },
+          "provisional": true
+        },
+        {
+          "members": [
+            { "id": "char_400_weedy", "room": "manufacture", "elite": 0, "level": 1, "station": "main" },
+            { "id": "char_385_finlpp", "room": "manufacture", "elite": 1, "level": 1, "station": "main" },
+            { "id": "char_472_pasngr", "room": "manufacture", "elite": 2, "level": 1, "station": "main" }
+          ],
+          "score": 78, "production": 70,
+          "reason": "初始温蒂20%、清流40%、异客10%，合计70%赤金生产力。",
+          "conditions": "两发电站、两贸易站、三级制造站，生产赤金。",
+          "requirements": { "powerCountExact": 2, "tradingCount": 2, "manufactureLevel": 3 },
           "provisional": true
         }
       ]
@@ -8239,8 +8357,9 @@
           ],
           "score": 94,
           "reason": "温蒂45%、清流40%、森蚺30%的设施数量型加成共存，合计115%赤金生产力；森蚺在制造站，无需占用中枢或安排Lancet-2。",
+          "production": 115,
           "conditions": "三发电站、两贸易站、三级制造站，生产赤金。",
-          "requirements": { "powerCount": 3, "tradingCount": 2, "manufactureLevel": 3 },
+          "requirements": { "powerCountExact": 3, "tradingCount": 2, "manufactureLevel": 3 },
           "provisional": true
         },
         {
@@ -8251,8 +8370,9 @@
           ],
           "score": 88,
           "reason": "两发电站下温蒂30%、清流40%、森蚺20%，合计90%赤金生产力；森蚺只在制造站提供加成。",
+          "production": 90,
           "conditions": "两发电站、两贸易站、三级制造站，生产赤金。",
-          "requirements": { "powerCount": 2, "tradingCount": 2, "manufactureLevel": 3 },
+          "requirements": { "powerCountExact": 2, "tradingCount": 2, "manufactureLevel": 3 },
           "provisional": true
         },
         {
@@ -8264,7 +8384,68 @@
           "score": 78,
           "reason": "初始温蒂每发电站10%、初始森蚺每发电站5%，两发电站加清流40%，合计70%赤金生产力。",
           "conditions": "两发电站、两贸易站、三级制造站，生产赤金；两名六星均无需精二即可过渡。",
-          "requirements": { "powerCount": 2, "tradingCount": 2, "manufactureLevel": 3 },
+          "production": 70,
+          "requirements": { "powerCountExact": 2, "tradingCount": 2, "manufactureLevel": 3 },
+          "provisional": true
+        },
+        {
+          "members": [
+            { "id": "char_400_weedy", "room": "manufacture", "elite": 0, "level": 1, "station": "main" },
+            { "id": "char_385_finlpp", "room": "manufacture", "elite": 1, "level": 1, "station": "main" },
+            { "id": "char_416_zumama", "room": "manufacture", "elite": 0, "level": 1, "station": "main" }
+          ],
+          "score": 86, "production": 85,
+          "reason": "初始温蒂30%、清流40%、初始森蚺15%，合计85%赤金生产力；森蚺在制造站。",
+          "conditions": "三发电站、两贸易站、三级制造站，生产赤金。",
+          "requirements": { "powerCountExact": 3, "tradingCount": 2, "manufactureLevel": 3 },
+          "provisional": true
+        },
+        {
+          "members": [
+            { "id": "char_400_weedy", "room": "manufacture", "elite": 2, "level": 1, "station": "main" },
+            { "id": "char_385_finlpp", "room": "manufacture", "elite": 1, "level": 1, "station": "main" },
+            { "id": "char_416_zumama", "room": "manufacture", "elite": 0, "level": 1, "station": "main" }
+          ],
+          "score": 91, "production": 100,
+          "reason": "精二温蒂45%、清流40%、初始森蚺15%，合计100%赤金生产力；森蚺无需精二即可补位。",
+          "conditions": "三发电站、两贸易站、三级制造站，生产赤金。",
+          "requirements": { "powerCountExact": 3, "tradingCount": 2, "manufactureLevel": 3 },
+          "provisional": true
+        },
+        {
+          "members": [
+            { "id": "char_400_weedy", "room": "manufacture", "elite": 2, "level": 1, "station": "main" },
+            { "id": "char_385_finlpp", "room": "manufacture", "elite": 1, "level": 1, "station": "main" },
+            { "id": "char_416_zumama", "room": "manufacture", "elite": 0, "level": 1, "station": "main" }
+          ],
+          "score": 83, "production": 80,
+          "reason": "精二温蒂30%、清流40%、初始森蚺10%，合计80%赤金生产力。",
+          "conditions": "两发电站、两贸易站、三级制造站，生产赤金。",
+          "requirements": { "powerCountExact": 2, "tradingCount": 2, "manufactureLevel": 3 },
+          "provisional": true
+        },
+        {
+          "members": [
+            { "id": "char_400_weedy", "room": "manufacture", "elite": 0, "level": 1, "station": "main" },
+            { "id": "char_385_finlpp", "room": "manufacture", "elite": 1, "level": 1, "station": "main" },
+            { "id": "char_416_zumama", "room": "manufacture", "elite": 2, "level": 1, "station": "main" }
+          ],
+          "score": 91, "production": 100,
+          "reason": "初始温蒂30%、清流40%、精二森蚺30%，合计100%赤金生产力。",
+          "conditions": "三发电站、两贸易站、三级制造站，生产赤金。",
+          "requirements": { "powerCountExact": 3, "tradingCount": 2, "manufactureLevel": 3 },
+          "provisional": true
+        },
+        {
+          "members": [
+            { "id": "char_400_weedy", "room": "manufacture", "elite": 0, "level": 1, "station": "main" },
+            { "id": "char_385_finlpp", "room": "manufacture", "elite": 1, "level": 1, "station": "main" },
+            { "id": "char_416_zumama", "room": "manufacture", "elite": 2, "level": 1, "station": "main" }
+          ],
+          "score": 83, "production": 80,
+          "reason": "初始温蒂20%、清流40%、精二森蚺20%，合计80%赤金生产力。",
+          "conditions": "两发电站、两贸易站、三级制造站，生产赤金。",
+          "requirements": { "powerCountExact": 2, "tradingCount": 2, "manufactureLevel": 3 },
           "provisional": true
         }
       ]
@@ -8481,22 +8662,23 @@
               "station": "main"
             },
             {
-              "id": "char_4155_talr",
+              "id": "char_240_wyvern",
               "room": "manufacture",
-              "elite": 2,
+              "elite": 0,
               "level": 1,
               "station": "main"
             },
             {
-              "id": "char_4211_snhunt",
+              "id": "char_235_jesica",
               "room": "manufacture",
-              "elite": 2,
+              "elite": 0,
               "level": 1,
               "station": "main"
             }
           ],
-          "score": 90,
-          "reason": "水月基础生产力与标准化计数一起生效，搭配已具备标准化的高效成员。",
+          "score": 85,
+          "production": 90,
+          "reason": "香草、杰西卡各提供25%，水月自身25%并按三项标准化技能获得15%，合计90%生产力；普通25%技能不自动属于标准化类。",
           "conditions": "三级制造站；按队友实际技能类别计数。",
           "requirements": {
             "manufactureLevel": 3
@@ -8508,27 +8690,28 @@
             {
               "id": "char_437_mizuki",
               "room": "manufacture",
-              "elite": 2,
+              "elite": 0,
               "level": 1,
               "station": "main"
             },
             {
-              "id": "char_4155_talr",
+              "id": "char_240_wyvern",
               "room": "manufacture",
-              "elite": 2,
+              "elite": 0,
               "level": 1,
               "station": "main"
             },
             {
-              "id": "char_281_popka",
+              "id": "char_235_jesica",
               "room": "manufacture",
               "elite": 0,
               "level": 1,
               "station": "main"
             }
           ],
-          "score": 85,
-          "reason": "水月基础生产力与标准化计数一起生效，搭配已具备标准化的高效成员。",
+          "score": 65,
+          "production": 60,
+          "reason": "初始水月没有自身25%与标准化标签，只按香草、杰西卡的两项标准化技能获得10%，合计60%生产力。",
           "conditions": "三级制造站；按队友实际技能类别计数。",
           "requirements": {
             "manufactureLevel": 3
@@ -11030,11 +11213,19 @@
               "elite": 2,
               "level": 1,
               "station": "main"
+            },
+            {
+              "id": "char_196_sunbr",
+              "room": "trading",
+              "elite": 0,
+              "level": 1,
+              "station": "main"
             }
           ],
           "score": 85,
-          "reason": "与另一乌萨斯学生成员同站时，怒潮凛冬经验生产力由30%增至40%，队友产出一起评价。",
-          "conditions": "",
+          "production": 75,
+          "reason": "怒潮凛冬与烈夏同站提供40%经验生产力；古米在贸易站时烈夏再提供35%，两人合计75%。",
+          "conditions": "古米必须在贸易站工作，烈夏的35%加成才生效。",
           "requirements": {},
           "provisional": true
         },

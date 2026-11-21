@@ -127,7 +127,7 @@ export function ratingVariantStatus(variant: RatingVariant, roster: RatingRoster
     const room = key === 'tradingLevel' ? 'trading' : 'manufacture'
     const needed = [...groups.values()].filter((group) => group.room === room).map((group) => Math.max(group.count, Number(value))).sort((a, b) => b - a)
     const orderedLevels = levels ? [...levels].sort((a, b) => b - a) : null
-    const sufficient = orderedLevels && needed.length ? needed.every((level, index) => (orderedLevels[index] ?? 0) >= level) : actual !== null && actual >= Number(value)
+    const sufficient = orderedLevels && needed.length ? needed.every((level, index) => (orderedLevels[index] ?? 0) >= level) : actual !== null && (key === 'powerCountExact' ? actual === Number(value) : actual >= Number(value))
     conditions.push({ key, required: value, state: actual === null ? 'unknown' : sufficient ? 'ready' : 'blocked' })
   }
   const state: 'missing' | 'locked' | 'blocked' | 'unknown' | 'ready' = memberStates.includes('missing') ? 'missing' : memberStates.includes('locked') ? 'locked'
@@ -139,7 +139,8 @@ export function ratingVariantStatus(variant: RatingVariant, roster: RatingRoster
 function ratingFacilityValue(key: string, config: LicenseConfig): number | null {
   switch (key) {
     case 'tradingCount': return config.trading_stations_count
-    case 'powerCount': return getFacilityIds(config).filter((id) => id.startsWith('power_')).length
+    case 'powerCount':
+    case 'powerCountExact': return getFacilityIds(config).filter((id) => id.startsWith('power_')).length
     case 'tradingLevel': return config.trading_station_levels?.length ? Math.max(...config.trading_station_levels) : null
     case 'manufactureLevel': return config.manufacturing_station_levels?.length ? Math.max(...config.manufacturing_station_levels) : null
     case 'goldLines': return config.product_requirements.manufacturing_stations['Pure Gold'] ?? 0

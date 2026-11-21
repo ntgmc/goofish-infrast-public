@@ -95,6 +95,33 @@ describe('published building skill ratings', () => {
     }
   })
 
+  it('counts actual Standardization skills and includes Gummy whenever Leto contributes production', () => {
+    const standard = buildingRatingCombos.find((combo) => combo.id === 'standard')!
+    expect(standard.variants.map((variant) => variant.production)).toEqual([90, 60])
+    for (const variant of standard.variants) for (const member of variant.members.filter((member) => member.id !== 'char_437_mizuki')) {
+      const active = new Map<number, string>()
+      for (const skill of characters[member.id].skills) if (skill.elite <= member.elite) active.set(skill.slot, skill.id)
+      expect([...active.values()].some((id) => catalog.skills[id as keyof typeof catalog.skills].name.startsWith('标准化'))).toBe(true)
+    }
+    const leto = buildingRatingCombos.find((combo) => combo.id === 'headbringer')!.variants[0]
+    expect(leto.production).toBe(75)
+    expect(leto.members).toContainEqual(expect.objectContaining({ id: 'char_196_sunbr', room: 'trading' }))
+    const roster = buildingRatingRoster(leto.members.filter((member) => member.id !== 'char_196_sunbr').map((member) => owned(member)))
+    expect(ratingVariantStatus(leto, roster, config).state).toBe('missing')
+  })
+
+  it('covers every automation unlock pairing in two- and three-power layouts', () => {
+    for (const [comboId, partnerId, expected] of [
+      ['winter', 'char_4208_wintim', [[0, 0, 2, 60], [0, 0, 3, 70], [0, 1, 2, 90], [0, 1, 3, 100], [2, 0, 2, 70], [2, 0, 3, 85], [2, 1, 2, 100], [2, 1, 3, 115]]],
+      ['weedy-eunectes', 'char_416_zumama', [[0, 0, 2, 70], [0, 0, 3, 85], [0, 2, 2, 80], [0, 2, 3, 100], [2, 0, 2, 80], [2, 0, 3, 100], [2, 2, 2, 90], [2, 2, 3, 115]]],
+    ] as [string, string, number[][]][]) {
+      const combo = buildingRatingCombos.find((combo) => combo.id === comboId)!
+      const actual = combo.variants.map((variant) => [variant.members.find((member) => member.id === 'char_400_weedy')!.elite, variant.members.find((member) => member.id === partnerId)!.elite, variant.requirements.powerCountExact, variant.production])
+      expect(actual, comboId).toHaveLength(expected.length)
+      expect(actual, comboId).toEqual(expect.arrayContaining(expected))
+    }
+  })
+
   it('keeps the four required tailor variants together and preserves Peper in control as an independent use', () => {
     expect(shamare.variants.slice(0, 4).map((variant) => variant.members.map((member) => characters[member.id].name))).toEqual([
       ['巫恋', '龙舌兰', '柏喙'], ['巫恋', '龙舌兰', '卡夫卡'], ['巫恋', '龙舌兰', '折光'], ['巫恋', '龙舌兰', '明椒'],
@@ -168,6 +195,16 @@ describe('rating profile matching', () => {
     expect(ratingVariantStatus(first, locked, config)).toMatchObject({ membersOwned: true, state: 'locked' })
     expect(ratingVariantStatus(first, roster, { ...config, trading_station_levels: [2, 2] }).state).toBe('blocked')
     expect(ratingVariantStatus(first, roster, null).state).toBe('unknown')
+  })
+
+  it('matches layout-specific scores to the actual power station count', () => {
+    const winter = buildingRatingCombos.find((combo) => combo.id === 'winter')!
+    const twoPower = winter.variants.find((variant) => variant.production === 100 && variant.requirements.powerCountExact === 2)!
+    const roster = buildingRatingRoster(twoPower.members.map((member) => owned(member)))
+    expect(ratingVariantStatus(twoPower, roster, config).state).toBe('blocked')
+    const twoPowerConfig = { ...CONFIG_PRESETS['252'], manufacturing_station_levels: [3, 3, 3, 2, 2] }
+    expect(ratingVariantStatus(twoPower, roster, twoPowerConfig).state).toBe('ready')
+    expect(ratingVariantStatus(winter.variants.find((variant) => variant.production === 115)!, roster, twoPowerConfig).state).toBe('blocked')
   })
 
   it('does not infer live dormitory, mood, or training-task conditions from account ownership', () => {

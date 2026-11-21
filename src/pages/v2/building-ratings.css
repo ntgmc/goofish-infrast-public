@@ -134,3 +134,7 @@
   .v2-rating-dialog-body, .v2-rating-details { padding: var(--space-sm); }
   .v2-rating-members, .v2-rating-partner-picker { grid-template-columns: minmax(0, 1fr); }
 }
+@media (max-width: 24rem) {
+  .v2-rating-dialog-heading { grid-template-columns: 72px minmax(0, 1fr); }
+  .v2-rating-dialog-heading > .v2-rating-artwork { width: 72px; }
+}

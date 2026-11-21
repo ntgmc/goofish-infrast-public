@@ -39,6 +39,7 @@
   { "id": "char_4048_doroth", "elite": 0, "capacity": 0, "production": 0, "rhineProduction": true, "companion": "char_1047_halo2" },
   { "id": "char_4048_doroth", "elite": 2, "capacity": 0, "production": 25, "rhineProduction": true, "companion": "char_1047_halo2" },
   { "id": "char_4212_nasti", "elite": 0, "capacity": 0, "production": 25, "companion": "char_1047_halo2" },
+  { "id": "char_4212_nasti", "elite": 2, "capacity": 0, "production": 25, "goldProduction": 6, "companion": "char_1047_halo2", "conditions": "娜斯提与溯光星源两名同站莱茵成员提供6%赤金生产力。" },
   { "id": "char_4077_palico", "elite": 0, "level": 30, "capacity": 8, "production": 5, "conditions": "未配置木天蓼来源，额外生产力另计。" },
   { "id": "char_4126_fuze", "elite": 2, "capacity": 8, "production": 20, "support": ["char_459_tachak", "char_197_poca", "char_115_headbr", "char_195_glassb", "char_194_leto"], "conditions": "战车精二与四名乌萨斯学生自治团干员同驻中枢，提供4瓶特饮；计入五个中枢位置。" },
   { "id": "char_4062_totter", "elite": 1, "capacity": 6, "production": 25, "requirements": { "mood": true }, "conditions": "铅踝仅在心情落差大于12且小于16时提供这里的25%生产力与6格仓库，离开该区间需重新评价。" }
