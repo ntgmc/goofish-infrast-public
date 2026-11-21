@@ -48,7 +48,7 @@ export function RatingStageDetails({ stages, member, profileId }: { stages: Rati
     <p><strong>{text.reason}：</strong>{assessment.reason}</p>
     {assessment.conditions && <p><strong>{text.conditions}：</strong>{assessment.conditions}</p>}
     {related.length > 0 && <p className="v2-muted">{text.independent}</p>}
-    <BuildingRatingFactors room={member.room} series={stages.map((item) => ({ id: `${item.elite}.${item.level}`, label: unlock(item.elite, item.level, buildingRatingCharacter(member.id).rarity <= 2), factors: buildingRatingFactors(member.room, item.skills).factors }))} />
+    <BuildingRatingFactors room={member.room} series={stages.map((item) => ({ id: `${item.elite}.${item.level}`, label: unlock(item.elite, item.level, buildingRatingCharacter(member.id).rarity <= 2), factors: buildingRatingFactors(member.room, item.skills, { member: { id: member.id, elite: item.elite } }).factors }))} />
     <RatingSkills ids={stage.skills} />
     {stages.length > 1 && <div><h3>{text.stages}</h3><ol className="v2-rating-stages">{stages.map((item) => <li key={`${item.elite}.${item.level}`}><span>{unlock(item.elite, item.level, buildingRatingCharacter(member.id).rarity <= 2)}</span><RatingBadge score={item.assessment.score!} /><p>{item.assessment.reason}</p></li>)}</ol></div>}
     {assessment.scenarios?.length ? <div><h3>{text.scenarios}</h3><ul className="v2-rating-scenarios">{assessment.scenarios.map((scenario) => <li key={scenario.label}><span>{scenario.label}</span><RatingBadge score={scenario.score} /><p>{scenario.reason}</p></li>)}</ul></div> : null}

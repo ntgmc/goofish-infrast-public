@@ -1,11 +1,12 @@
-import { buildingRatingSkill, type RatingVariant } from './building-skill-ratings'
+import { buildingMeetingBonus, buildingRatingSkill, type RatingMember, type RatingVariant } from './building-skill-ratings'
 
 export type RatingFactorId = 'efficiency' | 'coverage' | 'mood' | 'facility' | 'team' | 'slots' | 'flexibility'
 type RatingFactorLevel = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
-export type RatingFactor = { id: RatingFactorId; score: RatingFactorLevel | null; raw?: number; high?: number; basis: string; conditional?: boolean; scenes?: string[] }
+export type RatingFactor = { id: RatingFactorId; score: RatingFactorLevel | null; raw?: number; high?: number; basis: string; conditional?: boolean; scenes?: string[]; parts?: ReturnType<typeof buildingMeetingBonus> & { skill: number | null } }
 type RatingFactorProfile = { room: string; factors: RatingFactor[] }
+type RatingFactorContext = Pick<RatingVariant, 'members' | 'requirements' | 'production'> | { member: Pick<RatingMember, 'id' | 'elite'> }
 
-const references: Record<string, number> = { manufacture: 40, trading: 40, power: 25, meeting: 40, hire: 50, processing: 100, training: 100, recycling: 30, dormitory: 1.2 }
+const references: Record<string, number> = { manufacture: 40, trading: 40, power: 25, meeting: 65, hire: 50, processing: 100, training: 100, recycling: 30, dormitory: 1.2 }
 const outputPatterns: Record<string, RegExp> = {
   manufacture: /生产力(?:提升)?([+-]?\d+(?:\.\d+)?)%/g,
   trading: /订单(?:获取)?效率(?:提升)?([+-]?\d+(?:\.\d+)?)%/g,
@@ -48,6 +49,7 @@ const routineOutputs: Record<string, { raw: number; scene: string; target?: stri
   'power_rec_drone[000]': { raw: 200 / 10, scene: 'droneCapacity200' },
   'hire_spd_cost&extra[000]': { raw: 10 * 3, scene: 'threeRecruitSlots' },
   'meet_spd&clue[000]': { raw: 5 * 3, scene: 'threeRecruitSlots' },
+  'meet_spd_hast[000]': { raw: (20 + 22 + 24 + 26 + 28 + 30 + 30 + 30) / 8, scene: 'eightHourAverage' },
   'manu_prod_spd_addition[030]': { raw: (20 + 21 + 22 + 23 + 24 + 25 + 25 + 25) / 8, scene: 'eightHourAverage' },
   'manu_prod_spd_addition[031]': { raw: (20 + 21 + 22 + 23 + 24 + 25 + 25 + 25) / 8, scene: 'eightHourAverage' },
   'manu_prod_spd_addition[040]': { raw: (15 + 17 + 19 + 21 + 23 + 25 + 25 + 25) / 8, scene: 'eightHourAverage' },
@@ -55,7 +57,9 @@ const routineOutputs: Record<string, { raw: number; scene: string; target?: stri
 }
 
 // These descriptive indices never read the published assessment score.
-export function buildingRatingFactors(room: string, ids: string[], variant?: Pick<RatingVariant, 'members' | 'requirements' | 'production'>): RatingFactorProfile {
+export function buildingRatingFactors(room: string, ids: string[], context?: RatingFactorContext): RatingFactorProfile {
+  const variant = context && 'members' in context ? context : undefined
+  const member = context && 'member' in context ? context.member : undefined
   const effects = ids.map((id) => ({ id, ...buildingRatingSkill(id) }))
   const local = effects.filter((skill) => skill.room === room)
   const descriptions = local.map((skill) => skill.description)
@@ -77,7 +81,7 @@ export function buildingRatingFactors(room: string, ids: string[], variant?: Pic
   const solo = /只有自身处于工作状态/.test(combined)
   const trainingConditions = [/专精技能至\d级/, /训练位干员分支/, /训练时长达/].filter((pattern) => pattern.test(combined)).length + partnerCount
   return { room, factors: [
-    outputFactor(room, effects, variant),
+    room === 'meeting' && (member || variant) ? meetingOutputFactor(effects, member ? [member] : variant!.members.filter((item) => item.room === room)) : outputFactor(room, effects, variant),
     coverageFactor(room, descriptions),
     moodFactor(room, descriptions),
     { id: 'facility', score: level(100 / (1 + dependencyRooms.size)), raw: dependencyRooms.size, basis: 'facilities' },
@@ -121,8 +125,26 @@ function outputFactor(room: string, effects: { id: string; description: string; 
   return { id: 'efficiency', score: level(raw / references[room] * 100), raw, basis: routine.length ? 'routineOutput' : 'bonus', conditional: conditional || routine.length > 0, scenes: [...new Set(routine.map((effect) => routineOutputs[effect.id].scene))] }
 }
 
+function meetingOutputFactor(effects: { id: string; description: string; room: string }[], members: Pick<RatingMember, 'id' | 'elite'>[]): RatingFactor {
+  if (!members.length) return { id: 'efficiency', score: null, basis: 'meetingNoStaff' }
+  const skill = outputFactor('meeting', effects.filter((effect) => /线索搜集速度/.test(effect.description)))
+  const bonuses = members.map(buildingMeetingBonus)
+  const average = (key: 'rarity' | 'elite' | 'work') => bonuses.reduce((sum, value) => sum + value[key], 0) / members.length
+  const parts = { rarity: average('rarity'), elite: average('elite'), work: average('work'), skill: skill.raw === undefined ? null : skill.raw / members.length }
+  const raw = parts.skill === null ? undefined : parts.rarity + parts.elite + parts.work + parts.skill
+  return { ...skill, raw, parts, score: raw === undefined ? null : level(raw / references.meeting * 100), basis: members.length > 1 ? 'meetingPerWorker' : 'meetingWorker' }
+}
+
 function coverageFactor(room: string, descriptions: string[]): RatingFactor {
   const text = descriptions.join('；')
+  if (room === 'meeting') {
+    const missing = descriptions.filter((description) => /尚未拥有/.test(description)).length
+    if (/必定获得/.test(text)) return { id: 'coverage', score: 5, raw: 100, basis: 'guaranteedClue', conditional: true }
+    if (missing) return { id: 'coverage', score: null, basis: missing > 1 ? 'clueStackUnverified' : 'clueMissingUnquantified', conditional: /当与|处于线索交流/.test(text) }
+    if (/已经拥有/.test(text)) return { id: 'coverage', score: 1, basis: 'clueOwned' }
+    if (/更容易|概率|倾向/.test(text)) return { id: 'coverage', score: null, basis: 'clueFactionUnquantified' }
+    return { id: 'coverage', score: 1, basis: 'clueNone' }
+  }
   if (room === 'processing') {
     const output = descriptions.filter((description) => /副产品|因果|业报/.test(description)).join('；')
     const [score, basis]: [number, string] = !output ? [0, 'noByproduct'] : /原始心情消耗为|原始\d心情/.test(output) ? [40, 'moodTier']

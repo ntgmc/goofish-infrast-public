@@ -70,7 +70,7 @@ function OperatorRating({ entry, operator, roster }: { entry: SingleBuildingRati
     <p>{assessment.reason}</p>
     {assessment.conditions && <p className="v2-operator-rating-condition"><strong>{text.conditions}：</strong>{assessment.conditions}</p>}
     {assessment.scenarios?.length ? <ul className="v2-rating-scenarios">{assessment.scenarios.map((scenario) => <li key={scenario.label}><span>{scenario.label}</span><RatingBadge score={scenario.score} /><p>{scenario.reason}</p></li>)}</ul> : null}
-    <BuildingRatingFactors room={entry.room} current={index} series={entry.stages.map((item) => ({ id: `${item.elite}.${item.level}`, label: unlock(item.elite, item.level, buildingRatingCharacter(entry.operatorId).rarity <= 2), factors: buildingRatingFactors(entry.room, item.skills).factors }))} />
+    <BuildingRatingFactors room={entry.room} current={index} series={entry.stages.map((item) => ({ id: `${item.elite}.${item.level}`, label: unlock(item.elite, item.level, buildingRatingCharacter(entry.operatorId).rarity <= 2), factors: buildingRatingFactors(entry.room, item.skills, { member: { id: entry.operatorId, elite: item.elite } }).factors }))} />
     <BuildingSkillList skills={skills} owned={operator.own} levelBased={buildingRatingCharacter(entry.operatorId).rarity <= 2} />
   </section>
 }

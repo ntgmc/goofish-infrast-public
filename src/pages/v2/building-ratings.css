@@ -81,7 +81,7 @@
 .v2-rating-dialog { width: min(50rem, calc(100vw - 2rem)); }
 .v2-rating-dialog > .shared-card-scroll { padding: 0; }
 .v2-rating-dialog.v2-dialog > .shared-card-close { z-index: 3; }
-.v2-rating-dialog-heading { position: sticky; top: 0; z-index: 2; display: grid; grid-template-columns: 96px minmax(0, 1fr); grid-template-areas: 'portrait identity' 'portrait description'; gap: var(--space-xs) var(--space-md); align-items: center; padding: var(--space-md) 56px var(--space-sm) var(--space-md); border-bottom: 1px solid var(--v2-line); background: var(--v2-paper); }
+.v2-rating-dialog-heading { position: sticky; top: 0; z-index: 2; display: grid; grid-template-columns: 96px minmax(0, 1fr); grid-template-areas: 'portrait identity' 'portrait description'; gap: var(--space-xs) var(--space-md); align-items: center; padding: var(--space-md) calc(56px + var(--space-xs)) var(--space-sm) var(--space-md); border-bottom: 1px solid var(--v2-line); background: var(--v2-paper); }
 .v2-rating-dialog-heading > .v2-rating-artwork { grid-area: portrait; width: 96px; }
 .v2-rating-dialog-heading > .v2-rating-identity { grid-area: identity; }
 .v2-rating-dialog-heading h2 { font-size: var(--text-xl); font-weight: 650; }

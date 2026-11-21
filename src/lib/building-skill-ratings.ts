@@ -19,6 +19,7 @@ type Character = { name: string; profession: string; skills: { id: string; slot:
 const characters: Record<string, Character> = catalog.operators
 const skills: Record<string, Skill> = catalog.skills
 const rarities: Record<string, number> = published.rarities
+const meetingStageScores: Record<string, (number | null)[]> = published.meetingStageScores
 const reviews: SkillAssessment[] = published.reviews
 const joints: SkillAssessment[] = published.joints
 export const buildingRatingEdition = { version: published.version, evaluatedAt: published.evaluatedAt, sources: published.sources }
@@ -40,11 +41,18 @@ export function buildingRatingSkill(id: string) {
   return skills[id]
 }
 
+export function buildingMeetingBonus(member: Pick<RatingMember, 'id' | 'elite'>) {
+  const rarity = rarities[member.id]
+  return { rarity: rarity <= 3 ? 0 : rarity === 4 ? 2 : rarity === 5 ? 4 : 5, elite: member.elite * 8, work: 5 }
+}
+
 export const singleBuildingRatings: SingleBuildingRating[] = Object.entries(characters).flatMap(([operatorId, operator]) => {
   const active = new Map<number, string>()
   const stages = new Map<string, RatingStage[]>()
   const dependent = new Set<string>()
-  const unlocks = [...new Map(operator.skills.map((unlock) => [`${unlock.elite}.${unlock.level}`, unlock])).values()]
+  const meetingProgression = operator.skills.some((skill) => skills[skill.id].room === 'meeting')
+    ? Array.from({ length: rarities[operatorId] <= 2 ? 1 : rarities[operatorId] === 3 ? 2 : 3 }, (_, elite) => ({ elite, level: 1 })) : []
+  const unlocks = [...new Map([...operator.skills, ...meetingProgression].map((unlock) => [`${unlock.elite}.${unlock.level}`, unlock])).values()]
     .sort((a, b) => a.elite - b.elite || a.level - b.level)
   for (const { elite, level } of unlocks) {
     for (const skill of operator.skills) if (skill.elite < elite || skill.elite === elite && skill.level <= level) active.set(skill.slot, skill.id)
@@ -60,12 +68,23 @@ export const singleBuildingRatings: SingleBuildingRating[] = Object.entries(char
       const assessment = ids.length === 1 ? reviewBySkill.get(ids[0]) : jointBySkills.get(signature(ids))
       if (!assessment || assessment.score === null) throw new Error(`Missing building skill assessment: ${operatorId}/${signature(ids)}`)
       const history = stages.get(room) ?? []
-      if (signature(history[history.length - 1]?.skills ?? []) !== signature(ids)) history.push({ elite, level, skills: ids, assessment })
+      if (signature(history[history.length - 1]?.skills ?? []) !== signature(ids) || room === 'meeting' && history[history.length - 1]?.elite !== elite) {
+        history.push({ elite, level, skills: ids, assessment })
+      }
       stages.set(room, history)
     }
   }
-  return [...stages].filter(([room]) => !dependent.has(room)).map(([room, history]) => ({ id: `${operatorId}:${room}`, operatorId, name: operator.name, room, stages: history, stage: history[history.length - 1] }))
+  return [...stages].filter(([room]) => !dependent.has(room)).map(([room, history]) => {
+    const progression = room === 'meeting' ? history.map((stage) => meetingStage(operatorId, stage)) : history
+    return { id: `${operatorId}:${room}`, operatorId, name: operator.name, room, stages: progression, stage: progression[progression.length - 1] }
+  })
 })
+
+function meetingStage(operatorId: string, stage: RatingStage): RatingStage {
+  const score = meetingStageScores[operatorId]?.[stage.elite]
+  if (score === null || score === undefined) throw new Error(`Missing meeting stage assessment: ${operatorId}/${stage.elite}`)
+  return { ...stage, assessment: { ...stage.assessment, score, provisional: stage.assessment.provisional || stage.skills.some((id) => /更容易|概率|倾向/.test(skills[id].description)) } }
+}
 
 export function comboBuildingRatingRange(combo: RatingCombo) {
   const scores = combo.variants.map((variant) => variant.score)

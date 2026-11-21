@@ -5,7 +5,7 @@ import published from '../data/building-skill-ratings.json'
 import warehousePartners from '../data/building-rating-warehouse-partners.json'
 import { canonicalJson } from './crypto'
 import { CONFIG_PRESETS } from './config'
-import { buildingRatingCombos, buildingRatingRoster, buildingRatingTrainingCost, ratingMemberStatus, ratingVariantStatus, singleBuildingRatings, type RatingMember } from './building-skill-ratings'
+import { buildingMeetingBonus, buildingRatingCombos, buildingRatingRoster, buildingRatingTrainingCost, ratingMemberStatus, ratingVariantStatus, singleBuildingRatings, type RatingMember } from './building-skill-ratings'
 import type { LicenseOperator } from './types'
 
 const characters: Record<string, typeof catalog.operators.char_285_medic2> = catalog.operators
@@ -78,22 +78,48 @@ describe('published building skill ratings', () => {
     expect(pair.variants.map((variant) => variant.score)).toEqual([78, 68])
   })
 
-  it('keeps usable high-speed shifts above ordinary clue staff and charges solitary effects for both positions', () => {
+  it('compares meeting shifts with actual promotion bonuses and the passive contribution of exhausted partners', () => {
     const ordinary = singleBuildingRatings.find((entry) => entry.name === '远山' && entry.room === 'meeting')!.stage.assessment.score!
     const forcer = singleBuildingRatings.find((entry) => entry.name === '见行者' && entry.room === 'meeting')!.stage.assessment.score!
     const clem = singleBuildingRatings.find((entry) => entry.name === '克莱门莎' && entry.room === 'meeting')!.stage.assessment.score!
     expect(forcer).toBeGreaterThan(ordinary)
-    expect(clem).toBe(forcer)
+    expect(clem).toBeGreaterThan(forcer)
     const solitary = new Set(Object.entries(catalog.skills).filter(([, skill]) => skill.description.includes('只有自身处于工作状态')).map(([id]) => id))
     const affected = singleBuildingRatings.filter((entry) => entry.room === 'meeting' && entry.stage.skills.some((id) => solitary.has(id)))
     expect(affected.map((entry) => entry.name).sort()).toEqual(['予愿安洁莉娜', '和弦', '复奏', '奥达', '霍尔海雅', '风丸'].sort())
-    for (const entry of affected) expect(entry.stage.assessment.score!, entry.name).toBeLessThan(ordinary)
+    for (const entry of affected.filter((item) => ['霍尔海雅', '奥达', '复奏'].includes(item.name))) expect(entry.stage.assessment.score!, entry.name).toBeLessThan(ordinary)
+    for (const entry of affected.filter((item) => ['风丸', '和弦', '予愿安洁莉娜'].includes(item.name))) expect(entry.stage.assessment.score!, entry.name).toBeGreaterThan(ordinary)
     for (const [penalized, baseline] of [['manu_prod_spd&limit&cost[110]', 'manu_prod_spd[020]'], ['manu_formula_spd&limit&cost[100]', 'manu_formula_spd[020]'], ['hire_spd_cost[200]', 'hire_spd[011]']]) {
       const score = published.reviews.find((review) => review.skills.includes(penalized))!.score!
       const reference = published.reviews.find((review) => review.skills.includes(baseline))!.score!
       expect(reference - score, penalized).toBeGreaterThanOrEqual(0)
       expect(reference - score, penalized).toBeLessThanOrEqual(3)
     }
+  })
+
+  it('keeps only real meeting dependencies and preserves the free second work position', () => {
+    expect(buildingRatingCombos.some((combo) => /meeting-(faithmixer|reserve)-cantabile/.test(combo.id))).toBe(false)
+    for (const [id, names] of [['meeting-faithmixer-fiammetta', ['信仰搅拌机', '菲亚梅塔']], ['meeting-reserve-orchid', ['罗德岛隐秘队', '焰狐龙梓兰']]] as const) {
+      const combo = buildingRatingCombos.find((item) => item.id === id)!
+      expect(combo.variants[0].members.map((member) => characters[member.id].name)).toEqual(names)
+      expect(combo.variants[0].members.filter((member) => member.room === 'meeting')).toHaveLength(1)
+    }
+  })
+
+  it('includes meeting progression even when the skill does not change, with stage-specific reviewed scores', () => {
+    const entries = singleBuildingRatings.filter((entry) => entry.room === 'meeting')
+    for (const entry of entries) for (const stage of entry.stages) {
+      expect(stage.assessment.score).toBe(published.meetingStageScores[entry.operatorId as keyof typeof published.meetingStageScores][stage.elite])
+    }
+    const lowStar = entries.find((entry) => entry.name === '12F')!
+    const shirayuki = entries.find((entry) => entry.name === '白雪')!
+    expect(lowStar.stages.map((stage) => stage.elite)).toEqual([0])
+    expect(shirayuki.stages.map((stage) => stage.elite)).toEqual([0, 1, 2])
+    expect(shirayuki.stages.map((stage) => stage.skills)).toEqual([lowStar.stage.skills, lowStar.stage.skills, lowStar.stage.skills])
+    expect(shirayuki.stages[0].assessment.score).toBeGreaterThan(lowStar.stage.assessment.score!)
+    expect(shirayuki.stage.assessment.score).toBeGreaterThan(shirayuki.stages[0].assessment.score!)
+    expect(buildingMeetingBonus({ id: 'char_009_12fce', elite: 0 })).toEqual({ rarity: 0, elite: 0, work: 5 })
+    expect(buildingMeetingBonus({ id: 'char_4194_rmixer', elite: 2 })).toEqual({ rarity: 5, elite: 16, work: 5 })
   })
 
   it('values workshop coverage above reduced mood costs and one-recipe peak bonuses', () => {

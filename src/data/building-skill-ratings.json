@@ -1,5 +1,5 @@
 {
-  "version": "2026-11-22.5",
+  "version": "2026-11-22.6",
   "evaluatedAt": "2026-11-22",
   "snapshot": {
     "game": "63c7cec73c3858d0ae913f85cc89af3cef4d744f",
@@ -10,6 +10,26 @@
       "label": "游戏基建技能快照",
       "url": "https://github.com/Kengxxiao/ArknightsGameData/tree/63c7cec73c3858d0ae913f85cc89af3cef4d744f/zh_CN/gamedata/excel",
       "use": "技能效果与解锁条件"
+    },
+    {
+      "label": "PRTS 会客室机制",
+      "url": "https://prts.wiki/w/罗德岛基建/会客室",
+      "use": "进驻、稀有度和精英阶段的搜集速度加成"
+    },
+    {
+      "label": "PRTS 晓歌",
+      "url": "https://prts.wiki/w/晓歌",
+      "use": "补缺倾向的技能原文；未披露命中概率与同类叠加算法"
+    },
+    {
+      "label": "PRTS 信仰搅拌机",
+      "url": "https://prts.wiki/w/信仰搅拌机",
+      "use": "菲亚梅塔宿舍支援条件"
+    },
+    {
+      "label": "一图流会客室公开实现",
+      "url": "https://github.com/Arknights-yituliu/frontend-v2-plus/blob/275fbbb6424683493adb2bfca5043d6eba29b178/src/utils/mower/theoretical-output/engine/engine/supportFacilities/receptionClues.ts",
+      "use": "交叉核对星级、精英阶段与涣散成员的被动加成；不作为线索概率实测"
     }
   ],
   "reviews": [
@@ -2698,7 +2718,7 @@
       ],
       "score": 10,
       "usage": "独处线索",
-      "reason": "15%加速要求另一工作位空置，损失第二人的搜集贡献，整间会客室收益很低。",
+      "reason": "15%加速要求另一成员不工作；可保留涣散搭档的星级与精英加成，但失去其正常进驻5%与技能速度。",
       "conditions": "仅自身处于工作状态时生效。",
       "provisional": false
     },
@@ -2708,7 +2728,7 @@
       ],
       "score": 25,
       "usage": "独处线索",
-      "reason": "35%加速要求另一工作位空置，不能叠加第二人的技能和自身搜集贡献，按整间会客室评价。",
+      "reason": "35%独处加速可配涣散搭档，保留其星级与精英加成；仍损失第二人正常进驻5%与技能速度。",
       "conditions": "仅自身处于工作状态时生效。",
       "provisional": false
     },
@@ -2718,7 +2738,7 @@
       ],
       "score": 35,
       "usage": "定向线索",
-      "reason": "可定向补罗德岛线索，但全过程须让出第二个工作位，所得单条线索不足以作为高效常驻方案。",
+      "reason": "达到连续心情消耗门槛后可保证下一条为罗德岛线索；另一成员需不工作，涣散搭档仍可提供星级与精英加成。",
       "conditions": "仅自身工作，连续消耗超过16点心情后，下一次线索必定为罗德岛。",
       "provisional": false
     },
@@ -2818,7 +2838,7 @@
       ],
       "score": 10,
       "usage": "独处线索",
-      "reason": "15%加速要求另一工作位空置，损失第二人的搜集贡献，整间会客室收益很低。",
+      "reason": "15%加速要求另一成员不工作；可保留涣散搭档的星级与精英加成，但失去其正常进驻5%与技能速度。",
       "conditions": "仅自身处于工作状态时生效。",
       "provisional": false
     },
@@ -2828,7 +2848,7 @@
       ],
       "score": 25,
       "usage": "独处线索",
-      "reason": "35%加速要求另一工作位空置，不能叠加第二人的技能和自身搜集贡献，按整间会客室评价。",
+      "reason": "35%独处加速可配涣散搭档，保留其星级与精英加成；仍损失第二人正常进驻5%与技能速度。",
       "conditions": "仅自身处于工作状态时生效。",
       "provisional": false
     },
@@ -2838,7 +2858,7 @@
       ],
       "score": 40,
       "usage": "独处线索",
-      "reason": "50%加速须让出第二个工作位，损失另一人的技能和自身搜集贡献；高个人百分比不等于高整站收益。",
+      "reason": "50%独处加速可配涣散搭档，保留其星级与精英加成；按完整一班、额外心情消耗和整站速度评价。",
       "conditions": "仅自身处于工作状态时生效。",
       "provisional": false
     },
@@ -3515,7 +3535,7 @@
       ],
       "score": 20,
       "usage": "独处线索",
-      "reason": "额外35%加速以空置另一工作位为代价，须扣除第二人的搜集贡献；与自身基础15%一起评价。",
+      "reason": "额外35%要求只有自身工作；与常驻15%合计50%，另一位可用涣散成员保留星级与精英加成。",
       "conditions": "",
       "provisional": false
     },
@@ -3742,7 +3762,7 @@
       ],
       "score": 35,
       "usage": "定向线索",
-      "reason": "可定向补莱茵线索，但全过程须让出第二个工作位，所得单条线索不足以作为高效常驻方案。",
+      "reason": "达到连续心情消耗门槛后可保证下一条为莱茵线索；另一成员需不工作，涣散搭档仍可提供星级与精英加成。",
       "conditions": "仅自身工作，连续消耗超过16点心情后，下一次线索必定为莱茵。",
       "provisional": false
     },
@@ -3909,7 +3929,7 @@
       ],
       "score": 40,
       "usage": "独处线索",
-      "reason": "50%加速须让出第二个工作位，损失另一人的技能和自身搜集贡献；高个人百分比不等于高整站收益。",
+      "reason": "50%独处加速可配涣散搭档，保留其星级与精英加成；按完整一班、额外心情消耗和整站速度评价。",
       "conditions": "仅自身处于工作状态时生效。",
       "provisional": false
     },
@@ -6666,7 +6686,7 @@
       ],
       "score": 45,
       "usage": "罗德岛定向线索",
-      "reason": "独处35%加速与定向罗德岛线索共同生效，但占用整间会客室的工作机会；适合临时补缺，常驻收益有限。",
+      "reason": "独处35%可配涣散搭档保留星级与精英加成；达到连续心情消耗门槛后可保证下一条为罗德岛线索，适合定向需求。",
       "conditions": "仅自身工作，连续消耗超过16点心情后，下一次线索必定为罗德岛；能否触发取决于实际消耗速度。",
       "provisional": false
     },
@@ -7047,7 +7067,7 @@
       ],
       "score": 48,
       "usage": "线索搜集",
-      "reason": "双人工作保留基础15%加速；独处虽达50%，但需空置另一工作位，整站收益不足以提高其常规评级。",
+      "reason": "双人工作保留基础15%；独处合计50%时可配涣散搭档保留其星级与精英加成，整站速度可以超过两名普通20%成员。",
       "conditions": "线索收取、交流及线索类型需求会影响实际价值。",
       "provisional": false
     },
@@ -7135,7 +7155,7 @@
       ],
       "score": 45,
       "usage": "莱茵定向线索",
-      "reason": "独处35%加速与定向莱茵线索共同生效，但占用整间会客室的工作机会；适合临时补缺，常驻收益有限。",
+      "reason": "独处35%可配涣散搭档保留星级与精英加成；达到连续心情消耗门槛后可保证下一条为莱茵线索，适合定向需求。",
       "conditions": "仅自身工作，连续消耗超过16点心情后，下一次线索必定为莱茵；能否触发取决于实际消耗速度。",
       "provisional": false
     },
@@ -7256,7 +7276,7 @@
       ],
       "score": 68,
       "usage": "线索补缺",
-      "reason": "双人工作仍可偏向未拥有的线索；独处50%加速需让出第二工作位，不提高日常补缺评级。",
+      "reason": "独处50%加速可配涣散搭档保留其星级与精英加成，整站速度接近或超过普通双人；补缺倾向的额外收益仍待量化。",
       "conditions": "独处加速仅在自身工作时生效；补缺倾向的隐藏概率未公开。",
       "provisional": true
     },
@@ -13342,8 +13362,8 @@
       ]
     },
     {
-      "id": "meeting-reserve-cantabile",
-      "title": "罗德岛隐秘队与晓歌",
+      "id": "meeting-reserve-orchid",
+      "title": "罗德岛隐秘队与焰狐龙梓兰",
       "room": "meeting",
       "usage": "线索搜集",
       "variants": [
@@ -13357,13 +13377,6 @@
               "station": "main"
             },
             {
-              "id": "char_497_ctable",
-              "room": "meeting",
-              "elite": 2,
-              "level": 1,
-              "station": "main"
-            },
-            {
               "id": "char_1048_orchd2",
               "room": "control",
               "elite": 0,
@@ -13371,9 +13384,9 @@
               "station": "main"
             }
           ],
-          "score": 82,
-          "reason": "同室或跨设施指定搭档触发额外线索效果，按两名成员及配套位置整体评价。",
-          "conditions": "额外10%来自焰狐龙梓兰中枢。",
+          "score": 70,
+          "reason": "焰狐龙梓兰为罗德岛隐秘队提供额外10%搜集速度；隐秘队自身带有补缺倾向，按一个会客室岗位和一个中枢岗位评价。",
+          "conditions": "焰狐龙梓兰进驻中枢时额外提供10%搜集速度；另一会客室岗位可自由安排。同类补缺倾向的叠加和概率尚未查证。",
           "requirements": {},
           "provisional": true
         }
@@ -13411,8 +13424,8 @@
       ]
     },
     {
-      "id": "meeting-faithmixer-cantabile",
-      "title": "信仰搅拌机与晓歌",
+      "id": "meeting-faithmixer-fiammetta",
+      "title": "信仰搅拌机与菲亚梅塔",
       "room": "meeting",
       "usage": "线索搜集",
       "variants": [
@@ -13426,13 +13439,6 @@
               "station": "main"
             },
             {
-              "id": "char_497_ctable",
-              "room": "meeting",
-              "elite": 2,
-              "level": 1,
-              "station": "main"
-            },
-            {
               "id": "char_300_phenxi",
               "room": "dormitory",
               "elite": 0,
@@ -13440,9 +13446,9 @@
               "station": "main"
             }
           ],
-          "score": 82,
-          "reason": "同室或跨设施指定搭档触发额外线索效果，按两名成员及配套位置整体评价。",
-          "conditions": "菲亚梅塔处于宿舍，兼顾她的心情支援。",
+          "score": 88,
+          "reason": "信仰搅拌机精二的20%搜集速度与菲亚梅塔宿舍支援10%相加；六星精二的进驻加成进一步提高实际速度。",
+          "conditions": "菲亚梅塔处于宿舍即可提供额外10%搜集速度；信仰搅拌机技能合计30%，加上六星精二正常进驻26%，合计56%。另一会客室岗位可自由安排。",
           "requirements": {},
           "provisional": true
         }
@@ -15468,6 +15474,59 @@
     "char_164_nightm": "c80a2c41da5fd8f2b6950deb1c8d429093d7218927fa45b90e1d4318be0683a5",
     "char_220_grani": "c6f1fc61a8b25a08046651ac5d2282d05b56f1fb48dcceff62fec0147810a66f",
     "char_263_skadi": "94a429053f4c9fb8de0c765d9f773b98a19f96633d60406dd45682177aee3191"
+  },
+  "meetingStageScores": {
+    "char_4220_kormr": [65],
+    "char_4091_ulika": [10],
+    "char_009_12fce": [50],
+    "char_109_fmout": [null, 73, 82],
+    "char_235_jesica": [null, 55, 67],
+    "char_133_mm": [53, 70, 82],
+    "char_118_yuki": [53, 65, 77],
+    "char_4100_caper": [34, 88, 92],
+    "char_198_blackd": [null, 55, 67],
+    "char_337_utage": [null, 65, 77],
+    "char_445_wscoot": [44, 70, 82],
+    "char_236_rope": [53, 65, 77],
+    "char_275_breeze": [38, 53, 70],
+    "char_4199_makiri": [38, 53, 78],
+    "char_401_elysm": [44, 52, 65],
+    "char_4237_jcinta": [null, null, 79],
+    "char_497_ctable": [58, 66, 78],
+    "char_4017_puzzle": [38, 53, 78],
+    "char_106_franka": [38, 53, 70],
+    "char_4142_laios": [55, 67, 79],
+    "char_155_tiger": [38, 53, 70],
+    "char_294_ayer": [38, 53, 79],
+    "char_274_astesi": [38, 53, 85],
+    "char_4131_odda": [25, 35, 79],
+    "char_405_absin": [44, 52, 65],
+    "char_4031_liesel": [25, 35, 68],
+    "char_297_hamoni": [null, null, 87],
+    "char_4013_kjera": [38, 53, 76],
+    "char_4114_harold": [38, 53, 65],
+    "char_144_red": [null, null, 85],
+    "char_158_milu": [38, 53, 79],
+    "char_195_glassb": [null, null, 70],
+    "char_492_quercu": [44, 52, 65],
+    "char_4172_xingzh": [null, null, 79],
+    "char_4036_forcer": [38, 53, 90],
+    "char_4016_kazema": [48, 60, 88],
+    "char_4026_vulpis": [40, 56, 80],
+    "char_427_vigil": [65, 77, 85],
+    "char_4087_ines": [null, null, 86],
+    "char_213_mostma": [40, 56, 72],
+    "char_4027_heyak": [26, 36, 80],
+    "char_291_aglina": [40, 56, 72],
+    "char_1015_aglna2": [58, 66, 90],
+    "char_202_demkni": [40, 56, 72],
+    "char_4194_rmixer": [50, 62, 80],
+    "char_264_f12yin": [null, null, 58],
+    "char_010_chen": [null, null, 85],
+    "char_1050_chen3": [58, 66, 78],
+    "char_4231_clemnt": [55, 67, 91],
+    "char_4214_cairn": [null, null, 88],
+    "char_347_jaksel": [null, 65, 77]
   },
   "rarities": {
     "char_285_medic2": 1,

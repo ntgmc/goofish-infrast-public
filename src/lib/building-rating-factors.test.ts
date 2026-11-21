@@ -10,7 +10,7 @@ describe('descriptive building rating factors', () => {
   it('uses ordinary five-level references, reviewed exceptional tiers, and explicit unknowns across all stages', () => {
     const snapshots = singleBuildingRatings.map((entry) => entry.stages.map((stage) => stage.assessment.score))
     for (const entry of singleBuildingRatings) for (const stage of entry.stages) {
-      const profile = buildingRatingFactors(entry.room, stage.skills)
+      const profile = buildingRatingFactors(entry.room, stage.skills, { member: { id: entry.operatorId, elite: stage.elite } })
       expect(profile.factors, entry.id).toHaveLength(5)
       expect(new Set(profile.factors.map((item) => item.id)).size).toBe(5)
       for (const item of profile.factors) {
@@ -111,6 +111,25 @@ describe('descriptive building rating factors', () => {
     expect(factor('meeting', ho.stage.skills, 'slots').score).toBe(1)
     expect(factor('meeting', ho.stage.skills, 'slots').raw).toBe(1)
     expect(factor('meeting', forcer.stage.skills, 'efficiency').raw).toBe(35)
+  })
+
+  it('adds actual meeting rarity and promotion bonuses to skill speed and distinguishes probability from speed', () => {
+    const at = (id: string, elite: number, skills: string[]) => buildingRatingFactors('meeting', skills, { member: { id, elite } }).factors
+    const low = at('char_009_12fce', 0, ['meet_spd[020]'])[0]
+    const high = at('char_118_yuki', 2, ['meet_spd[020]'])[0]
+    expect(low.raw).toBe(25)
+    expect(high.raw).toBe(43)
+    expect(high.score).toBeGreaterThan(low.score!)
+    const initial = at('char_497_ctable', 0, ['meet_spd_notOwned[000]'])
+    expect(initial[0]).toMatchObject({ raw: 9, parts: { rarity: 4, elite: 0, work: 5, skill: 0 } })
+    expect(initial[1]).toMatchObject({ score: null, basis: 'clueMissingUnquantified' })
+    const duplicate = buildingRatingFactors('meeting', ['meet_spd_notOwned[010]', 'meet_spd&team[000]', 'meet_spd_notOwned[001]'], { members: [{ id: 'char_497_ctable', elite: 2, level: 1, room: 'meeting', station: 'main' }, { id: 'char_4017_puzzle', elite: 2, level: 1, room: 'meeting', station: 'main' }], requirements: {} }).factors
+    expect(duplicate[0].raw).toBe(35)
+    expect(duplicate[1]).toMatchObject({ score: null, basis: 'clueStackUnverified' })
+    const mixer = buildingRatingCombos.find((combo) => combo.id === 'meeting-faithmixer-fiammetta')!.variants[0]
+    expect(buildingRatingFactors('meeting', ['meet_spd[022]', 'meet_spd_ext&P[000]'], mixer).factors[0].raw).toBe(56)
+    expect(at('char_4087_ines', 2, ['meet_spd_hast[000]'])[0].raw).toBe(52.25)
+    expect(at('char_4027_heyak', 2, ['meet_spd&cost_condChar[011]', 'meet_spd&condChar_mustget[000]'])[1]).toMatchObject({ raw: 100, conditional: true })
   })
 
   it('distinguishes profession coverage and conditional training boosts', () => {

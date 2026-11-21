@@ -35,14 +35,14 @@ export default function BuildingRatingFactors({ room, series, current = series.l
           </g>
         })}
       </svg>
-      <figcaption id={caption}>{text.help} {text.summary}</figcaption>
+      <figcaption id={caption}>{text.help} {text.summary}{room === 'meeting' && ` ${text.meetingHelp}`}{profiles.some((item) => item.factors.some((factor) => factor.score === null)) && ` ${text.unquantified}`}</figcaption>
     </figure>
     <details className="v2-disclosure v2-factor-evidence"><summary>{text.table}</summary>
       <table className="v2-factor-table"><caption className="sr-only">{text.table}</caption><thead><tr><th scope="col">{text.factor}</th>{profiles.map((item) => <th scope="col" key={item.id}>{item.label}</th>)}</tr></thead>
         <tbody>{axes.map((id, index) => <tr key={id}><th scope="row">{label(id)}</th>{profiles.map((item) => <td key={item.id} data-current={item.index === current}>{item.factors[index].score === null ? text.unknown : text.level(item.factors[index].score!)}</td>)}</tr>)}</tbody>
       </table>
       {profiles.map((item) => <div key={item.id}>
-        <h4>{item.label}</h4><dl>{item.factors.map((factor) => <div key={factor.id}><dt>{label(factor.id)}</dt><dd>{measurement(factor)}{factor.conditional && ` · ${text.conditional}`}<p>{text.basis[factor.basis]}</p>{factor.scenes?.map((scene) => <p key={scene}>{text.basis[scene]}</p>)}</dd></div>)}</dl>
+        <h4>{item.label}</h4><dl>{item.factors.map((factor) => <div key={factor.id}><dt>{label(factor.id)}</dt><dd>{measurement(factor)}{factor.conditional && ` · ${text.conditional}`}<p>{text.basis[factor.basis]}</p>{factor.parts && <p>{text.meetingParts(factor.parts)}</p>}{factor.scenes?.map((scene) => <p key={scene}>{text.basis[scene]}</p>)}</dd></div>)}</dl>
       </div>)}
     </details>
   </div>
@@ -62,6 +62,7 @@ function measurement(factor: RatingFactor) {
   const raw = Number(factor.raw.toFixed(3))
   if (factor.basis === 'hourMood' || factor.basis === 'craftMood') return text.mood(raw, factor.high, factor.basis === 'craftMood')
   if (factor.basis === 'recovery') return text.recovery(raw)
+  if (factor.basis === 'guaranteedClue') return text.probability(raw)
   if (factor.id === 'efficiency') return text.percent(raw)
   return text.count(raw)
 }
