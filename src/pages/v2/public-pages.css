@@ -21,7 +21,12 @@
 .v2-safety-content { display: grid; gap: var(--space-lg); }
 .v2-safety-content fieldset { min-width: 0; }
 .v2-safety-content .v2-danger-zone { margin-top: 0; }
-.v2-not-found-path { margin-block: var(--space-md); padding: var(--space-sm); border: 1px solid var(--color-v2-line); border-radius: var(--radius-v2-control); background: var(--color-v2-inset); overflow-wrap: anywhere; white-space: pre-wrap; }
+.v2-not-found-page .v2-public-main { display: flex; flex-direction: column; justify-content: center; width: min(100%, 42rem); gap: var(--space-lg); }
+.v2-not-found-page .v2-section-heading { margin: 0; }
+.v2-not-found-code { display: block; margin-bottom: var(--space-sm); color: var(--color-v2-accent); font-size: var(--text-display); font-weight: 600; letter-spacing: -.04em; line-height: 1; }
+.v2-not-found-content { display: grid; min-width: 0; gap: var(--space-md); }
+.v2-not-found-content .v2-actions { margin: 0; }
+.v2-not-found-path { display: block; min-width: 0; padding: var(--space-sm); border: 1px solid var(--color-v2-line); border-radius: var(--radius-v2-control); background: var(--color-v2-inset); overflow-wrap: anywhere; white-space: pre-wrap; }
 .v2-thanks-section + .v2-thanks-section { margin-top: var(--space-xl); }
 .v2-thanks-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); gap: var(--space-md); margin-top: var(--space-md); }
 .v2-thanks-list article { display: flex; align-items: start; gap: var(--space-sm); padding: var(--space-md); border: 1px solid var(--color-v2-line); border-radius: var(--radius-v2-panel); background: var(--color-v2-surface); min-width: 0; }
