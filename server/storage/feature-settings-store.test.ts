@@ -11,7 +11,7 @@ describe('feature settings', () => {
     expect(normalizeSiteFeatureSettings(null)).toEqual(DEFAULT_SITE_FEATURE_SETTINGS)
     expect(normalizeSiteFeatureSettings({ version: 0, features: { login: false, qqbot: false } })).toMatchObject({
       version: 1,
-      features: { login: false, site: true, profiles: true, tools: true, qqbot: false, website_events: true, building_rating_radar: false },
+      features: { login: false, site: true, profiles: true, tools: true, qqbot: false, website_events: true, building_rating_radar: false, base_value_dashboard: false },
     })
   })
 
@@ -24,6 +24,12 @@ describe('feature settings', () => {
     expect(computeEffectiveSiteFeatures(radar).building_rating_radar).toBe(true)
     for (const parent of ['site', 'tools', 'v2']) {
       expect(computeEffectiveSiteFeatures({ ...radar, features: { ...radar.features, [parent]: false } }).building_rating_radar).toBe(false)
+    }
+
+    const clock = normalizeSiteFeatureSettings({ features: { base_value_dashboard: true } })
+    expect(computeEffectiveSiteFeatures(clock).base_value_dashboard).toBe(true)
+    for (const parent of ['site', 'tools', 'v2']) {
+      expect(computeEffectiveSiteFeatures({ ...clock, features: { ...clock.features, [parent]: false } }).base_value_dashboard).toBe(false)
     }
 
     const loginClosed = normalizeSiteFeatureSettings({ features: { login: false, profiles: true, schedule_generation: true } })

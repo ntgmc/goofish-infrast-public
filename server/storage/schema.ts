@@ -5,6 +5,8 @@ import { getPool, query } from './postgres'
 import { CURRENT_PERSONAL_USE_DECLARATION } from '../personal-use-declaration'
 import { PERSONAL_USE_DECLARATION_ACTIONS } from '../../src/lib/personal-use-declaration'
 import databaseSchemaContract from '../database-schema-contract.json'
+import { VALUE_CLOCK_SCHEMA_SQL } from './value-clock-schema'
+import { syncValueClockHistory } from './value-clock-sync'
 
 const MIGRATION_PHASE_SEPARATOR = '-- goofish:migration-phase'
 const RETRIABLE_MIGRATION_CODES = new Set(['40P01', '40001', '55P03'])
@@ -2755,6 +2757,9 @@ SET result_json = result_json || '{"schedule_source":"manual"}'::jsonb
 WHERE jsonb_typeof(payload_json #> '{request,manual_schedule}') = 'object'
   AND jsonb_typeof(result_json) = 'object'
   AND result_json->>'schedule_source' IS DISTINCT FROM 'manual';
+
+-- goofish:migration-phase
+${VALUE_CLOCK_SCHEMA_SQL}
 `
 
 export const DATABASE_SCHEMA_CHECKSUM = createHash('sha256')
@@ -2767,6 +2772,7 @@ export const DATABASE_SCHEMA_CHECKSUM = createHash('sha256')
 
 const TABLE_CONSTRAINT_KEYWORDS = new Set(['and', 'check', 'constraint', 'foreign', 'or', 'primary', 'unique'])
 const API_ONLY_RUNTIME_TABLES = new Set([
+  'value_clock_series', 'value_clock_pending', 'value_clock_intervals', 'value_clock_days', 'value_clock_daily_totals',
   'feature_settings',
   'public_content_settings',
   'public_content_images',
@@ -2905,6 +2911,14 @@ export async function migrateDatabaseSchema(): Promise<void> {
 
     for (const [index, phase] of migrationPhases.entries()) {
       await runMigrationPhase(client, phase.sql, phase.values ?? [], index + 1, migrationPhases.length)
+    }
+    await client.query('begin')
+    try {
+      await syncValueClockHistory(client)
+      await client.query('commit')
+    } catch (error) {
+      await client.query('rollback')
+      throw error
     }
     await validateCurrentPersonalUseDeclarationVersion(client)
     await client.query(

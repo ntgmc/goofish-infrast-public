@@ -34,6 +34,7 @@ export const featuresCopy = {
     profiles: '账号档案与工作区',
     tools: '公开工具中心',
     building_rating_radar: '基建评级雷达图',
+    base_value_dashboard: '基建价值大屏',
     cdk_redemption: 'CDK 兑换与升级',
     free_preview: '免费档案',
     schedule_generation: '排班生成',

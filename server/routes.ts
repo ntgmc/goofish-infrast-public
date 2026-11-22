@@ -58,6 +58,7 @@ import usageStatsHandler from './handlers/usage-stats'
 import siteFeaturesHandler from './handlers/site-features'
 import sitePublicContentHandler from './handlers/site-public-content'
 import serviceStatusHandler from './handlers/service-status'
+import valueClockHandler from './handlers/value-clock'
 import adminServiceStatusHandler from './handlers/admin-service-status'
 import { checkPostgresHealth, hasDatabaseUrl } from './storage/postgres'
 import { getServiceLifecycleState, isServiceReady } from './lifecycle'
@@ -111,6 +112,7 @@ export const API_ROUTES: ReadonlyArray<readonly [path: string, handler: ApiHandl
   ['/api/site/public-content-image', sitePublicContentImageHandler],
   ['/api/changelog', changelogHandler],
   ['/api/status', serviceStatusHandler],
+  ['/api/site/value-clock', valueClockHandler],
   ['/api/user/data/export', accountDataHandler],
   ['/api/user/data/delete-request', accountDataHandler],
   ['/api/user/data/cancel', accountDataHandler],

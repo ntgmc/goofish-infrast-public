@@ -1,0 +1,64 @@
+.value-clock {
+  min-height: 100svh;
+  padding: 1.25rem clamp(1.25rem, 5vw, 5rem) 2rem;
+  color: var(--color-v2-ink);
+  background: var(--color-v2-canvas);
+  font-family: var(--font-body);
+  font-variant-numeric: tabular-nums;
+}
+.value-clock-shell { max-width: 76rem; margin-inline: auto; container-type: inline-size; }
+.value-clock :focus-visible { outline: 2px solid var(--color-v2-focus); outline-offset: 4px; }
+.value-clock-masthead { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .5rem 1rem; min-height: 44px; margin-bottom: 2rem; }
+.value-clock-masthead a { color: inherit; font-size: 1.1rem; font-weight: 650; letter-spacing: -.04em; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
+.value-clock-masthead h1 { margin: 0; font-size: .875rem; font-weight: 450; color: var(--color-v2-muted); }
+.value-clock-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .75rem 1rem; }
+.value-clock-status { display: flex; flex-shrink: 0; max-width: 100%; align-items: center; gap: .6rem; margin: 0; color: var(--color-v2-secondary); font-size: .875rem; }
+.value-clock-status-mark { flex: 0 0 .4rem; height: .4rem; border-radius: 50%; background: var(--color-v2-muted); }
+.value-clock-status-mark[data-live] { background: var(--destructive); box-shadow: 0 0 0 .25rem color-mix(in srgb, var(--destructive) 10%, transparent); }
+.value-clock-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.value-clock-action { min-height: 44px; padding: .5rem .9rem; border: 1px solid var(--color-v2-line); border-radius: .35rem; background: transparent; color: inherit; font: inherit; font-size: .8125rem; cursor: pointer; white-space: nowrap; }
+.value-clock-action:hover { background: var(--color-v2-hover); }
+.value-clock-action:disabled { opacity: .5; cursor: wait; }
+.value-clock-hero { padding: clamp(2.5rem, 6svh, 5rem) 0 2.75rem; text-align: center; }
+.value-clock-eyebrow { margin: 0 0 2.5rem; font-family: var(--font-display); font-size: clamp(1.2rem, 2.8cqi, 2rem); font-weight: 500; letter-spacing: -.025em; text-wrap: balance; }
+.value-clock-total-label { margin: 0 0 .75rem; color: var(--color-v2-secondary); font-size: .875rem; }
+.value-clock-total { font-size: clamp(2rem, 8.8cqi, 7.5rem); font-weight: 600; line-height: 1.15; letter-spacing: -.065em; color: var(--destructive); }
+.value-clock-total-compact { display: none; }
+.value-clock-progress { display: none; width: 4rem; height: 2px; margin-top: 1rem; appearance: none; border: 0; background: var(--color-v2-line); }
+.value-clock-progress::-webkit-progress-bar { background: var(--color-v2-line); }
+.value-clock-progress::-webkit-progress-value { background: var(--destructive); }
+.value-clock-progress::-moz-progress-bar { background: var(--destructive); }
+.value-clock-unit { margin: .6rem 0 0; font-size: .875rem; color: var(--color-v2-secondary); }
+.value-clock-rate { display: flex; justify-content: center; align-items: baseline; flex-wrap: wrap; gap: .35rem .65rem; margin: 1.75rem 0 0; font-size: .875rem; color: var(--color-v2-secondary); }
+.value-clock-rate strong { color: var(--color-v2-ink); font-size: 1.5rem; font-weight: 500; }
+.value-clock-resources { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.5rem; margin: 0; padding: 1.5rem 0 2rem; border-bottom: 1px solid var(--color-v2-line); }
+.value-clock-resources > div { min-width: 0; text-align: center; }
+.value-clock dt { color: var(--color-v2-secondary); font-size: .875rem; }
+.value-clock-resources dd { margin: .65rem 0 0; font-size: clamp(1.25rem, 2.8cqi, 2rem); font-weight: 500; overflow-wrap: anywhere; }
+.value-clock-secondary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; margin: 0; padding: 1.5rem 0 2rem; }
+.value-clock-secondary > div { min-width: 0; text-align: center; }
+.value-clock-secondary dd { margin: .55rem 0 0; font-size: 1.5rem; overflow-wrap: anywhere; }
+.value-clock-secondary small { display: inline-block; margin-inline-start: .4rem; font-size: .8125rem; color: var(--color-v2-secondary); }
+.value-clock-data-note { font-size: .875rem; color: var(--color-v2-secondary); text-align: center; }
+.value-clock-data-note > p { margin: .75rem 0; }
+.value-clock-disclosure { border-top: 1px solid var(--color-v2-line); padding-top: .5rem; }
+.value-clock-disclosure > summary { display: list-item; width: fit-content; min-height: 44px; margin: 0 auto; padding: .5rem; cursor: pointer; align-content: center; }
+.value-clock-methodology { max-width: 65ch; margin: .5rem auto 0; text-align: start; line-height: 1.8; overflow-wrap: anywhere; }
+.value-clock-methodology p { margin: .75rem 0; }
+.value-clock-display { min-height: 100dvh; }
+.value-clock:fullscreen { overflow-y: auto; }
+.value-clock-display .value-clock-masthead { display: none; }
+@media (max-width: 48rem) {
+  .value-clock-masthead { margin-bottom: 1.25rem; }
+  .value-clock-hero { padding-block: 2.5rem 1.75rem; }
+  .value-clock-eyebrow { margin-bottom: 1.75rem; }
+  .value-clock-total { font-size: clamp(1.25rem, 14cqi, 5.5rem); }
+  .value-clock-total-full { display: none; }
+  .value-clock-total-compact { display: inline; }
+  .value-clock-progress:not([hidden]) { display: inline-block; }
+  .value-clock-resources { grid-template-columns: minmax(0, 1fr); gap: 1rem; padding-block: 1rem 1.5rem; }
+  .value-clock-resources > div { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; text-align: start; gap: .4rem 1rem; }
+  .value-clock-resources dd { flex-shrink: 0; max-width: 100%; margin: 0 0 0 auto; font-size: 1.25rem; }
+  .value-clock-secondary { gap: 1rem; padding-block: 1.5rem; }
+}
+@media (forced-colors: active) { .value-clock-progress { accent-color: Highlight; appearance: auto; } }

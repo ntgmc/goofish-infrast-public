@@ -27,3 +27,4 @@ export { scheduleExplanationCopy as scheduleExplanation } from './schedule-expla
 export { aiSettingsCopy as aiSettings } from './ai-settings'
 export { aiUsageCopy as aiUsage } from './ai-usage'
 export { buildingRatingsCopy as buildingRatings } from './building-ratings'
+export { valueClockCopy as valueClock } from './value-clock'
