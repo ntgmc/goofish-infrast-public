@@ -1,5 +1,6 @@
 import { useId } from 'react'
 import { copy } from '../../copy'
+import { useSiteFeatures } from '../../lib/site-feature-context'
 import type { RatingFactor, RatingFactorId } from '../../lib/building-rating-factors'
 
 const text = copy.buildingRatings.factors
@@ -7,6 +8,8 @@ type RatingFactorSeries = { id: string; label: string; factors: RatingFactor[] }
 
 export default function BuildingRatingFactors({ room, series, current = series.length - 1 }: { room: string; series: RatingFactorSeries[]; current?: number }) {
   const caption = useId()
+  const { features } = useSiteFeatures()
+  if (!features.building_rating_radar) return null
   const profiles = series.map((item, index) => ({ ...item, index }))
   const axes = series[0].factors.map((factor) => factor.id)
   const limit = Math.max(5, ...series.flatMap((item) => item.factors.map((factor) => factor.score ?? 0)))
