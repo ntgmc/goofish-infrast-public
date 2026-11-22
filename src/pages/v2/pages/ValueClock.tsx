@@ -47,7 +47,7 @@ function ClockReadings({ fullscreen }: { fullscreen: ReactNode }) {
   const [paused, setPaused] = useState(false)
   const [calibrated, setCalibrated] = useState(false)
   const previous = useRef<{ snapshot: ValueClockSnapshot; receivedAt: number } | null>(null)
-  const [reading, setReading] = useState({ sanity: '—', sanityFull: '—', today: '—', lmd: '—', experience: '—', orundum: '—', progress: 0, stale: false })
+  const [reading, setReading] = useState({ sanity: '—', sanityFull: '—', today: '—', todayFull: '—', lmd: '—', experience: '—', orundum: '—', progress: 0, stale: false })
   const data = query.data
   useEffect(() => {
     if (!data) return
@@ -65,7 +65,7 @@ function ClockReadings({ fullscreen }: { fullscreen: ReactNode }) {
       const progress = Math.round(((sanity % step + step) % step) / step * 1000)
       setReading((current) => {
         const next = paused ? { ...current, stale } : {
-          sanity: compact(values.totals?.sanity), sanityFull: full(values.totals?.sanity), today: full(values.today?.sanity),
+          sanity: compact(values.totals?.sanity), sanityFull: full(values.totals?.sanity), today: compact(values.today?.sanity), todayFull: full(values.today?.sanity),
           lmd: full(values.totals?.lmd_net, 0), experience: full(values.totals?.experience_points, 0), orundum: full(values.totals?.orundum, 0), progress, stale,
         }
         return Object.keys(next).every((key) => next[key as keyof typeof next] === current[key as keyof typeof current]) ? current : next
@@ -83,7 +83,7 @@ function ClockReadings({ fullscreen }: { fullscreen: ReactNode }) {
   return <>
     <div className="value-clock-toolbar"><p className="value-clock-status" role="status"><span className="value-clock-status-mark" data-live={status === text.ready || undefined} />{status}</p><div className="value-clock-actions"><button type="button" className="value-clock-action" onClick={() => setPaused((value) => !value)}>{paused ? text.resume : text.pause}</button>{fullscreen}</div></div>
     <div className="value-clock-hero" aria-busy={query.isPending}>
-      <h2 className="value-clock-eyebrow">{text.headline}</h2>
+      <h2 className="value-clock-eyebrow"><span>{text.headlineLead}</span><span>{text.headlineEnd}</span></h2>
       <p className="value-clock-total-label">{text.total}</p>
       <div className="value-clock-total" aria-label={`${text.total} ${reading.sanityFull} ${text.unit}`}><span className="value-clock-total-full" aria-hidden="true">{reading.sanityFull}</span><span className="value-clock-total-compact" aria-hidden="true">{reading.sanity}</span></div>
       <p className="value-clock-unit">{text.unit}</p>
@@ -93,7 +93,7 @@ function ClockReadings({ fullscreen }: { fullscreen: ReactNode }) {
     <dl className="value-clock-resources" aria-label={text.resources}>
       <div><dt>{text.lmd}</dt><dd>{reading.lmd}</dd></div><div><dt>{text.experience}</dt><dd>{reading.experience}</dd></div><div><dt>{text.orundum}</dt><dd>{reading.orundum}</dd></div>
     </dl>
-    <dl className="value-clock-secondary"><div><dt>{text.today}</dt><dd>{reading.today}<small>{text.unit}</small></dd></div><div><dt>{text.accounts}</dt><dd>{snapshot ? full(snapshot.active_accounts, 0) : '—'}<small>{text.accountUnit}</small></dd></div></dl>
+    <dl className="value-clock-secondary"><div><dt>{text.today}</dt><dd aria-label={`${reading.todayFull} ${text.unit}`}><span aria-hidden="true">{reading.today}</span><small aria-hidden="true">{text.unit}</small></dd></div><div><dt>{text.accounts}</dt><dd><span>{snapshot ? full(snapshot.active_accounts, 0) : '—'}</span><small>{text.accountUnit}</small></dd></div></dl>
     <div className="value-clock-data-note">
       {(query.error || reading.stale) && <p role="status">{query.error && text.refreshFailed} <button type="button" className="value-clock-action" disabled={query.isFetching} onClick={() => void query.refetch()}>{text.retry}</button></p>}
       {paused && <p role="status">{text.displayPaused}</p>}{calibrated && <p role="status">{text.calibrated}</p>}

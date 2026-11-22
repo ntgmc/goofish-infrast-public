@@ -1,5 +1,5 @@
 export const valueClockCopy = {
-  title: '基建价值时钟', headline: '博士歇会儿，基建还在打工。', home: '返回 MaaTool 工作台',
+  title: '基建价值时钟', headlineLead: '博士歇会儿，', headlineEnd: '基建还在打工。', home: '返回 MaaTool 工作台',
   tenThousand: '万', hundredMillion: '亿',
   total: '全站累计产出价值', unit: '等效理智', rate: '每分钟再攒', progress: '当前读数的增长进度',
   today: '今天又攒了', accounts: '正在打工的账号', accountUnit: '个',
