@@ -1,9 +1,10 @@
 export const valueClockCopy = {
   title: '基建价值时钟', headlineLead: '博士歇会儿，', headlineEnd: '基建还在打工。', home: '返回 MaaTool 工作台',
   tenThousand: '万', hundredMillion: '亿',
-  total: '全站累计产出价值', unit: '等效理智', rate: '每分钟再攒', progress: '当前读数的增长进度',
+  total: '全站累计产出价值', unit: '等效理智', rate: '每分钟再攒',
   today: '今天又攒了', accounts: '正在打工的账号', accountUnit: '个',
   resources: '累计预计资源产出', lmd: '龙门币净收入', experience: '作战经验', orundum: '合成玉',
+  localPreview: '本地预览 · 905 个账号', localLive: '本地开发 · 真实统计', liveData: '查看真实统计', previewData: '使用 905 账号预览',
   fullscreen: '全屏', exitFullscreen: '退出展示', pause: '暂停', resume: '继续',
   retry: '重新读取', loading: '正在读取统计', updated: '最近更新',
   notStarted: '暂无可统计的历史排班', empty: '当前没有可持续产出的排班', ready: '正在累计',
@@ -11,6 +12,6 @@ export const valueClockCopy = {
   refreshFailed: '更新失败，保留最近一次有效读数。', calibrated: '统计已校准', displayPaused: '动态显示已暂停，统计继续累计',
   methodology: '了解统计口径', methodologyIntro: '本站保存的历史排班自动纳入统计，从各账号最早保存的方案起估算，保存新方案后自动切换。同一游戏账号同时只按一份方案累计。',
   methodologyResources: '总价值沿用本站统一的净等效理智估值，包含支持房间等产出。龙门币为收入减支出，作战经验以经验点数计，合成玉受碎片供应约束；这三项不能再次相加作为总价值。',
-  methodologyTime: '今日按北京时间零点起算。库存耗尽后停止增长；数据未及时更新时，页面会暂停增长。负净收入保留负值。',
+  methodologyTime: '今日按北京时间零点起算。主读数和资源每秒更新一次，增长速率按实时数据计算；库存耗尽后停止增长，数据未及时更新时页面会暂停增长。负净收入保留负值。',
   completeValue: '当前完整读数', trackingSince: '历史统计起点',
 }
