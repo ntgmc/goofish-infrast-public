@@ -5,8 +5,9 @@ import SessionLoader from './SessionLoader'
 import ThemeSwitcher from './ThemeSwitcher'
 import BrandLogo from './BrandLogo'
 import SklandIcon from './SklandIcon'
+import { InfoIcon, NextIcon as ArrowRight, RefreshIcon, SecurityIcon, ServiceCongestedIcon as Hourglass } from './icons'
 import { copy } from '../copy/index'
-import { dashboardPath } from '../lib/app-routes'
+import './FeatureUnavailablePage.css'
 
 export function FeatureRoute({ feature, children, renderPending }: {
   feature: SiteFeatureKey
@@ -38,23 +39,40 @@ export default function FeatureUnavailablePage({
   const body = loadError
     ? copy.features.load_failed_body
     : pauseNotice ?? (siteClosed ? copy.features.site_closed_body : copy.features.closed_body)
+  const StatusIcon = loadError ? InfoIcon : Hourglass
+  const statusLabel = pauseNotice ? copy.features.paused_title : copy.features.paused
   return (
-    <main className="tool-page" tabIndex={-1} data-route-focus>
-      <div className="mx-auto max-w-2xl">
-        <div className="flex items-center justify-between gap-4">
+    <main className="feature-unavailable-page" tabIndex={-1} data-route-focus>
+      <div className="feature-unavailable-frame">
+        <header className="feature-unavailable-header">
           <BrandLogo size="md" />
           <ThemeSwitcher />
+        </header>
+        <div className="feature-unavailable-main">
+          <section className={`feature-unavailable-panel${loadError ? ' is-error' : ''}`} aria-labelledby="feature-unavailable-title">
+            <div className="feature-unavailable-visual" aria-hidden="true">
+              <div className="feature-unavailable-orbit feature-unavailable-orbit--outer" />
+              <div className="feature-unavailable-orbit feature-unavailable-orbit--inner" />
+              <div className="feature-unavailable-glyph"><StatusIcon size={34} strokeWidth={1.75} /></div>
+              <span className="feature-unavailable-spark feature-unavailable-spark--one" />
+              <span className="feature-unavailable-spark feature-unavailable-spark--two" />
+              <span className="feature-unavailable-spark feature-unavailable-spark--three" />
+            </div>
+            <div className="feature-unavailable-content">
+              <div className="feature-unavailable-meta">
+                <p className="feature-unavailable-eyebrow">{feature === 'skland' && <SklandIcon className="feature-unavailable-skland-icon" />}{copy.features.feature_labels[feature]}</p>
+                {!loadError && <span className="feature-unavailable-status"><span aria-hidden="true" />{statusLabel}</span>}
+              </div>
+              <h1 id="feature-unavailable-title" className="feature-unavailable-title">{title}</h1>
+              <p className="feature-unavailable-body">{body}</p>
+              <div className="feature-unavailable-actions">
+                {loadError && onRetry && <button type="button" onClick={onRetry} className="tool-primary-action"><RefreshIcon aria-hidden="true" size={16} />{copy.features.retry}</button>}
+                <Link to="/" className={loadError ? 'tool-secondary-action' : 'tool-primary-action'}>{copy.features.back_home}<ArrowRight aria-hidden="true" size={16} /></Link>
+                <Link to="/account-safety" className="tool-secondary-action"><SecurityIcon aria-hidden="true" size={16} />{copy.features.account_safety}</Link>
+              </div>
+            </div>
+          </section>
         </div>
-        <section className="tool-panel mt-8 p-6 sm:p-8">
-          <p className="tool-eyebrow">{!loadError && feature === 'skland' && <SklandIcon className="mr-2" />}{loadError ? copy.features.load_failed_title : copy.features.feature_labels[feature]}</p>
-          <h1 className="display-title mt-3 text-2xl text-ink-primary">{title}</h1>
-          <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-6 text-ink-secondary">{body}</p>
-          <div className="mt-6 flex flex-wrap gap-3">
-            {loadError && onRetry && <button type="button" onClick={onRetry} className="tool-primary-action">{copy.features.retry}</button>}
-            <Link to="/" className="tool-secondary-action">{copy.features.back_home}</Link>
-            <Link to={dashboardPath('settings')} className="tool-secondary-action">{copy.features.account_safety}</Link>
-          </div>
-        </section>
       </div>
     </main>
   )

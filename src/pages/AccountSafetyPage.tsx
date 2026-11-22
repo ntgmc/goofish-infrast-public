@@ -52,7 +52,7 @@ export default function AccountSafetyPage() {
   }
 
   if (featureState.status === 'loading') return <SessionLoader label={copy.features.loading} />
-  if (featureState.status === 'ready' && featureState.features.site && featureState.features.login) {
+  if (featureState.status === 'ready' && featureState.features.site && featureState.features.login && featureState.features.v2) {
     return <Navigate to={authPath('login', '/v2?section=settings')} replace />
   }
 

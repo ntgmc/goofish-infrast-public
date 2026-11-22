@@ -71,7 +71,7 @@ describe('AccountSafetyPage lifecycle controls', () => {
     expect(screen.queryByRole('button', { name: '申请注销账号' })).not.toBeInTheDocument()
   })
 
-  it.each(['site', 'login', 'error'] as const)('keeps safety controls available when %s is unavailable', async (unavailable) => {
+  it.each(['site', 'login', 'v2', 'error'] as const)('keeps safety controls available when %s is unavailable', async (unavailable) => {
     vi.mocked(useSiteFeatures).mockReturnValue({
       status: unavailable === 'error' ? 'error' : 'ready',
       features: { ...DEFAULT_SITE_FEATURES, ...(unavailable === 'error' ? {} : { [unavailable]: false }) },
