@@ -3,9 +3,8 @@ import { isPausableSiteFeature, type SiteFeatureKey } from '../lib/site-features
 import { useSiteFeatures } from '../lib/site-feature-context'
 import SessionLoader from './SessionLoader'
 import ThemeSwitcher from './ThemeSwitcher'
-import BrandLogo from './BrandLogo'
 import SklandIcon from './SklandIcon'
-import { InfoIcon, NextIcon as ArrowRight, RefreshIcon, SecurityIcon, ServiceCongestedIcon as Hourglass } from './icons'
+import { InfoIcon, NextIcon as ArrowRight, PauseIcon, RefreshIcon, SecurityIcon } from './icons'
 import { copy } from '../copy/index'
 import './FeatureUnavailablePage.css'
 
@@ -39,36 +38,30 @@ export default function FeatureUnavailablePage({
   const body = loadError
     ? copy.features.load_failed_body
     : pauseNotice ?? (siteClosed ? copy.features.site_closed_body : copy.features.closed_body)
-  const StatusIcon = loadError ? InfoIcon : Hourglass
-  const statusLabel = pauseNotice ? copy.features.paused_title : copy.features.paused
+  const StatusIcon = loadError ? InfoIcon : PauseIcon
   return (
-    <main className="feature-unavailable-page" tabIndex={-1} data-route-focus>
+    <main className="v2-app feature-unavailable-page" tabIndex={-1} data-route-focus>
       <div className="feature-unavailable-frame">
         <header className="feature-unavailable-header">
-          <BrandLogo size="md" />
-          <ThemeSwitcher />
+          <Link to="/" className="feature-unavailable-brand">
+            <img src="/assets/maatool-v2-icon.svg" width="36" height="36" alt="" />
+            <span><strong>{copy.v2.brand}</strong><small>{copy.v2.brandDescription}</small></span>
+          </Link>
+          <ThemeSwitcher iconOnly />
         </header>
         <div className="feature-unavailable-main">
           <section className={`feature-unavailable-panel${loadError ? ' is-error' : ''}`} aria-labelledby="feature-unavailable-title">
-            <div className="feature-unavailable-visual" aria-hidden="true">
-              <div className="feature-unavailable-orbit feature-unavailable-orbit--outer" />
-              <div className="feature-unavailable-orbit feature-unavailable-orbit--inner" />
-              <div className="feature-unavailable-glyph"><StatusIcon size={34} strokeWidth={1.75} /></div>
-              <span className="feature-unavailable-spark feature-unavailable-spark--one" />
-              <span className="feature-unavailable-spark feature-unavailable-spark--two" />
-              <span className="feature-unavailable-spark feature-unavailable-spark--three" />
-            </div>
             <div className="feature-unavailable-content">
               <div className="feature-unavailable-meta">
-                <p className="feature-unavailable-eyebrow">{feature === 'skland' && <SklandIcon className="feature-unavailable-skland-icon" />}{copy.features.feature_labels[feature]}</p>
-                {!loadError && <span className="feature-unavailable-status"><span aria-hidden="true" />{statusLabel}</span>}
+                <span className="feature-unavailable-icon" aria-hidden="true"><StatusIcon size={22} strokeWidth={1.75} /></span>
+                <p className="feature-unavailable-eyebrow">{feature === 'skland' && <SklandIcon />}<span>{copy.features.feature_labels[feature]}</span></p>
               </div>
               <h1 id="feature-unavailable-title" className="feature-unavailable-title">{title}</h1>
               <p className="feature-unavailable-body">{body}</p>
               <div className="feature-unavailable-actions">
-                {loadError && onRetry && <button type="button" onClick={onRetry} className="tool-primary-action"><RefreshIcon aria-hidden="true" size={16} />{copy.features.retry}</button>}
-                <Link to="/" className={loadError ? 'tool-secondary-action' : 'tool-primary-action'}>{copy.features.back_home}<ArrowRight aria-hidden="true" size={16} /></Link>
-                <Link to="/account-safety" className="tool-secondary-action"><SecurityIcon aria-hidden="true" size={16} />{copy.features.account_safety}</Link>
+                {loadError && onRetry && <button type="button" onClick={onRetry} className="tool-primary-action"><RefreshIcon aria-hidden="true" size={16} /><span>{copy.features.retry}</span></button>}
+                <Link to="/" className={loadError ? 'tool-secondary-action' : 'tool-primary-action'}><span>{copy.features.back_home}</span><ArrowRight aria-hidden="true" size={16} /></Link>
+                <Link to="/account-safety" className="tool-secondary-action"><SecurityIcon aria-hidden="true" size={16} /><span>{copy.features.account_safety}</span></Link>
               </div>
             </div>
           </section>

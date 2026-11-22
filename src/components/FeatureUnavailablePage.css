@@ -1,386 +1,196 @@
 .feature-unavailable-page {
-  position: relative;
   min-height: 100dvh;
-  padding: clamp(1rem, 3vw, 2.5rem) clamp(1rem, 4vw, 2.5rem);
-  isolation: isolate;
-  background:
-    radial-gradient(circle at 8% 10%, color-mix(in oklab, var(--theme-brand-500) 9%, transparent), transparent 30rem),
-    radial-gradient(circle at 92% 88%, color-mix(in oklab, var(--theme-brand-500) 6%, transparent), transparent 28rem),
-    var(--theme-surface-0);
-}
-
-.feature-unavailable-page::before {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background-image: linear-gradient(color-mix(in oklab, var(--theme-ink-primary) 4%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in oklab, var(--theme-ink-primary) 4%, transparent) 1px, transparent 1px);
-  background-position: center;
-  background-size: 4rem 4rem;
-  mask-image: radial-gradient(ellipse at center, black 0%, transparent 68%);
-  content: "";
-  opacity: 0.28;
-  pointer-events: none;
+  padding: var(--space-md) var(--page-gutter);
+  background: var(--color-v2-canvas);
+  color: var(--color-v2-ink);
+  font-family: var(--font-body);
 }
 
 .feature-unavailable-frame {
-  position: relative;
   display: flex;
-  width: min(100%, 62rem);
-  min-height: calc(100dvh - 2 * clamp(1rem, 3vw, 2.5rem));
-  margin: 0 auto;
+  width: min(100%, 64rem);
+  min-height: calc(100dvh - 2 * var(--space-md));
+  margin-inline: auto;
   flex-direction: column;
 }
 
-.feature-unavailable-header {
+.feature-unavailable-header,
+.feature-unavailable-brand,
+.feature-unavailable-meta {
   display: flex;
   align-items: center;
+  gap: var(--space-xs);
+}
+
+.feature-unavailable-header {
+  flex-wrap: wrap;
   justify-content: space-between;
-  gap: var(--space-sm);
+}
+
+.feature-unavailable-brand {
+  min-width: 0;
+  max-width: 100%;
+  min-height: 44px;
+  flex-shrink: 0;
+  border-radius: var(--radius-v2-control);
+  color: var(--color-v2-ink);
+  text-decoration: none;
+}
+
+.feature-unavailable-brand img {
+  flex: none;
+}
+
+.feature-unavailable-brand > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.feature-unavailable-brand strong,
+.feature-unavailable-brand small {
+  display: block;
+}
+
+.feature-unavailable-brand strong {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.35;
+}
+
+.feature-unavailable-brand small {
+  color: var(--color-v2-secondary);
+  font-size: var(--text-xs);
+  line-height: 1.5;
 }
 
 .feature-unavailable-header .tool-secondary-action {
-  background: color-mix(in oklab, var(--theme-surface-1) 86%, transparent);
-  backdrop-filter: blur(0.75rem);
+  height: auto;
+  margin-inline-start: auto;
+  min-height: 44px;
+  border-radius: var(--radius-v2-control);
+  background: var(--color-v2-surface);
 }
 
 .feature-unavailable-main {
   display: grid;
   flex: 1;
   place-items: center;
-  padding-block: clamp(2.5rem, 8vh, 6rem);
+  padding-block: var(--space-xl);
 }
 
 .feature-unavailable-panel {
-  display: grid;
-  width: 100%;
-  grid-template-columns: minmax(13rem, 0.72fr) minmax(0, 1.28fr);
-  overflow: hidden;
-  border: 1px solid color-mix(in oklab, var(--theme-brand-500) 18%, var(--border));
-  border-radius: 1.25rem;
-  background: color-mix(in oklab, var(--theme-surface-1) 94%, var(--theme-brand-500));
-  box-shadow: 0 1.5rem 4rem color-mix(in oklab, var(--theme-surface-0) 72%, transparent),
-    0 0 0 1px color-mix(in oklab, var(--theme-ink-primary) 3%, transparent);
-}
-
-.feature-unavailable-panel.is-error {
-  border-color: color-mix(in oklab, var(--theme-error) 32%, var(--border));
-}
-
-.feature-unavailable-visual {
-  position: relative;
-  display: grid;
-  min-height: 24rem;
-  place-items: center;
-  overflow: hidden;
-  border-inline-end: 1px solid color-mix(in oklab, var(--theme-brand-500) 16%, var(--border));
-  background: color-mix(in oklab, var(--theme-brand-500) 5%, var(--theme-surface-1));
-}
-
-.feature-unavailable-visual::before {
-  position: absolute;
-  width: 13rem;
-  aspect-ratio: 1;
-  border: 1px solid color-mix(in oklab, var(--theme-brand-500) 20%, transparent);
-  border-radius: 50%;
-  content: "";
-}
-
-.feature-unavailable-visual::after {
-  position: absolute;
-  width: 19rem;
-  aspect-ratio: 1;
-  border: 1px dashed color-mix(in oklab, var(--theme-brand-500) 14%, transparent);
-  border-radius: 50%;
-  content: "";
-  transform: rotate(-24deg);
-}
-
-.feature-unavailable-panel.is-error .feature-unavailable-visual {
-  border-color: color-mix(in oklab, var(--theme-error) 24%, var(--border));
-  background: color-mix(in oklab, var(--theme-error) 5%, var(--theme-surface-1));
-}
-
-.feature-unavailable-panel.is-error .feature-unavailable-visual::before,
-.feature-unavailable-panel.is-error .feature-unavailable-visual::after {
-  border-color: color-mix(in oklab, var(--theme-error) 25%, transparent);
-}
-
-.feature-unavailable-orbit {
-  position: absolute;
-  border: 1px solid color-mix(in oklab, var(--theme-brand-500) 24%, transparent);
-  border-radius: 50%;
-  transform: rotate(32deg);
-}
-
-.feature-unavailable-orbit--outer {
-  width: 16rem;
-  height: 5rem;
-}
-
-.feature-unavailable-orbit--inner {
-  width: 12rem;
-  height: 4rem;
-  transform: rotate(-32deg);
-}
-
-.feature-unavailable-panel.is-error .feature-unavailable-orbit {
-  border-color: color-mix(in oklab, var(--theme-error) 28%, transparent);
-}
-
-.feature-unavailable-glyph {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  width: 6.25rem;
-  height: 6.25rem;
-  place-items: center;
-  border: 1px solid color-mix(in oklab, var(--theme-brand-400) 48%, var(--border));
-  border-radius: 1.5rem;
-  background: color-mix(in oklab, var(--theme-surface-2) 90%, var(--theme-brand-500));
-  box-shadow: 0 1.25rem 2rem color-mix(in oklab, var(--theme-surface-0) 38%, transparent),
-    inset 0 1px color-mix(in oklab, white 12%, transparent);
-  color: var(--theme-brand-400);
-  transform: rotate(-8deg);
-}
-
-.feature-unavailable-glyph svg {
-  transform: rotate(8deg);
-}
-
-.feature-unavailable-panel.is-error .feature-unavailable-glyph {
-  border-color: color-mix(in oklab, var(--theme-error) 52%, var(--border));
-  background: color-mix(in oklab, var(--theme-error) 14%, var(--theme-surface-2));
-  color: var(--theme-error);
-}
-
-.feature-unavailable-spark {
-  position: absolute;
-  z-index: 1;
-  width: 0.4rem;
-  height: 0.4rem;
-  border-radius: 50%;
-  background: var(--theme-brand-400);
-  box-shadow: 0 0 0 0.35rem color-mix(in oklab, var(--theme-brand-400) 12%, transparent);
-}
-
-.feature-unavailable-spark--one {
-  top: 26%;
-  right: 20%;
-}
-
-.feature-unavailable-spark--two {
-  bottom: 25%;
-  left: 18%;
-  width: 0.3rem;
-  height: 0.3rem;
-  opacity: 0.7;
-}
-
-.feature-unavailable-spark--three {
-  top: 23%;
-  left: 25%;
-  width: 0.25rem;
-  height: 0.25rem;
-  opacity: 0.5;
-}
-
-.feature-unavailable-panel.is-error .feature-unavailable-spark {
-  background: var(--theme-error);
-  box-shadow: 0 0 0 0.35rem color-mix(in oklab, var(--theme-error) 12%, transparent);
+  width: min(100%, 40rem);
+  min-width: 0;
+  border: 1px solid var(--color-v2-line);
+  border-radius: var(--radius-v2-panel);
+  background: var(--color-v2-surface);
 }
 
 .feature-unavailable-content {
-  display: flex;
   min-width: 0;
-  flex-direction: column;
-  justify-content: center;
-  padding: clamp(2rem, 5vw, 4rem);
+  padding: clamp(1.25rem, 4vw, 2.5rem);
 }
 
-.feature-unavailable-meta {
-  display: flex;
-  min-width: 0;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-xs);
+.feature-unavailable-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  place-items: center;
+  border-radius: var(--radius-v2-control);
+  background: var(--color-v2-accent-soft);
+  color: var(--color-v2-accent);
+}
+
+.feature-unavailable-panel.is-error .feature-unavailable-icon {
+  background: var(--color-v2-error-soft);
+  color: var(--color-v2-error);
 }
 
 .feature-unavailable-eyebrow {
-  display: inline-flex;
+  display: flex;
   min-width: 0;
   align-items: center;
-  gap: 0.45rem;
+  gap: var(--space-2xs);
   margin: 0;
-  color: var(--color-selected-ink);
-  font-size: var(--text-xs);
-  font-weight: 700;
-  letter-spacing: 0.07em;
-  line-height: 1.4;
+  color: var(--color-v2-secondary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1.6;
   overflow-wrap: anywhere;
-  text-transform: uppercase;
-}
-
-.feature-unavailable-skland-icon {
-  margin-inline-end: 0.1rem;
-}
-
-.feature-unavailable-status {
-  display: inline-flex;
-  min-height: 1.75rem;
-  align-items: center;
-  gap: 0.4rem;
-  border: 1px solid color-mix(in oklab, var(--theme-brand-400) 34%, var(--border));
-  border-radius: var(--radius-pill);
-  padding: 0.25rem 0.65rem;
-  background: color-mix(in oklab, var(--theme-brand-500) 10%, var(--theme-surface-2));
-  color: var(--theme-brand-400);
-  font-size: var(--text-xs);
-  font-weight: 650;
-  line-height: 1.25;
-  white-space: nowrap;
-}
-
-.feature-unavailable-status > span {
-  width: 0.4rem;
-  height: 0.4rem;
-  border-radius: 50%;
-  background: currentColor;
-  box-shadow: 0 0 0 0.2rem color-mix(in oklab, currentColor 14%, transparent);
 }
 
 .feature-unavailable-title {
-  max-width: 15ch;
-  margin: clamp(1rem, 2vw, 1.5rem) 0 0;
-  color: var(--theme-ink-primary);
+  margin: var(--space-md) 0 0;
+  color: var(--color-v2-ink);
   font-family: var(--font-display);
-  font-size: clamp(2rem, 1.2rem + 2.4vw, 3.25rem);
-  font-weight: 720;
-  letter-spacing: -0.045em;
-  line-height: 1.14;
+  font-size: clamp(1.5rem, 1.25rem + 1vw, 2rem);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.4;
   overflow-wrap: anywhere;
   text-wrap: balance;
 }
 
 .feature-unavailable-body {
-  max-width: 46ch;
-  margin: 1rem 0 0;
-  color: var(--theme-ink-secondary);
-  font-size: clamp(0.9375rem, 0.88rem + 0.15vw, 1.0625rem);
-  line-height: 1.7;
+  margin: var(--space-xs) 0 0;
+  color: var(--color-v2-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.8;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
-  text-wrap: pretty;
 }
 
 .feature-unavailable-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-top: clamp(1.5rem, 3vw, 2rem);
+  gap: var(--space-xs);
+  margin-top: var(--space-lg);
 }
 
 .feature-unavailable-actions :is(.tool-primary-action, .tool-secondary-action) {
   min-width: 0;
-  min-height: 2.875rem;
-  border-radius: 0.625rem;
-  padding-inline: 1rem;
+  max-width: 100%;
+  border-radius: var(--radius-v2-control);
   overflow-wrap: anywhere;
   white-space: normal;
   text-align: center;
+  transform: none;
+  transition: background-color var(--dur-fast), border-color var(--dur-fast), color var(--dur-fast);
 }
 
 .feature-unavailable-actions .tool-primary-action {
-  box-shadow: 0 0.75rem 1.5rem color-mix(in oklab, var(--theme-brand-500) 18%, transparent);
+  border: 1px solid var(--color-v2-accent);
 }
 
 .feature-unavailable-actions .tool-secondary-action {
-  background: transparent;
+  border-color: var(--color-v2-control);
+  background: var(--color-v2-surface);
 }
 
-.feature-unavailable-actions :is(.tool-primary-action, .tool-secondary-action) svg {
+.feature-unavailable-actions .tool-secondary-action:hover {
+  background: var(--color-v2-hover);
+}
+
+.feature-unavailable-actions svg {
   flex: none;
 }
 
-@media (max-width: 44rem) {
-  .feature-unavailable-main {
-    padding-block: 2rem;
-  }
+.feature-unavailable-actions span,
+.feature-unavailable-eyebrow span {
+  min-width: 0;
+  text-wrap: balance;
+}
 
-  .feature-unavailable-panel {
-    grid-template-columns: 1fr;
-  }
-
-  .feature-unavailable-visual {
-    min-height: 10rem;
-    border-inline-end: 0;
-    border-block-end: 1px solid color-mix(in oklab, var(--theme-brand-500) 16%, var(--border));
-  }
-
-  .feature-unavailable-visual::before {
-    width: 9rem;
-  }
-
-  .feature-unavailable-visual::after {
-    width: 14rem;
-  }
-
-  .feature-unavailable-orbit--outer {
-    width: 12rem;
-  }
-
-  .feature-unavailable-orbit--inner {
-    width: 9rem;
-  }
-
-  .feature-unavailable-glyph {
-    width: 4.75rem;
-    height: 4.75rem;
-    border-radius: 1.25rem;
-  }
-
-  .feature-unavailable-glyph svg {
-    width: 1.75rem;
-    height: 1.75rem;
-  }
-
-  .feature-unavailable-content {
-    padding: 1.5rem;
-  }
-
-  .feature-unavailable-title {
-    max-width: none;
-    font-size: clamp(2rem, 9vw, 2.75rem);
-  }
-
+@media (max-width: 40rem) {
   .feature-unavailable-actions {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .feature-unavailable-actions :is(.tool-primary-action, .tool-secondary-action) {
-    width: 100%;
-  }
-}
-
-@media (max-width: 24rem) {
-  .feature-unavailable-page {
-    padding-inline: 0.75rem;
-  }
-
   .feature-unavailable-content {
-    padding: 1.25rem;
-  }
-
-  .feature-unavailable-meta {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 0.65rem;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .feature-unavailable-actions :is(.tool-primary-action, .tool-secondary-action) {
-    transition: color var(--motion-instant) ease-out, background-color var(--motion-instant) ease-out, border-color var(--motion-instant) ease-out, opacity var(--motion-instant) ease-out;
+    padding: min(1.5rem, 6vw);
   }
 }
