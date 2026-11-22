@@ -118,7 +118,23 @@ Vite 本地开发默认使用独立的 905 账号预览：累计约 2882 万等�
 
 增益视图复用时间投影、读数频率和全屏规则，使用独立的 `['public', 'value-clock', 'gain', null, null]` 查询。指定观察起点和个人贡献读取按观察窗口方案后续实现。
 
-## 6. 验收
+## 6. aktools.cn 独立部署
+
+独立页源文件位于 [`deploy/aktools/`](../deploy/aktools/)，构建复用本站的快照校验、时间投影、设计 tokens 和时钟样式。页面不提供工作台跳转，保留暂停、全屏、统计说明及 ICP／公安备案查询链接。数据来源在说明中标为 MaaTool 保存的排班预计产出。
+
+```sh
+node scripts/build-aktools.mjs
+node --test scripts/build-aktools.test.mjs
+bash -n deploy/aktools/apply.sh
+```
+
+产物写入 `.cache/aktools-deploy/`：单个自包含 `index.html`、固定只读接口代理 `value-clock.conf`、安装脚本 `apply.sh`。构建时为内联脚本生成 CSP 哈希；不包含开发预览或固定统计值。浏览器只请求同源 `/api/value-clock`，Nginx 固定代理本站 `https://maatool.com/api/site/value-clock?view=production`，验证上游 TLS，不转发访客请求头和登录凭据，也不向访客传递上游 Cookie。
+
+目标服务器需已有 `/etc/nginx/sites-available/aktools.cn`、`/var/www/aktools.cn/index.html`、有效 HTTPS 证书、Python 3、curl 和 Nginx。将完整产物目录上传到部署账号的私有目录，由管理员运行 `sudo bash /path/to/aktools-clock/apply.sh`。脚本先检查 MaaTool 已提供有效真实历史快照；功能关闭、无可用历史或数据过期时立即退出，保留现有首页。通过后备份首页及站点配置到 `/var/backups/aktools-clock.*`，添加专用 Nginx include，检查配置、安装首页并重载；本机 HTTPS 首页或代理校验失败时恢复原首页和配置。其他站点、证书和现有 location 保持原配置。
+
+部署后需从公网检查首页与 `/api/value-clock`，在真实浏览器核对读数、备案链接、暂停／全屏、手机和深色主题。管理员权限和 MaaTool 功能开关是正式发布前置条件；上传产物不代表已经上线。
+
+## 7. 验收
 
 - 实际迁移前已存在的历史结果可构成累计，超过 7 天的旧历史正常计入；迁移重跑不重复累计。
 - 固定每日价值 864 的方案，100 秒累计 1；下一份结果按保存时间切换，同一 UID 多档案不叠加。
