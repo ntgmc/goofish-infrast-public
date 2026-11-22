@@ -62,9 +62,9 @@ export function v2SectionAvailable(section: V2Section, features: SiteFeatures): 
 }
 
 const legacySections: Record<string, V2Section> = {
-  '/': 'overview', '/tool': 'profiles', '/tool/profiles': 'profiles', '/tool/tools': 'tools',
+  '/': 'overview', '/v1': 'overview', '/tool': 'profiles', '/tool/profiles': 'profiles', '/tool/tools': 'tools',
   '/tool/redeem': 'add-account', '/tool/inventory': 'inventory', '/tool/balance': 'balance',
-  '/tool/commercial': 'commercial', '/tool/settings': 'settings', '/tool/announcements': 'announcements',
+  '/tool/commercial': 'commercial', '/tool/settings': 'settings', '/tool/announcements': 'announcements', '/tool/invitations': 'profiles',
   '/tool/setup/operators': 'overview', '/tool/setup/config': 'overview', '/tool/setup/cdk': 'add-account',
   '/tool/optimize/overview': 'generation', '/tool/optimize/plans': 'plans', '/tool/optimize/config': 'overview',
   '/tool/optimize/result': 'overview', '/tool/optimize/lab': 'lab',
@@ -77,11 +77,12 @@ const legacySections: Record<string, V2Section> = {
 export function v2Href(href: string, profileId?: string | null): string {
   if (!href.startsWith('/') || href.startsWith('//')) return href
   const source = new URL(href, 'https://navigation.internal')
-  const section = legacySections[source.pathname.replace(/\/+$/, '') || '/']
+  const pathname = source.pathname.replace(/\/+$/, '') || '/'
+  const section = pathname === '/v2' ? v2Section(source.searchParams, source.hash) : legacySections[pathname] ?? (pathname.startsWith('/tool/') ? 'profiles' : undefined)
   if (!section) return href
   const target = new URL(v2Path(section, source.searchParams.get('profile_id') ?? profileId), source.origin)
   for (const [key, value] of source.searchParams) if (key !== 'section' && key !== 'profile_id') target.searchParams.set(key, value)
-  if (source.pathname === '/tool/setup/operators') target.searchParams.set('panel', 'operators')
-  if (source.pathname === '/tool/setup/config' || source.pathname === '/tool/optimize/config') target.searchParams.set('panel', 'config')
+  if (pathname === '/tool/setup/operators') target.searchParams.set('panel', 'operators')
+  if (pathname === '/tool/setup/config' || pathname === '/tool/optimize/config') target.searchParams.set('panel', 'config')
   return `${target.pathname}${target.search}${source.hash}`
 }

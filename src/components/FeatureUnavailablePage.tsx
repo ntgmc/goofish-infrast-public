@@ -6,6 +6,7 @@ import ThemeSwitcher from './ThemeSwitcher'
 import SklandIcon from './SklandIcon'
 import { InfoIcon, NextIcon as ArrowRight, PauseIcon, RefreshIcon, SecurityIcon } from './icons'
 import { copy } from '../copy/index'
+import { routesCopy } from '../copy/zh-CN/routes'
 import './FeatureUnavailablePage.css'
 
 export function FeatureRoute({ feature, children, renderPending }: {
@@ -45,7 +46,7 @@ export default function FeatureUnavailablePage({
         <header className="feature-unavailable-header">
           <Link to="/" className="feature-unavailable-brand">
             <img src="/assets/maatool-v2-icon.svg" width="36" height="36" alt="" />
-            <span><strong>{copy.v2.brand}</strong><small>{copy.v2.brandDescription}</small></span>
+            <span><strong>{routesCopy.v2.brand}</strong><small>{routesCopy.v2.brandDescription}</small></span>
           </Link>
           <ThemeSwitcher iconOnly />
         </header>

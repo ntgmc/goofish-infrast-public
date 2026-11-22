@@ -4,7 +4,7 @@ import { RefreshIcon as ArrowRight, ExportImageIcon as Download, JsonImportIcon 
 import { copy } from '../../../copy'
 import { DataActivity } from '../components/DataActivity'
 import { TweenValue } from '../../../components/NumberMotion'
-import { useDepotValue, formatProfileLabel, formatNumber, formatRankingNote, formatPricingStatus, formatContributionStatus, formatOptionalDate, formatUnitSanityLabel, getUtf8ByteLength } from '../../DepotValuePage'
+import { useDepotValue, formatProfileLabel, formatNumber, formatRankingNote, formatPricingStatus, formatContributionStatus, formatOptionalDate, formatUnitSanityLabel, getUtf8ByteLength } from '../../../hooks/useDepotValue'
 import SklandBindingDialog from '../../../components/SklandBindingDialog'
 import SklandIcon from '../../../components/SklandIcon'
 import type { V2Session } from '../OptionsDrawer'

@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect } from 'react'
 import { MotionConfig } from 'motion/react'
-import { Route, Routes, useLocation, useNavigate } from 'react-router'
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router'
 import BuildMetaStrip from './components/BuildMetaStrip'
 import DeploymentUpdatePrompt from './components/DeploymentUpdatePrompt'
 import MobileBrowserPrompt from './components/MobileBrowserPrompt'
@@ -19,31 +19,23 @@ import PublicContentRoute from './components/PublicContentRoute'
 import { PublicContentProvider } from './lib/public-content-context'
 import { apiVoid } from './lib/api-client'
 import { categorizeBehaviorRiskPath } from './lib/behavior-risk-client'
-import NotFoundPage from './components/NotFoundPage'
 import { recordDebugNavigation } from './lib/debug-diagnostics'
 import QueryProvider from './lib/query-provider'
-import V1Route from './components/V1Route'
 import { completeDeploymentRefresh } from './lib/deployment-refresh'
 import { TaskDraftProvider } from './lib/task-drafts'
 import { authModeForPath, authPath, USER_SESSION_EXPIRED_EVENT } from './lib/auth-navigation'
-import { v2Section } from './pages/v2/navigation'
+import { v2Href, v2Section } from './pages/v2/navigation'
 
 
-const LandingPage = lazy(() => import('./pages/LandingPage'))
+const NotFoundPage = lazy(() => import('./components/NotFoundPage'))
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'))
 const VerifyEmailPage = lazy(() => import('./pages/VerifyEmailPage'))
 const CancelAccountDeletionPage = lazy(() => import('./pages/CancelAccountDeletionPage'))
 const AccountSafetyPage = lazy(() => import('./pages/AccountSafetyPage'))
-const ToolPage = lazy(() => import('./pages/ToolPage'))
-const CultivationPlanPage = lazy(() => import('./pages/CultivationPlanPage'))
-const ThanksRecruitmentPage = lazy(() => import('./pages/ThanksRecruitmentPage'))
-const TrainingRatioPage = lazy(() => import('./pages/TrainingRatioPage'))
 const AnnouncementsPage = lazy(() => import('./pages/AnnouncementsPage'))
 const ChangelogPage = lazy(() => import('./pages/ChangelogPage'))
 const AdminPage = lazy(() => import('./pages/AdminPage'))
 const AdminSetupPage = lazy(() => import('./pages/AdminSetupPage'))
-const DepotValuePage = lazy(() => import('./pages/DepotValuePage'))
-const ManualSchedulePage = lazy(() => import('./pages/ManualSchedulePage'))
 const PublicInfoPage = lazy(() => import('./pages/PublicInfoPage'))
 const PricingPage = lazy(() => import('./pages/PricingPage'))
 const ThanksPage = lazy(() => import('./pages/ThanksPage'))
@@ -110,12 +102,8 @@ function AppContent() {
       <RouteMetadata />
       <RouteLifecycle />
       <Routes>
-        <Route element={<V1Route />}>
-          <Route element={<PublicContentRoute />}>
-            <Route path="/v1" element={<LazyPage fallback={copy.features.loading}><LandingPage onStart={() => navigate('/tool/profiles')} /></LazyPage>} />
-          </Route>
-          <Route path="/tool/*" element={<LazyPage fallback={copy.common.App_001}><ToolPage /></LazyPage>} />
-        </Route>
+        <Route path="/v1" element={<RetiredPageRedirect />} />
+        <Route path="/tool/*" element={<RetiredPageRedirect />} />
         <Route element={<PublicContentRoute />}>
           <Route path="/changelog" element={<FeatureRoute feature="changelog"><LazyPage fallback={copy.common.App_014}><ChangelogPage /></LazyPage></FeatureRoute>} />
           <Route path="/faq" element={<FeatureRoute feature="faq"><LazyPage fallback={copy.common.App_003}><PublicInfoPage page="faq" /></LazyPage></FeatureRoute>} />
@@ -138,20 +126,21 @@ function AppContent() {
         <Route path="/cancel-account-deletion" element={<LazyPage fallback={copy.features.loading}><CancelAccountDeletionPage /></LazyPage>} />
         <Route path="/account-safety" element={<LazyPage fallback={copy.features.loading}><AccountSafetyPage /></LazyPage>} />
         <Route path="/announcements" element={<FeatureRoute feature="announcements"><LazyPage fallback={copy.common.App_002}><AnnouncementsPage /></LazyPage></FeatureRoute>} />
-        <Route path="/tools/depot-value" element={<FeatureRoute feature="depot_value"><LazyPage fallback={copy.common.App_009}><DepotValuePage /></LazyPage></FeatureRoute>} />
-        <Route path="/tools/manual-schedule" element={<FeatureRoute feature="manual_schedule"><LazyPage fallback={routesCopy.loading['manual-tool']}><ManualSchedulePage /></LazyPage></FeatureRoute>} />
-        <Route path="/tools/training-ratio" element={<FeatureRoute feature="training_ratio"><LazyPage fallback={routesCopy.loading['training-ratio']}><TrainingRatioPage /></LazyPage></FeatureRoute>} />
-        <Route path="/tools/cultivation-plan" element={<FeatureRoute feature="cultivation_plan"><LazyPage fallback={routesCopy.loading.cultivation}><CultivationPlanPage /></LazyPage></FeatureRoute>} />
-        <Route path="/tools/thanks-recruitment" element={<FeatureRoute feature="thanks_recruitment"><LazyPage fallback={routesCopy.loading['thanks-recruitment']}><ThanksRecruitmentPage /></LazyPage></FeatureRoute>} />
+        {['/tools/depot-value', '/tools/manual-schedule', '/tools/training-ratio', '/tools/cultivation-plan', '/tools/thanks-recruitment'].map((path) => <Route key={path} path={path} element={<RetiredPageRedirect />} />)}
         <Route path="/admin/setup" element={<LazyPage fallback={copy.common.App_010}><AdminSetupPage /></LazyPage>} />
         <Route path="/admin/*" element={<LazyPage fallback={copy.common.App_011}><AdminPage /></LazyPage>} />
-        <Route path="*" element={<NotFoundPage />} />
+        <Route path="*" element={<Suspense fallback={<V2LoadingScreen />}><NotFoundPage /></Suspense>} />
       </Routes>
       {import.meta.env.PROD && <DeploymentUpdatePrompt />}
       <MobileBrowserPrompt />
       {location.pathname !== '/' && location.pathname !== '/v2' && location.pathname !== '/v2/benchmarks' && <BuildMetaStrip placement="corner" />}
     </div>
   )
+}
+
+function RetiredPageRedirect() {
+  const location = useLocation()
+  return <Navigate to={v2Href(`${location.pathname}${location.search}${location.hash}`)} replace />
 }
 
 function LazyPage({ fallback, children }: { fallback: string; children: React.ReactNode }) {

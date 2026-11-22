@@ -1,5 +1,4 @@
 import { recordDebugApiEvent, type DebugApiOutcome } from './debug-diagnostics'
-import { observeToolApiRequest } from './tool-behavior-observation'
 import { copy } from '../copy/index'
 import { USER_LOGOUT_EVENT, USER_SESSION_EXPIRED_EVENT } from './auth-navigation'
 
@@ -174,7 +173,7 @@ type PendingResponse = {
 
 async function request(url: string, init: ApiRequestInit): Promise<PendingResponse> {
   const { json, fallbackMessage, headers, timeoutMs, signal: callerSignal, ...rest } = init
-  const diagnostics = createRequestDiagnostics(url, rest.method, json)
+  const diagnostics = createRequestDiagnostics(url, rest.method)
   const requestHeaders = new Headers(headers)
   const deadline = createRequestDeadline(
     callerSignal,
@@ -218,13 +217,12 @@ async function request(url: string, init: ApiRequestInit): Promise<PendingRespon
   }
 }
 
-function createRequestDiagnostics(url: string, method: string | undefined, json: unknown): {
+function createRequestDiagnostics(url: string, method: string | undefined): {
   setResponse: (response: Response) => void
   completeSuccess: () => void
   completeFailure: (error: ApiError) => void
 } {
   const startedAt = debugNow()
-  const observeBehavior = observeToolApiRequest(url, method, json)
   let response: Response | null = null
   let completed = false
   const finish = (error: ApiError | null) => {
@@ -243,11 +241,6 @@ function createRequestDiagnostics(url: string, method: string | undefined, json:
       })
     } catch {
       // Diagnostics must never affect the API contract.
-    }
-    try {
-      observeBehavior(error?.code === 'request_aborted' ? 'aborted' : error ? 'failed' : 'succeeded', debugNow() - startedAt)
-    } catch {
-      // Optional local observations must never affect API results.
     }
   }
   return {

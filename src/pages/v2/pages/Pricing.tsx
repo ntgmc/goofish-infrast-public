@@ -26,11 +26,11 @@ const comparisonQuotas = { single_account_monthly: quotas.month, single_account_
 const archiveQuotas = { single_account_monthly: 1, single_account_half_year: 1, single_account_annual: 1, single_account_lifetime: 3 }
 const comparisonLabels = [text.pricing_choice.free_title, ...planIds.map((id) => text.pricing_choice.term_labels[id])]
 
-export default function Pricing({ session }: { session: V2Session }) {
+export default function Pricing({ session }: { session?: V2Session }) {
   const { content } = usePublicContent()
   const { features } = useSiteFeatures()
   const [params] = useSearchParams()
-  const profile = session.authStatus === 'authenticated' ? session.activeProfile : null
+  const profile = session?.authStatus === 'authenticated' ? session.activeProfile : null
   const profileId = profile?.id ?? params.get('profile_id')
   const canUpgrade = Boolean(profile && isFreePreviewProfile(profile) && profile.status === 'active' && !profile.archived_at)
   const redemptionPath = `${v2Path('add-account', profileId)}&mode=${canUpgrade ? 'upgrade' : 'cdk'}`

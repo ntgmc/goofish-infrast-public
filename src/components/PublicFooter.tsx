@@ -17,16 +17,14 @@ const footerLinks: Array<{ to: string; label: string; feature?: SiteFeatureKey }
 
 interface PublicFooterProps {
   className?: string
-  variant?: 'landing' | 'tool'
 }
 
-export default function PublicFooter({ className = '', variant = 'landing' }: PublicFooterProps) {
+export default function PublicFooter({ className = '' }: PublicFooterProps) {
   const { features } = useSiteFeatures()
   const linkClassName = 'inline-flex min-h-11 items-center text-sm text-ink-secondary underline-offset-4 transition-colors hover:text-ink-primary hover:underline'
   const iconLinkClassName = 'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-ink-secondary transition-colors hover:bg-surface-2 hover:text-ink-primary'
   return (
-    <footer className={`public-footer ${variant === 'tool' ? 'bg-surface-1/45' : ''} ${className}`} aria-label={copy.public.components_PublicFooter_005}>
-      <div className="mx-auto flex max-w-7xl flex-col gap-5 text-sm sm:flex-row sm:items-center sm:justify-between">
+    <footer className={`v2-public-footer ${className}`} aria-label={copy.public.components_PublicFooter_005}>
         <div>
           <p className="font-medium text-ink-primary">{copy.public.components_PublicFooter_006}</p>
           <p className="mt-1 text-xs leading-5 text-ink-muted">{copy.public.components_PublicFooter_007}</p>
@@ -50,7 +48,6 @@ export default function PublicFooter({ className = '', variant = 'landing' }: Pu
             <GitHubIcon className="size-5" />
           </a>
         </nav>
-      </div>
     </footer>
   )
 }
@@ -70,8 +67,7 @@ function GitHubIcon({ className = '' }: { className?: string }) {
 }
 
 export function FeedbackLink({ className = '', children }: { className?: string; children?: React.ReactNode }) {
-  const { features } = useSiteFeatures()
-  return <Link className={className} to={features.v2 ? '/v2?feedback=new' : '/tool/profiles?feedback=new'} onClick={(event) => {
+  return <Link className={className} to="/v2?feedback=new" onClick={(event) => {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
     const trigger = document.querySelector('.feedback-trigger')
     if (trigger) { event.preventDefault(); trigger.dispatchEvent(new CustomEvent('goofish:open-feedback', { detail: 'new' })) }

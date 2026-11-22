@@ -1,44 +1,7 @@
-/* Hallmark · pre-emit critique: P5 H4 E4 S5 R5 V5
- * scope: app · genre: modern-minimal
- * macrostructures: marketing=Workbench · application=Workbench · content=Long Document
- * theme: custom tuned · vibe: "technical, restrained, precise, trustworthy"
- * axes: light / geometric-sans / cool-violet · enrichment: existing-product-captures
- * nav: N9 public + existing side rail app · footer: Ft2 · studied: no
- * contrast: pass (40–41) · slop: pass (42–49) · mobile: static-pass (34, 49–57)
- */
+/* MaaTool V2 design tokens; shared components and portals use the same theme. */
 
 :root,
 .light {
-  --color-paper: #f3f2ef;
-  --color-paper-2: #faf9f7;
-  --color-paper-3: #ecebe8;
-  --color-paper-4: #e4e2df;
-  --color-ink: #25252b;
-  --color-ink-2: #5f5d67;
-  --color-ink-3: #65616c;
-  --color-rule: #89858f;
-  --color-rule-2: #d9d7d3;
-  --color-brand-primary: #6548c5;
-  --color-brand-hover: #563ab2;
-  --color-on-brand: #faf9f7;
-  --color-focus: #7655cc;
-  --color-selected-bg: #ece7f8;
-  --color-selected-hover: #e3dbf4;
-  --color-selected-border: #9279b9;
-  --color-selected-ink: #5e43b4;
-
-  --palette-brand-50: oklch(0.965 0.018 285);
-  --palette-brand-100: oklch(0.925 0.034 285);
-  --palette-brand-200: oklch(0.840 0.070 285);
-  --palette-brand-300: oklch(0.535 0.155 285);
-  --palette-brand-400: oklch(0.495 0.175 285);
-  --palette-brand-500: var(--color-brand-primary);
-  --palette-brand-600: oklch(0.425 0.175 285);
-  --palette-brand-700: oklch(0.365 0.150 285);
-  --palette-brand-800: oklch(0.305 0.115 285);
-  --palette-brand-900: oklch(0.245 0.080 285);
-  --palette-brand-950: oklch(0.180 0.045 285);
-
   --color-positive: #246644;
   --color-positive-bg: #e6efe8;
   --color-positive-border: #a5c5af;
@@ -104,8 +67,8 @@
   --dur-fast: 160ms;
   --dur-base: 220ms;
   --dur-slow: 300ms;
-  --radius-card: 10px;
-  --radius-input: 7px;
+  --radius-card: var(--radius-v2-panel);
+  --radius-input: var(--radius-v2-control);
   --radius-pill: 999px;
   --nav-height: 5rem;
 
@@ -117,7 +80,7 @@
   --color-v2-secondary: oklch(0.440 0.018 255);
   --color-v2-muted: oklch(0.495 0.012 255);
   --color-v2-line: oklch(0.865 0.008 75);
-  --color-v2-control: oklch(0.665 0.012 255);
+  --color-v2-control: oklch(0.625 0.012 255);
   --color-v2-accent: oklch(0.490 0.120 45);
   --color-v2-accent-hover: oklch(0.430 0.110 45);
   --color-v2-accent-ink: oklch(0.993 0.003 75);
@@ -159,36 +122,6 @@
 }
 
 .dark {
-  --color-paper: #17181b;
-  --color-paper-2: #202126;
-  --color-paper-3: #292a31;
-  --color-paper-4: #32333c;
-  --color-ink: #e6e5ea;
-  --color-ink-2: #b3b1bc;
-  --color-ink-3: #9d9bab;
-  --color-rule: #777582;
-  --color-rule-2: #3a3b44;
-  --color-brand-primary: #ad98ee;
-  --color-brand-hover: #beaaf7;
-  --color-on-brand: #211b2d;
-  --color-focus: #b29af4;
-  --color-selected-bg: #30283f;
-  --color-selected-hover: #3a304d;
-  --color-selected-border: #836da2;
-  --color-selected-ink: #d5c4ff;
-
-  --palette-brand-50: oklch(0.950 0.018 285);
-  --palette-brand-100: oklch(0.900 0.035 285);
-  --palette-brand-200: oklch(0.845 0.060 285);
-  --palette-brand-300: oklch(0.815 0.080 285);
-  --palette-brand-400: oklch(0.790 0.100 285);
-  --palette-brand-500: var(--color-brand-primary);
-  --palette-brand-600: #a58fe2;
-  --palette-brand-700: oklch(0.560 0.110 285);
-  --palette-brand-800: oklch(0.440 0.090 285);
-  --palette-brand-900: oklch(0.315 0.060 285);
-  --palette-brand-950: oklch(0.205 0.035 285);
-
   --color-positive: #84c9a2;
   --color-positive-bg: #22372c;
   --color-positive-border: #476b55;
@@ -236,6 +169,9 @@
   --color-v2-error-soft: oklch(0.300 0.030 25);
 }
 
+:root,
+.light,
+.dark,
 .v2-app,
 .v2-drawer,
 .v2-dialog,
@@ -296,7 +232,7 @@ body:has(.admin-app) [data-slot="popover-content"] {
   --color-focus: var(--color-v2-focus);
   --color-selected-bg: var(--color-v2-accent-soft);
   --color-selected-hover: var(--color-v2-hover);
-  --color-selected-border: var(--color-v2-control);
+  --color-selected-border: var(--color-v2-accent);
   --color-selected-ink: var(--color-v2-accent);
   --palette-brand-50: var(--color-v2-accent-soft);
   --palette-brand-100: var(--color-v2-accent-soft);

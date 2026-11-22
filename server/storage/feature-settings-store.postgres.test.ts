@@ -26,7 +26,7 @@ afterAll(async () => {
 describe('Drizzle feature settings storage', () => {
   it('reads defaults before the first save and preserves the stored JSON and timestamp', async () => {
     expect(await getSiteFeatureSettings()).toEqual({ ...DEFAULT_SITE_FEATURE_SETTINGS, revision: 0 })
-    const features = { ...DEFAULT_SITE_FEATURE_SETTINGS.features, v1: false }
+    const features = { ...DEFAULT_SITE_FEATURE_SETTINGS.features, faq: false }
     const saved = await saveSiteFeatureSettings(features, 0)
     expect(saved).toMatchObject({ version: 1, features, revision: 1 })
     expect(await getSiteFeatureSettings()).toEqual(saved)
@@ -67,7 +67,7 @@ describe('Drizzle feature settings storage', () => {
 
   it('allows only one concurrent first save', async () => {
     const results = await Promise.allSettled([
-      saveSiteFeatureSettings({ ...DEFAULT_SITE_FEATURE_SETTINGS.features, v1: false }, 0),
+      saveSiteFeatureSettings({ ...DEFAULT_SITE_FEATURE_SETTINGS.features, faq: false }, 0),
       saveSiteFeatureSettings({ ...DEFAULT_SITE_FEATURE_SETTINGS.features, announcements: false }, 0),
     ])
     const success = results.filter((result) => result.status === 'fulfilled')
@@ -81,7 +81,7 @@ describe('Drizzle feature settings storage', () => {
   it('allows one writer per revision and rejects stale writes without changing settings', async () => {
     const original = await saveSiteFeatureSettings(DEFAULT_SITE_FEATURE_SETTINGS.features, 0)
     const results = await Promise.allSettled([
-      saveSiteFeatureSettings({ ...original.features, v1: false }, original.revision),
+      saveSiteFeatureSettings({ ...original.features, faq: false }, original.revision),
       saveSiteFeatureSettings({ ...original.features, announcements: false }, original.revision),
     ])
     const success = results.filter((result) => result.status === 'fulfilled')
@@ -97,7 +97,7 @@ describe('Drizzle feature settings storage', () => {
   })
 
   it('serves persisted settings through Fastify and the real HTTP boundary', async () => {
-    const saved = await saveSiteFeatureSettings({ ...DEFAULT_SITE_FEATURE_SETTINGS.features, v1: false }, 0)
+    const saved = await saveSiteFeatureSettings({ ...DEFAULT_SITE_FEATURE_SETTINGS.features, faq: false }, 0)
     const server = createApiServer()
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
     try {

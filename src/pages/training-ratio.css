@@ -3,9 +3,6 @@
  * Hallmark · pre-emit critique: P5 H4 E5 S5 R5 V4
  */
 .training-ratio { --training-lmd: var(--color-caution); --training-lmd-bg: var(--color-caution-bg); --training-exp: var(--color-v2-trading); --training-exp-bg: var(--color-v2-trading-soft); min-width: 0; color: var(--color-ink); }
-.training-ratio--standalone { max-width: 1100px; margin: 0 auto; padding: 24px 16px 48px; }
-.training-ratio-header, .training-ratio-header > div { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.training-ratio-header { margin-bottom: 32px; }
 .training-ratio h1 { font-family: var(--font-display); font-size: 28px; font-weight: 650; }
 .training-ratio h2 { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; font-family: var(--font-display); font-size: 18px; font-weight: 650; }
 .training-ratio h2 > svg { flex-shrink: 0; color: var(--color-ink-2); }
@@ -19,7 +16,7 @@
 .training-ratio-range { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: var(--radius-input); color: var(--color-positive); background: var(--color-positive-bg); }
 .training-ratio-columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
 .training-ratio-inputs, .training-ratio-results { min-width: 0; padding: 24px; }
-.training-ratio button, .training-ratio select, .training-ratio input, .training-ratio-header a { min-height: 44px; }
+.training-ratio button, .training-ratio select, .training-ratio input { min-height: 44px; }
 .training-ratio button { max-width: 100%; white-space: nowrap; }
 .training-ratio-link { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; color: var(--color-brand-primary); font-size: 13px; white-space: nowrap; }
 .training-ratio-link:hover { text-decoration: underline; }
@@ -137,5 +134,4 @@
   .training-ratio-verdict-icon { width: 40px; min-height: 44px; }
   .training-ratio-verdict-icon img { max-width: 40px; }
   .training-ratio-reference > div { align-items: flex-start; flex-direction: column; gap: 6px; }
-  .training-ratio-header, .training-ratio-header > div { gap: 8px; }
 }

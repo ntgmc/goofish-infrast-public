@@ -18,7 +18,7 @@ TanStack Query v5 管理普通页面读取：库存、新手任务、优化任�
 | 积分余额与明细分页 | `['user', userId, profileId, 'balance']` |
 | 好友邀请概况与记录分页 | `['user', userId, profileId, 'invitations']` |
 | 商用档案分页 | `['user', userId, profileId, 'commercial-profiles', state, appliedQuery]` |
-| 用户公告全量列表（V1 列表与弹窗共用） | `['user', userId, null, 'announcements', 'all']` |
+| 登录公告弹窗全量列表 | `['user', userId, null, 'announcements', 'all']` |
 | V2 用户公告分页 | `['user', userId, null, 'announcements', 'page', page, unreadOnly]` |
 | V2 公开公告分页 | `['public', 'announcements', 'page', page, false]` |
 | 用户反馈列表、时间线与任务反馈状态 | `['user', userId, null, 'feedback', 'list'或'thread'或'optimization-job', ...分页或反馈ID或任务ID]` |
@@ -32,7 +32,7 @@ TanStack Query v5 管理普通页面读取：库存、新手任务、优化任�
 | 排班历史详情 | `['user', userId, profileId, 'result-history', 'detail', resultId]` |
 | 排班历史分页 | `['user', userId, profileId, 'result-history', 'pages', scope, 首屏快照]` |
 | 公共内容、站点开关、注册配置、服务状态和构建版本 | `['public', 'content'或'features'或'registration-settings'或'service-status'或'service-build', ...条件]` |
-| 公开公告全量列表（横幅、提醒来源与原公开页共用） | `['public', 'announcements', 'all']` |
+| 公开公告全量列表（横幅与提醒来源共用） | `['public', 'announcements', 'all']` |
 | 更新记录分页与定位 | `['public', 'changelog', page, ...未缓存的版本ID]` |
 | 后台栏目读取（反馈、设置、道具、行为风控、服务历史、死信） | `['admin', adminUsername, 'panels', capabilities, name, ...条件]` |
 | 后台用户、CDK、干员和积分详情 | `['admin', adminUsername, 'details', capabilities, name, ...目标与分页]` |
@@ -64,11 +64,11 @@ TanStack Query v5 管理普通页面读取：库存、新手任务、优化任�
 
 ## 公告列表与阅读状态
 
-`useUserAnnouncementsQuery` 供 V1 公告列表与登录公告弹窗共用请求和快照；弹窗只在有有效提醒且本次访问尚未展示时订阅。V2 访客通过默认收起的公告条主动展开最新公告，登录用户保留限时弹窗提醒；全局横幅优先于普通公告条，公告中心页面不重复显示普通公告条。弹窗初始焦点位于标题，摘要与操作区保持可见，正文独立滚动并支持键盘聚焦。保留按公告版本判断已读、一次访问只提醒一次、到期自动关闭和焦点恢复；读取失败不弹出无法确认阅读状态的旧公告。访客在公告中心继续使用本地阅读标记，展开公告条不自动标记已读。
+`useUserAnnouncementsQuery` 为登录公告弹窗提供请求和快照；弹窗只在有有效提醒且本次访问尚未展示时订阅。V2 访客通过默认收起的公告条主动展开最新公告，登录用户保留限时弹窗提醒；全局横幅优先于普通公告条，公告中心页面不重复显示普通公告条。弹窗初始焦点位于标题，摘要与操作区保持可见，正文独立滚动并支持键盘聚焦。保留按公告版本判断已读、一次访问只提醒一次、到期自动关闭和焦点恢复；读取失败不弹出无法确认阅读状态的旧公告。访客在公告中心继续使用本地阅读标记，展开公告条不自动标记已读。
 
 V2 分页按用户或公开身份、页码与未读筛选隔离。直达尚未缓存的公告时，查询键追加公告 ID，让服务端定位所在页；响应也保存到实际页码对应的缓存。页码校正、页内切换和短时间内返回访问过的页面可复用结果；页码校正沿用原响应时间，不延长旧快照的新鲜期。切页失败只显示所请求页的错误，不用上一页正文占位；同一页刷新失败保留已有快照。
 
-标记单条或全部已读仍由用户明确提交，单条提交携带原公告版本。成功后先取消旧读取，使该用户所有公告列表和分页失效，再将响应写入已有的对应快照；其他正在使用的视图重新读取，缓存页下次打开时更新。只返回未读数量的响应也会触发重读。退出后清除的缓存不会被迟到响应重建；查询失败不会自动重复标记。V1/V2 列表在身份变化或卸载时取消未完成的标记提交，V2 翻页也会取消并忽略该页的迟到提交结果。
+标记单条或全部已读仍由用户明确提交，单条提交携带原公告版本。成功后先取消旧读取，使该用户所有公告列表和分页失效，再将响应写入已有的对应快照；其他正在使用的视图重新读取，缓存页下次打开时更新。只返回未读数量的响应也会触发重读。退出后清除的缓存不会被迟到响应重建；查询失败不会自动重复标记。公告列表在身份变化或卸载时取消未完成的标记提交，V2 翻页也会取消并忽略该页的迟到提交结果。
 
 ## 后台概览与配置快照
 
@@ -122,4 +122,4 @@ V2 分页按用户或公开身份、页码与未读筛选隔离。直达尚未�
 
 公共内容校验失败时保留最后成功的内容；站点开关失败时关闭功能。服务状态每 30 秒刷新，保留对 HTTP 503 有效状态正文的解析。页面构建信息与更新提示共用健康读取，更新提示只接受成功健康响应并在发现新版本后停止轮询。更新记录保留翻页失败时继续显示上一次成功正文的行为，通过缓存中的页码读取正文，不另存一份响应；重试仍请求当前页。注册设置只在注册表单打开时读取。管理账号设置页先确认管理员会话，再按身份读取账号列表；列表重试与 Root 授权的创建、替换、删除分开处理。
 
-涉及缓存共享、身份切换、迟到响应、退出清理或修改后的失效时，运行 `admin-panel-query.test.tsx`、`useAdminDetailQuery.test.tsx`、`use-feedback-thread.test.ts`、`NotificationCenter.test.tsx`、`balance-actions.test.tsx`、`useResultHistoryPagination.test.tsx`、`inventory-query.test.tsx`、`inventory-hooks.test.tsx`、`useOptimizationTaskCenter.test.tsx`、`useOptimizeWorkflow.races.test.tsx`、`BalanceSection.test.tsx`、`InvitationsSection.test.tsx`、`CommercialProfilesSection.test.tsx`、`ProfileUpgradePrompt.test.tsx`、`announcement-query.test.tsx`、`AnnouncementsSection.test.tsx`、V2 `Announcements.test.tsx`、`Accessibility.test.tsx`、`useAdminUserList.test.tsx`、`useAdminCdkData.test.tsx`、`useAdminOverview.test.ts`、`useAdminController.test.tsx`、`OperationsTodosPanel.test.tsx`、`QueueMonitorPanel.test.tsx`、`AdminDashboardView.navigation.test.tsx` 及相关页面集成测试，再按 [验证规则](agent-validation.md) 运行仓库检查。
+涉及缓存共享、身份切换、迟到响应、退出清理或修改后的失效时，运行 `admin-panel-query.test.tsx`、`useAdminDetailQuery.test.tsx`、`use-feedback-thread.test.ts`、`NotificationCenter.test.tsx`、`balance-actions.test.tsx`、`useResultHistoryPagination.test.tsx`、`inventory-query.test.tsx`、`inventory-hooks.test.tsx`、`useOptimizationTaskCenter.test.tsx`、`useOptimizeWorkflow.races.test.tsx`、`BalanceSection.test.tsx`、`CommercialProfilesSection.test.tsx`、`ProfileUpgradePrompt.test.tsx`、`announcement-query.test.tsx`、V2 `Announcements.test.tsx`、`Accessibility.test.tsx`、`useAdminUserList.test.tsx`、`useAdminCdkData.test.tsx`、`useAdminOverview.test.ts`、`useAdminController.test.tsx`、`OperationsTodosPanel.test.tsx`、`QueueMonitorPanel.test.tsx`、`AdminDashboardView.navigation.test.tsx` 及相关页面集成测试，再按 [验证规则](agent-validation.md) 运行仓库检查。

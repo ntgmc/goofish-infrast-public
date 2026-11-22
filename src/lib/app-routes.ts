@@ -1,45 +1,7 @@
-export const DASHBOARD_SECTIONS = ['profiles', 'commercial', 'tools', 'redeem', 'invitations', 'inventory', 'balance', 'announcements', 'settings'] as const
-export type DashboardSection = typeof DASHBOARD_SECTIONS[number]
-
-export const WORKSPACE_SETUP_SECTIONS = ['operators', 'config', 'cdk'] as const
-export type WorkspaceSetupSection = typeof WORKSPACE_SETUP_SECTIONS[number]
-
-export const OPTIMIZE_ROUTE_SECTIONS = ['overview', 'plans', 'config', 'result', 'lab'] as const
-export type OptimizeSection = typeof OPTIMIZE_ROUTE_SECTIONS[number]
+export type OptimizeSection = 'overview' | 'plans' | 'config' | 'result' | 'lab'
 
 export const ADMIN_SECTIONS = ['overview', 'features', 'ai', 'content', 'queue', 'items', 'cdk', 'risk', 'registration', 'invitation', 'announcement', 'users', 'feedback', 'audit'] as const
 export type AdminSection = typeof ADMIN_SECTIONS[number]
-
-export type ToolRoute =
-  | { kind: 'dashboard'; section: DashboardSection }
-  | { kind: 'setup'; section: WorkspaceSetupSection }
-  | { kind: 'optimize'; section: OptimizeSection }
-
-const dashboardPaths: Record<DashboardSection, string> = {
-  profiles: '/tool/profiles',
-  commercial: '/tool/commercial',
-  tools: '/tool/tools',
-  redeem: '/tool/redeem',
-  invitations: '/tool/invitations',
-  inventory: '/tool/inventory',
-  balance: '/tool/balance',
-  announcements: '/tool/announcements',
-  settings: '/tool/settings',
-}
-
-const setupPaths: Record<WorkspaceSetupSection, string> = {
-  operators: '/tool/setup/operators',
-  config: '/tool/setup/config',
-  cdk: '/tool/setup/cdk',
-}
-
-const optimizePaths: Record<OptimizeSection, string> = {
-  overview: '/tool/optimize/overview',
-  plans: '/tool/optimize/plans',
-  config: '/tool/optimize/config',
-  result: '/tool/optimize/result',
-  lab: '/tool/optimize/lab',
-}
 
 const adminPaths: Record<AdminSection, string> = {
   overview: '/admin/overview',
@@ -90,47 +52,15 @@ const standaloneAppPaths = new Set([
   '/v2/benchmarks',
 ])
 
-export function dashboardPath(section: DashboardSection): string {
-  return dashboardPaths[section]
-}
-
-export function workspaceSetupPath(section: WorkspaceSetupSection): string {
-  return setupPaths[section]
-}
-
-export function optimizePath(section: OptimizeSection): string {
-  return optimizePaths[section]
-}
+const retiredToolPaths = new Set([
+  '/tool/profiles', '/tool/commercial', '/tool/tools', '/tool/redeem', '/tool/invitations',
+  '/tool/inventory', '/tool/balance', '/tool/announcements', '/tool/settings',
+  '/tool/setup/operators', '/tool/setup/config', '/tool/setup/cdk',
+  '/tool/optimize/overview', '/tool/optimize/plans', '/tool/optimize/config', '/tool/optimize/result', '/tool/optimize/lab',
+])
 
 export function adminPath(section: AdminSection): string {
   return adminPaths[section]
-}
-
-export function profileScopedPath(path: string, profileId?: string | null): string {
-  if (!profileId) return path
-  const separator = path.includes('?') ? '&' : '?'
-  return path + separator + new URLSearchParams({ profile_id: profileId })
-}
-
-export function resolveToolRoute(pathname: string): ToolRoute | null {
-  const path = normalizePath(pathname)
-  const dashboardSection = entryForValue(dashboardPaths, path)
-  if (dashboardSection) return { kind: 'dashboard', section: dashboardSection }
-
-  const setupSection = entryForValue(setupPaths, path)
-  if (setupSection) return { kind: 'setup', section: setupSection }
-
-  const optimizeSection = entryForValue(optimizePaths, path)
-  if (optimizeSection) return { kind: 'optimize', section: optimizeSection }
-
-  return null
-}
-
-export function fallbackToolPath(pathname: string): string {
-  const path = normalizePath(pathname)
-  if (path === '/tool/setup' || path.startsWith('/tool/setup/')) return workspaceSetupPath('operators')
-  if (path === '/tool/optimize' || path.startsWith('/tool/optimize/')) return optimizePath('overview')
-  return dashboardPath('profiles')
 }
 
 export function resolveAdminSection(pathname: string): AdminSection | null {
@@ -143,7 +73,7 @@ export function fallbackAdminPath(): string {
 
 export function isAppRoutePath(pathname: string): boolean {
   const path = normalizePath(pathname)
-  return standaloneAppPaths.has(path) || resolveToolRoute(path) !== null || resolveAdminSection(path) !== null
+  return standaloneAppPaths.has(path) || retiredToolPaths.has(path) || resolveAdminSection(path) !== null
 }
 
 function normalizePath(pathname: string): string {

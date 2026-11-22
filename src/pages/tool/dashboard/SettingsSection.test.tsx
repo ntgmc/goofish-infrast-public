@@ -1,13 +1,25 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render as renderUi, screen, waitFor } from '../../../test/query-render'
+import { cleanup, fireEvent, render as renderUi, screen, waitFor, within } from '../../../test/query-render'
 import { createMemoryRouter, MemoryRouter, RouterProvider } from 'react-router'
 import type { ReactNode } from 'react'
 import AccountSafetyPage from '../../AccountSafetyPage'
 import { formatAccountDeletionDeadline } from '../../../lib/account-lifecycle-client'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import SettingsSection from './SettingsSection'
+import Settings from '../../v2/pages/Settings'
+import AccountDataSettings from '../../v2/AccountDataSettings'
+import { useAccountSettings } from '../../../hooks/useAccountSettings'
+import type { V2Session } from '../../v2/OptionsDrawer'
+
+function SettingsSection({ safetyOnly, ...props }: Parameters<typeof useAccountSettings>[0] & { safetyOnly?: boolean }) {
+  const model = useAccountSettings(props)
+  const session = { profiles: props.profiles, activeProfile: props.activeProfileId ? { id: props.activeProfileId } : null, applyAuthPayload: props.onPayload } as V2Session
+  return safetyOnly ? <AccountDataSettings model={model} safetyOnly /> : <Settings session={session} />
+}
 import { disableDebugMode } from '../../../lib/debug-diagnostics'
+import { copy } from '../../../copy'
+
+vi.mock('../../v2/useAdminPreviewSession', () => ({ useAdminPreviewSession: () => false }))
 
 vi.mock('../../../components/QqBotSettingsPanel', () => ({ default: () => null }))
 
@@ -28,6 +40,7 @@ describe('SettingsSection privacy controls', () => {
     const user = userEvent.setup()
     const props = { profiles: [], onPayload: vi.fn() }
     const { unmount } = render(<SettingsSection {...props} />)
+    await user.click(screen.getByRole('button', { name: copy.dashboard.settings.preferences }))
     const toggle = screen.getByText('调试模式').closest('summary')!
     expect(toggle.closest('details')).not.toHaveAttribute('open')
     await user.click(toggle)
@@ -37,6 +50,7 @@ describe('SettingsSection privacy controls', () => {
 
     unmount()
     render(<SettingsSection {...props} />)
+    await user.click(screen.getByRole('button', { name: copy.dashboard.settings.preferences }))
     const diagnostics = screen.getByText('调试模式').closest('details')!
     expect(diagnostics).toHaveAttribute('open')
     await user.click(screen.getByRole('button', { name: '关闭并清空' }))
@@ -47,7 +61,7 @@ describe('SettingsSection privacy controls', () => {
   it('limits all change-password fields and reports oversized passwords', async () => {
     const user = userEvent.setup()
     render(<SettingsSection profiles={[]} onPayload={vi.fn()} />)
-    const oldPassword = screen.getByLabelText('当前密码', { selector: '#settings-old-password' })
+    const oldPassword = within(screen.getByRole('button', { name: '修改密码' }).closest('form')!).getByLabelText('当前密码')
     const newPassword = screen.getByLabelText('新密码')
     const confirmation = screen.getByLabelText('确认新密码')
 
@@ -82,9 +96,11 @@ describe('SettingsSection privacy controls', () => {
       },
     }]} activeProfileId={activeProfileId} onPayload={onPayload} />)
 
+    await user.click(screen.getByRole('button', { name: copy.dashboard.settings.data }))
     await user.click(screen.getByRole('button', { name: '清除授权信息' }))
 
-    await waitFor(() => expect(onPayload).toHaveBeenCalledOnce())
+    await waitFor(() => expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(['/api/user/data/credential/clear', `/api/auth/me?profile_id=${activeProfileId}`]))
+    expect(onPayload).toHaveBeenCalledOnce()
     expect(screen.getByRole('status')).toHaveTextContent('森空岛授权信息已清除')
     expect(screen.queryByRole('button', { name: '清除授权信息' })).not.toBeInTheDocument()
     expect(screen.getByText(/再次导入数据时，请使用相同 UID 重新授权/)).toBeInTheDocument()
@@ -100,9 +116,9 @@ describe('SettingsSection privacy controls', () => {
       scheduled_for: '2026-08-07T00:00:42.000Z',
     }), { status: 202, headers: { 'Content-Type': 'application/json' } })))
     const router = createMemoryRouter([
-      { path: '/tool/settings', element: <SettingsSection safetyOnly profiles={[]} onPayload={vi.fn()} /> },
+      { path: '/settings', element: <SettingsSection safetyOnly profiles={[]} onPayload={vi.fn()} /> },
       { path: '/account-safety', element: <AccountSafetyPage /> },
-    ], { initialEntries: ['/tool/settings'] })
+    ], { initialEntries: ['/settings'] })
     renderUi(<RouterProvider router={router} />)
 
     await user.click(screen.getByText('注销账号'))
@@ -110,7 +126,7 @@ describe('SettingsSection privacy controls', () => {
     expect(email).toHaveAttribute('type', 'email')
     expect(email).toHaveAttribute('maxlength', '254')
     await user.type(email, 'user@example.test')
-    await user.type(screen.getByLabelText('当前密码', { selector: '#settings-delete-password' }), 'password')
+    await user.type(screen.getByLabelText('当前密码'), 'password')
     await user.selectOptions(screen.getByLabelText('注销原因（必选）'), 'no_longer_needed')
     await user.click(screen.getByRole('button', { name: '申请注销账号' }))
 
@@ -133,7 +149,7 @@ describe('SettingsSection privacy controls', () => {
     render(<SettingsSection safetyOnly profiles={[]} onPayload={vi.fn()} onDeletionStateChange={onDeletionStateChange} />)
     await user.click(screen.getByText('注销账号'))
     await user.type(screen.getByLabelText('确认邮箱'), 'user@example.test')
-    const password = screen.getByLabelText('当前密码', { selector: '#settings-delete-password' })
+    const password = screen.getByLabelText('当前密码')
     await user.type(password, 'password')
     await user.selectOptions(screen.getByLabelText('注销原因（必选）'), 'privacy')
     await user.click(screen.getByRole('button', { name: '申请注销账号' }))

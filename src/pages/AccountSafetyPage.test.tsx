@@ -84,7 +84,8 @@ describe('AccountSafetyPage lifecycle controls', () => {
     expect(screen.getByRole('button', { name: '安全退出' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '修改密码' })).not.toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/account-safety')
-    await screen.findByText('QQ 通知服务尚未开放，开放后即可绑定并接收提醒。')
+    expect(screen.getByText('注销账号')).toBeInTheDocument()
+    expect(fetch).not.toHaveBeenCalled()
   })
 })
 

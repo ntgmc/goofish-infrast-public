@@ -9,9 +9,9 @@ live in [V2 workspace](docs/v2-workspace.md).
 
 - Genre: modern-minimal. Applications use a Workbench layout; documents use a
   Long Document layout. Keep the existing navigation and route ownership.
-- V2 and admin use mist paper, slate text and copper accents. `--color-v2-*`
-  supplies both themes; `.v2-app`, `.v2-drawer`, `.admin-app` and `.admin-dialog`
-  map them to shared semantic tokens. Other routes retain the canonical palette.
+- All pages use mist paper, slate text and copper accents. `--color-v2-*`
+  supplies both themes and maps to shared semantic tokens at the root and within
+  `.v2-app`, `.v2-drawer`, `.admin-app` and `.admin-dialog`.
 - Keep Noto Sans SC display, Geist body and the existing monospace stack. Use
   tabular numbers for production, prices, efficiency and time.
 - Accent identifies primary actions, selection and focus. Destructive actions
@@ -25,7 +25,8 @@ live in [V2 workspace](docs/v2-workspace.md).
 
 ## Workspace and admin
 
-The shell owns page headings, navigation, theme and utility actions. V2 supporting
+The shell owns page headings, navigation, theme and utility actions. Standalone
+public pages use `PublicPageLayout.tsx` and the same V2 content components. V2 supporting
 pages use `src/pages/v2/pages/` and `.v2-page-section` in `workspace-pages.css`;
 admin uses `AdminShell.tsx` and `admin.css`. Reuse business hooks and specialized
 editors, binding dialogs, task progress and comparison charts.

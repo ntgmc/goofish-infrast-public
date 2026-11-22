@@ -39,7 +39,8 @@ describe('PublicContentProvider', () => {
     server.pricing.plans.single_account_lifetime.discount_fold = 10
     apiJson.mockResolvedValue(server)
     render(<PublicContentProvider><MemoryRouter><PricingPage /></MemoryRouter></PublicContentProvider>)
-    expect(await screen.findByText('88 元 / 长期')).toBeInTheDocument()
+    expect(await screen.findByText('88 元')).toBeInTheDocument()
+    expect(screen.getByText('／长期')).toBeInTheDocument()
     expect((getSku('single_account_lifetime') as unknown as { original_display_price: string }).original_display_price).toBe('59 元 / 长期')
   })
 

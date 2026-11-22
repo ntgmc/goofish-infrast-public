@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { apiVoid } from '../lib/api-client'
 import { copy } from '../copy/index'
-import ThemeSwitcher from '../components/ThemeSwitcher'
+import AuthLayout from './v2/AuthLayout'
 
 
 export default function CancelAccountDeletionPage() {
@@ -22,22 +22,13 @@ export default function CancelAccountDeletionPage() {
   }
 
   return (
-    <main className="tool-shell flex min-h-dvh items-center justify-center px-4 py-6 sm:px-6" tabIndex={-1} data-route-focus>
-      <section className="tool-panel w-full max-w-lg p-6 sm:p-8" aria-labelledby="cancel-account-deletion-title">
-        <div className="flex items-center justify-between gap-3">
-          <p className="section-index">{copy.auth.pages_CancelAccountDeletionPage_003}</p>
-          <ThemeSwitcher />
-        </div>
-        <h1 id="cancel-account-deletion-title" className="display-title mt-2 text-2xl text-ink-primary">{copy.auth.pages_CancelAccountDeletionPage_004}</h1>
-        <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.auth.pages_CancelAccountDeletionPage_005}</p>
-        {error && <p className="tool-alert tool-alert--error mt-5" role="alert">{error}</p>}
-        {status && <p className="tool-alert tool-alert--success mt-5" role="status" aria-live="polite">{status}</p>}
-        <button type="button" disabled={!token || loading || Boolean(status)} onClick={() => void cancel()} className="tool-primary-action mt-5 w-full">
+    <AuthLayout title={copy.auth.pages_CancelAccountDeletionPage_004} description={copy.auth.pages_CancelAccountDeletionPage_005}>
+        {error && <p className="v2-feedback v2-feedback-error" role="alert">{error}</p>}
+        {status && <p className="v2-feedback" role="status" aria-live="polite">{status}</p>}
+        <button type="button" disabled={!token || loading || Boolean(status)} onClick={() => void cancel()} className="v2-button v2-button-primary v2-auth-submit">
           {loading ? copy.auth.pages_CancelAccountDeletionPage_006 : copy.auth.pages_CancelAccountDeletionPage_007}
         </button>
-        <Link to="/login" className="mt-5 inline-flex min-h-11 w-full items-center justify-center text-sm font-medium text-brand-300 underline-offset-4 hover:underline">
-          {copy.auth.pages_CancelAccountDeletionPage_008}</Link>
-      </section>
-    </main>
+        <Link to="/login" className="v2-auth-link">{copy.auth.pages_CancelAccountDeletionPage_008}</Link>
+    </AuthLayout>
   )
 }

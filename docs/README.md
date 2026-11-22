@@ -35,7 +35,7 @@
 | 选择测试和完成检查 | [验证规范](agent-validation.md) |
 | 放置和维护文档 | [README 与文档规范](readme-guidelines.md) |
 | 修改后台操作、权限与并发校验 | [管理操作约定](admin-operations.md) |
-| 核对运营指标和工具事件 | [运营统计](operations-overview.md)、[工具操作观测](tool-behavior-observation.md) |
+| 核对运营指标 | [运营统计](operations-overview.md) |
 | 定位慢请求、SQL 与运行时开销 | [性能观测](performance-observation.md) |
 | 部署反向代理 | [Nginx 配置](nginx-deployment.md) |
 | 发布和验证产物 | [发布工件](release-artifacts.md) |

@@ -6,7 +6,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Announcement } from '../lib/types'
 import AnnouncementPopup from './AnnouncementPopup'
 import AuthForm from './AuthForm'
-import DeferredFeatureMenu from './DeferredFeatureMenu'
 import ThemeSwitcher from './ThemeSwitcher'
 
 const { apiJsonMock, apiVoidMock } = vi.hoisted(() => ({
@@ -275,23 +274,20 @@ describe('AnnouncementPopup accessibility', () => {
 })
 
 describe('mobile touch targets', () => {
-  it('keeps toolbar theme and more controls at the same 44px height', () => {
+  it('keeps the toolbar theme control at 44px height', () => {
     render(
       <MemoryRouter>
         <ThemeSwitcher />
-        <DeferredFeatureMenu />
       </MemoryRouter>,
     )
 
     expect(screen.getByRole('button', { name: /选择主题/ })).toHaveClass('h-11', 'py-0')
-    expect(screen.getByText('更多')).toHaveClass('h-11', 'py-0')
   })
 
   it('keeps icon-only toolbar controls square and accessibly named', () => {
     render(
       <MemoryRouter>
         <ThemeSwitcher iconOnly />
-        <DeferredFeatureMenu iconOnly />
       </MemoryRouter>,
     )
 
@@ -299,9 +295,6 @@ describe('mobile touch targets', () => {
     expect(theme).toHaveClass('h-11', 'w-11', 'px-0')
     expect(theme).not.toHaveTextContent('跟随系统')
 
-    const more = screen.getByText('', { selector: 'summary[aria-label="更多操作"]' })
-    expect(more).toHaveClass('h-11', 'w-11', 'px-0')
-    expect(more).toHaveAccessibleName('更多操作')
   })
 
   it('keeps AuthForm controls at 44px and the submit action at 48px', async () => {

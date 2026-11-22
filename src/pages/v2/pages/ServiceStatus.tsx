@@ -1,7 +1,7 @@
 import { useState, type KeyboardEvent } from 'react'
 import { RefreshIcon as RefreshCw } from '../../../components/icons'
 import { copy } from '../../../copy'
-import { useServiceStatus, createHistoryCells, historyCellLabel, statusLabel, incidentStatusLabel, incidentImpactLabel, formatUpdatedAt } from '../../StatusPage'
+import { useServiceStatus, createHistoryCells, historyCellLabel, statusLabel, incidentStatusLabel, incidentImpactLabel, formatUpdatedAt } from '../../../hooks/useServiceStatus'
 import ServiceStatusBadge from '../../../components/ServiceStatusBadge'
 import type { ServiceStatusLevel } from '../../../lib/service-status'
 import { DataActivity } from '../components/DataActivity'

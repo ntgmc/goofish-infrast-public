@@ -15,22 +15,23 @@ import { EmptyState, Loading, Notice } from '../components/WorkspaceUI'
 const text = copy.dashboard
 const Markdown = memo(AnnouncementMarkdown)
 
-export default function Announcements({ session }: { session: V2Session }) {
-  return <AnnouncementFeed key={session.authStatus === 'authenticated' ? session.user?.id ?? 'public' : 'public'} session={session} />
+export default function Announcements({ session }: { session?: V2Session }) {
+  return <AnnouncementFeed key={session?.authStatus === 'authenticated' ? session.user?.id ?? 'public' : 'public'} session={session} />
 }
 
-function AnnouncementFeed({ session }: { session: V2Session }) {
+function AnnouncementFeed({ session }: { session?: V2Session }) {
   const location = useLocation()
   const navigate = useNavigate()
   const search = new URLSearchParams(location.search)
   const rawPage = Number(search.get('page') ?? 1)
   const page = Number.isSafeInteger(rawPage) && rawPage > 0 ? rawPage : 1
-  const signedIn = session.authStatus === 'authenticated' && Boolean(session.user)
+  const user = session?.authStatus === 'authenticated' ? session.user : null
+  const signedIn = Boolean(user)
   const unreadOnly = signedIn && search.get('unread_only') === '1'
   let announcementId = location.hash.startsWith('#announcement-') ? location.hash.slice(14) : ''
   try { announcementId = decodeURIComponent(announcementId) } catch { /* Keep malformed anchors visible as missing announcements. */ }
   const client = useQueryClient()
-  const query = useAnnouncementPageQuery(signedIn ? session.user!.id : null, page, unreadOnly, announcementId)
+  const query = useAnnouncementPageQuery(user?.id ?? null, page, unreadOnly, announcementId)
   const { data, apiUrl } = query
   const loading = query.isFetching
   const [writeError, setWriteError] = useState<string | null>(null)
@@ -45,14 +46,14 @@ function AnnouncementFeed({ session }: { session: V2Session }) {
 
   useEffect(() => {
     if (!data) return
-    if (typeof data.unread_count === 'number') session.setAnnouncementUnreadCount(data.unread_count)
+    if (typeof data.unread_count === 'number') session?.setAnnouncementUnreadCount(data.unread_count)
     if (data.page !== page) {
       const normalized = new URLSearchParams(location.search)
       normalized.set('section', 'announcements')
       normalized.set('page', String(data.page))
       navigate({ search: `?${normalized}`, hash: location.hash }, { replace: true })
     }
-  }, [data, page, location.search, location.hash, navigate, session.setAnnouncementUnreadCount])
+  }, [data, page, location.search, location.hash, navigate, session?.setAnnouncementUnreadCount])
 
   function openPage(nextPage: number, id = '', unread = unreadOnly) {
     const next = new URLSearchParams(location.search)
@@ -64,7 +65,7 @@ function AnnouncementFeed({ session }: { session: V2Session }) {
   }
 
   async function markRead(id?: string) {
-    if (!signedIn || marking) return
+    if (!user || marking) return
     const controller = new AbortController()
     writeAbort.current = controller
     setMarking(id ?? 'all')
@@ -78,9 +79,9 @@ function AnnouncementFeed({ session }: { session: V2Session }) {
       const acknowledged = id ? data?.announcements.filter((item) => item.announcement.id === id).map((item) => item.announcement) ?? []
         : result.announcements?.filter((item) => item.read_at).map((item) => item.announcement) ?? []
       for (const announcement of acknowledged) markAnnouncementRead(announcement)
-      await updateUserAnnouncementQueries(client, session.user!.id, result, id ? query.queryKey : undefined)
+      await updateUserAnnouncementQueries(client, user.id, result, id ? query.queryKey : undefined)
       if (controller.signal.aborted) return
-      if (typeof result.unread_count === 'number') session.setAnnouncementUnreadCount(result.unread_count)
+      if (typeof result.unread_count === 'number') session?.setAnnouncementUnreadCount(result.unread_count)
       if ('page' in result && (unreadOnly || result.page !== page)) openPage(result.page, unreadOnly ? '' : announcementId)
     } catch (cause: unknown) {
       if (!controller.signal.aborted) setWriteError(getApiErrorMessage(cause, text.pages_tool_dashboard_AnnouncementsSection_002))
@@ -91,7 +92,7 @@ function AnnouncementFeed({ session }: { session: V2Session }) {
 
   const selected = data?.announcements.find((item) => item.announcement.id === announcementId)
     ?? (!announcementId ? data?.announcements[0] : undefined)
-  const unreadCount = data?.unread_count ?? session.announcementUnreadCount
+  const unreadCount = data?.unread_count ?? session?.announcementUnreadCount ?? 0
   const pages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1
   const busy = loading || marking !== null
   return <div className="v2-announcement-inbox">

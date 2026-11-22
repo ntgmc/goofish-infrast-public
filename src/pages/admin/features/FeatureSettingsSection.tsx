@@ -19,7 +19,7 @@ type FeatureSettingsResponse = {
 const GROUPS: Array<{ label: string; features: SiteFeatureKey[] }> = [
   { label: copy.features.admin_groups.site, features: ['site'] },
   { label: copy.features.admin_groups.account, features: ['registration', 'login', 'profiles', 'cdk_redemption', 'free_preview', 'skland'] },
-  { label: copy.features.admin_groups.pages, features: ['v2', 'v1', 'faq', 'support', 'pricing', 'changelog', 'thanks', 'service_status'] },
+  { label: copy.features.admin_groups.pages, features: ['v2', 'faq', 'support', 'pricing', 'changelog', 'thanks', 'service_status'] },
   { label: copy.features.admin_groups.scheduling, features: ['schedule_generation', 'one_shift_per_day', 'scenario_comparison', 'metered_billing'] },
   { label: copy.features.admin_groups.assistants, features: ['ai_credits', 'ai_schedule_explanation', 'schedule_explanation_avatar', 'ai_goal_comparison', 'ai_cultivation_advisor', 'workspace_page_help', 'ai_change_summary'] },
   { label: copy.features.admin_groups.tools, features: ['tools', 'manual_schedule', 'schedule_comparison', 'cultivation_plan', 'cultivation_projects', 'training_ratio', 'thanks_recruitment', 'material_demand', 'depot_value', 'building_rating_radar', 'base_value_dashboard'] },
@@ -190,7 +190,7 @@ export default function FeatureSettingsSection() {
                   />
                   <span className="min-w-0">
                     <strong className="flex items-center gap-2 text-sm text-ink-primary">{feature === 'skland' && <SklandIcon />}{copy.features.feature_labels[feature]}</strong>
-                    {(feature === 'v1' || assistantHelp) && <span className="mt-1 block text-xs leading-5 text-ink-secondary">{assistantHelp ?? copy.features.v1_migration.admin_help}</span>}
+                    {assistantHelp && <span className="mt-1 block text-xs leading-5 text-ink-secondary">{assistantHelp}</span>}
                     <span className={`mt-1 block text-xs ${effectiveEnabled ? 'text-success' : 'text-ink-muted'}`}>
                       {effectiveEnabled ? copy.features.admin_effective_on : rawEnabled ? copy.features.admin_raw_on_effective_off : copy.features.admin_effective_off}
                     </span>
