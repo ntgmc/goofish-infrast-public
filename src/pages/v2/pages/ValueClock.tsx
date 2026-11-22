@@ -81,7 +81,7 @@ function ClockReadings({ fullscreen }: { fullscreen: ReactNode }) {
     : reading.stale || snapshot.status === 'paused' ? text.paused
       : snapshot.status === 'not_started' ? text.notStarted : snapshot.status === 'rebuilding' ? text.rebuilding : snapshot.status === 'empty' ? text.empty : text.ready
   return <>
-    <div className="value-clock-toolbar"><p className="value-clock-status" role="status"><span className="value-clock-status-mark" data-live={status === text.ready || undefined} />{status}</p><div className="value-clock-actions"><button type="button" className="value-clock-action" onClick={() => setPaused((value) => !value)}>{paused ? text.resume : text.pause}</button>{fullscreen}</div></div>
+    <div className="value-clock-toolbar"><p className="value-clock-status" role="status"><span className="value-clock-status-mark" data-live={status === text.ready || undefined} /><span className="value-clock-status-text" data-live={status === text.ready || undefined}>{status}</span></p><div className="value-clock-actions"><button type="button" className="value-clock-action" onClick={() => setPaused((value) => !value)}>{paused ? text.resume : text.pause}</button>{fullscreen}</div></div>
     <div className="value-clock-hero" aria-busy={query.isPending}>
       <h2 className="value-clock-eyebrow"><span>{text.headlineLead}</span><span>{text.headlineEnd}</span></h2>
       <p className="value-clock-total-label">{text.total}</p>

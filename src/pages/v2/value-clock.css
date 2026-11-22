@@ -13,6 +13,8 @@
 .value-clock-masthead h1 { margin: 0; font-size: .875rem; font-weight: 450; color: var(--color-v2-muted); }
 .value-clock-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .75rem 1rem; }
 .value-clock-status { display: flex; flex-shrink: 0; max-width: 100%; align-items: center; gap: .6rem; margin: 0; color: var(--color-v2-secondary); font-size: .875rem; }
+.value-clock-status-text { min-width: 0; }
+.value-clock-status-text[data-live] { flex-shrink: 0; white-space: nowrap; }
 .value-clock-status-mark { flex: 0 0 .4rem; height: .4rem; border-radius: 50%; background: var(--color-v2-muted); }
 .value-clock-status-mark[data-live] { background: var(--color-v2-accent); box-shadow: 0 0 0 .25rem color-mix(in srgb, var(--color-v2-accent) 10%, transparent); }
 .value-clock-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
