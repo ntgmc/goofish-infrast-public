@@ -43,14 +43,14 @@ describe('admin feature settings handler', () => {
     expect((await handler(jsonRequest({ features: settings.features, expected_revision: 2 }))).status).toBe(200)
   })
 
-  it('publishes a saved V1 switch without disabling V2 or shared scheduling capabilities', async () => {
-    const saved = { ...settings, features: { ...settings.features, v1: false }, revision: 3 }
+  it('publishes page switches without disabling shared scheduling capabilities', async () => {
+    const saved = { ...settings, features: { ...settings.features, faq: false }, revision: 3 }
     store.saveSiteFeatureSettings.mockResolvedValueOnce(saved)
     expect((await handler(jsonRequest({ features: saved.features, expected_revision: 2 }))).status).toBe(200)
     expect(store.saveSiteFeatureSettings).toHaveBeenCalledWith(saved.features, 2, undefined)
     store.getSiteFeatureSettings.mockResolvedValueOnce(saved)
     const response = await siteHandler(new Request('http://localhost/api/site/features'))
-    await expect(response.json()).resolves.toMatchObject({ features: { v1: false, v2: true, profiles: true, schedule_generation: true } })
+    await expect(response.json()).resolves.toMatchObject({ features: { faq: false, v2: true, profiles: true, schedule_generation: true } })
   })
 
   it('validates pause text and publishes it only when the feature could otherwise open', async () => {

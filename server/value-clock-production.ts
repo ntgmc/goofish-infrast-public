@@ -12,7 +12,7 @@ const productionSchema = z.object({
 export class ValueClockError extends Error {}
 
 export function freezeValueClockProduction(item: WorkspaceResultHistoryExportItem, importedAt: string | null): {
-  daily: ValueClockVector; inventory: { snapshot: string; durationMs: number } | null
+  daily: ValueClockVector; inventory: { snapshot: string; durationMs: number } | null; inventorySnapshot: string
 } {
   const result = item.result
   const parsed = productionSchema.safeParse(result.daily_production)
@@ -58,9 +58,10 @@ export function freezeValueClockProduction(item: WorkspaceResultHistoryExportIte
   }
   if (amount(trading, 'Orundum') > 0 && !economy) throw new ValueClockError('Saved result lacks orundum supply analysis')
   const inventoryValues = { ...item.config?.intermediate_inventory, 'Originium Shard': item.config?.intermediate_inventory?.['Originium Shard'] ?? daily.originium_shard_inventory ?? null }
+  const inventorySnapshot = createHash('sha256').update(JSON.stringify([importedAt, Object.entries(inventoryValues).sort()])).digest('hex')
   const inventory = depletion.length ? {
-    snapshot: createHash('sha256').update(JSON.stringify([importedAt, Object.entries(inventoryValues).sort()])).digest('hex'),
+    snapshot: inventorySnapshot,
     durationMs: Math.min(...depletion) * 86_400_000,
   } : null
-  return { daily: vector.data, inventory }
+  return { daily: vector.data, inventory, inventorySnapshot }
 }

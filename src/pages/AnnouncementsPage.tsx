@@ -1,64 +1,9 @@
-import { usePublicAnnouncementsQuery } from '../lib/announcement-query'
-import { Link } from 'react-router'
-import { getAnnouncementReminderState } from '../lib/announcement-reminders'
-import AnnouncementMarkdown from '../components/AnnouncementMarkdown'
-import ThemeSwitcher from '../components/ThemeSwitcher'
-import { copy, CURRENT_LOCALE } from '../copy/index'
+import { copy } from '../copy'
+import Announcements from './v2/pages/Announcements'
+import PublicPageLayout from './v2/PublicPageLayout'
 
-
-function usePublicAnnouncements() {
-  const query = usePublicAnnouncementsQuery()
-  return { announcements: query.data?.announcements ?? [], loading: query.isFetching, error: query.error?.message }
-}
-
-export default function AnnouncementsPage({ embedded = false }: { embedded?: boolean } = {}) {
-  const PageRoot = embedded ? 'section' : 'main'
-  const { announcements, loading, error } = usePublicAnnouncements()
-  return (
-    <PageRoot className={embedded ? 'v2-embedded-tool' : 'tool-page'} tabIndex={-1} data-route-focus>
-      <div className={embedded ? undefined : 'public-document'}>
-        <div className="tool-page-header flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="section-index">{copy.public.pages_AnnouncementsPage_002}</p>
-            <h1 className="display-title text-2xl">{copy.public.pages_AnnouncementsPage_003}</h1>
-            <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.public.pages_AnnouncementsPage_004}</p>
-          </div>
-          {!embedded && <div className="flex flex-wrap gap-2">
-            <ThemeSwitcher />
-            <Link to="/tool/profiles" className="tool-secondary-action shrink-0">
-              {copy.public.pages_AnnouncementsPage_005}</Link>
-          </div>}
-        </div>
-
-        {loading && <p className="tool-inset mt-6 px-4 py-3 text-sm text-ink-secondary" role="status">{copy.public.pages_AnnouncementsPage_006}</p>}
-        {error && <div className="tool-alert tool-alert--error mt-6" role="alert">{error}</div>}
-        {!loading && !error && announcements.length === 0 && (
-          <div className="tool-inset mt-6 px-4 py-5 text-sm leading-6 text-ink-secondary">
-            {copy.public.pages_AnnouncementsPage_007}</div>
-        )}
-
-        <div className="mt-6 border-t border-surface-4">
-          {announcements.map((announcement) => (
-            <article key={announcement.id} className="workspace-announcement-public border-b border-surface-3 py-6">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="tool-status">
-                  {copy.public.pages_AnnouncementsPage_009}
-                </span>
-                {getAnnouncementReminderState(announcement) === 'ended' && <span className="tool-status">{copy.public.announcement_reminder_ended}</span>}
-                <time className="text-xs text-ink-muted">{formatDate(announcement.updated_at)}</time>
-              </div>
-              <h2 className="mt-3 text-base font-semibold text-ink-primary">{announcement.title}</h2>
-              <AnnouncementMarkdown className="mt-2">{announcement.body}</AnnouncementMarkdown>
-            </article>
-          ))}
-        </div>
-      </div>
-    </PageRoot>
-  )
-}
-
-function formatDate(value: string): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleString(CURRENT_LOCALE, { hour12: false })
+export default function AnnouncementsPage() {
+  return <PublicPageLayout title={copy.v2.announcements}>
+    <Announcements />
+  </PublicPageLayout>
 }

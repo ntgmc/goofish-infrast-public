@@ -7,7 +7,6 @@ import { copy } from '../../../copy/index'
 import { apiJson } from '../../../lib/api-client'
 import { useQueryClient } from '@tanstack/react-query'
 import { fetchCachedResultHistoryDetail, resultHistoryKey } from './result-history-query'
-import { recordToolBehavior } from '../../../lib/tool-behavior-observation'
 
 
 type Setter<T> = Dispatch<SetStateAction<T>>
@@ -158,7 +157,6 @@ export function useOptimizeWorkspace({
   }, [client, userId, invalidateHistoryRequest, profileId, setWorkspaceBusyAction, setWorkspaceError])
 
   const handleViewHistory = useCallback(async (summary: WorkspaceResultHistorySummary) => {
-    recordToolBehavior({ name: 'result_select', profile: profileId, subject: summary.id })
     const loaded = await loadHistoryDetail(summary)
     if (!loaded?.current()) return
     const { item } = loaded
@@ -174,7 +172,6 @@ export function useOptimizeWorkspace({
 
   const handleUseHistoryConfig = useCallback(async (summary: WorkspaceResultHistorySummary) => {
     if (isConfigReadOnly?.()) return
-    recordToolBehavior({ name: 'history_config_select', profile: profileId, subject: summary.id })
     const loaded = await loadHistoryDetail(summary)
     if (!loaded?.current() || isConfigReadOnly?.()) return
     const { item } = loaded

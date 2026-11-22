@@ -1,36 +1,20 @@
 import { Link } from 'react-router'
 import GuestAccountLink from '../components/GuestAccountLink'
-import BrandLogo from '../components/BrandLogo'
-import ThemeSwitcher from '../components/ThemeSwitcher'
 import { copy } from '../copy'
-import { useCultivation } from './CultivationPlanPage'
-import { useToolSession } from './tool/useToolSession'
+import { useCultivation } from '../hooks/useCultivation'
 import { v2Path } from './v2/navigation'
 import type { V2Session } from './v2/OptionsDrawer'
 import { RefreshIcon } from '../components/icons'
 
 const text = copy.tools.thanksRecruitment
 
-type PageProps = { embedded?: boolean; session?: ReturnType<typeof useToolSession> }
-
-export default function ThanksRecruitmentPage({ embedded = false, session }: PageProps = {}) {
-  return session ? <ThanksRecruitmentContent embedded={embedded} session={session} /> : <StandaloneThanksRecruitment />
-}
-
-function StandaloneThanksRecruitment() {
-  const session = useToolSession()
-  return <ThanksRecruitmentContent embedded={false} session={session} />
-}
-
-function ThanksRecruitmentContent({ embedded, session }: { embedded: boolean; session: V2Session }) {
+export default function ThanksRecruitmentPage({ session }: { session: V2Session }) {
   const model = useCultivation(session)
   const queues = model.data?.thanksRecruitment?.queues ?? []
   const highestScore = Math.max(...queues.map((queue) => queue.expectedScore))
-  return <div className={embedded ? 'v2-embedded-tool' : 'mx-auto max-w-7xl px-4 py-6 sm:px-6'}>
-    {!embedded && <header className="mb-8 flex items-center justify-between gap-3"><Link to="/tool/tools" aria-label={text.back}><BrandLogo /></Link><div className="flex items-center gap-3"><Link to="/tool/tools" className="whitespace-nowrap text-sm text-ink-secondary hover:text-ink-primary">{text.back}</Link><ThemeSwitcher /></div></header>}
+  return <div className="v2-embedded-tool">
     <main className="space-y-6">
       <section className="tool-panel space-y-5 p-5 sm:p-6">
-        {!embedded && <h1 className="text-2xl font-semibold">{text.title}</h1>}
         <p className="text-sm leading-6 text-ink-secondary">{text.description}</p>
         {session.authLoading ? <p role="status">{text.loading}</p> : session.authStatus === 'error' ? <div role="alert"><p>{session.authError?.message}</p><button type="button" className="tool-secondary-action mt-3" onClick={session.retryAuth}>{copy.tools.pages_DepotValuePage_086}</button></div>
           : session.authStatus === 'anonymous' ? <GuestAccountLink inset label={copy.v2.guestAccount.recruitment} description={copy.v2.guestAccount.recruitmentHelp} />

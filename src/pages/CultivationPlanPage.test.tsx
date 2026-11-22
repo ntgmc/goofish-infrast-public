@@ -3,7 +3,6 @@ import { StrictMode } from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import CultivationPlanPage from './CultivationPlanPage'
 import Cultivation from './v2/pages/Cultivation'
 import type { CultivationData } from '../lib/cultivation-contract'
 import { copy } from '../copy'
@@ -11,7 +10,7 @@ import { copy } from '../copy'
 const text = copy.tools.cultivation
 const mocks = vi.hoisted(() => ({ api: vi.fn(), session: vi.fn(), snapshot: vi.fn(), refresh: vi.fn() }))
 vi.mock('../hooks/useSklandSnapshot', () => ({ useSklandSnapshot: mocks.snapshot }))
-vi.mock('../lib/api-client', () => ({ apiJson: mocks.api }))
+vi.mock('../lib/api-client', async (original) => ({ ...await original<typeof import('../lib/api-client')>(), apiJson: mocks.api }))
 vi.mock('./tool/useToolSession', () => ({ useToolSession: mocks.session }))
 vi.mock('../components/ThemeSwitcher', () => ({ default: () => null }))
 
@@ -26,20 +25,21 @@ const sample = (): CultivationData => ({
 beforeEach(() => {
   localStorage.clear()
   vi.clearAllMocks()
+  mocks.refresh.mockResolvedValue({ version: 'refreshed' })
   mocks.snapshot.mockReturnValue({ data: null, busy: false, error: '', refresh: mocks.refresh })
-  mocks.session.mockReturnValue({ authLoading: false, authStatus: 'authenticated', activeProfile: { id: 'one' }, profiles: [{ id: 'one', display_name: '档案一', status: 'active', skland_binding: {} }, { id: 'two', display_name: '档案二', status: 'active', skland_binding: {} }] })
+  mocks.session.mockReturnValue({ user: { id: 'doctor' }, authLoading: false, authStatus: 'authenticated', activeProfile: { id: 'one' }, profiles: [{ id: 'one', display_name: '档案一', status: 'active', skland_binding: {} }, { id: 'two', display_name: '档案二', status: 'active', skland_binding: {} }] })
   mocks.api.mockResolvedValue(sample())
 })
 afterEach(cleanup)
 
-const content = (v2: boolean) => <MemoryRouter>{v2 ? <Cultivation session={mocks.session()} /> : <CultivationPlanPage />}</MemoryRouter>
+const content = () => <MemoryRouter><Cultivation session={mocks.session()} /></MemoryRouter>
 
 describe('homework training recommendations', () => {
   it('shows real sync and calculation waits and preserves results and drafts after a failed refresh', async () => {
     let finishSync!: () => void, finishCalculation!: (data: CultivationData) => void
-    mocks.refresh.mockReturnValue(new Promise<void>((resolve) => { finishSync = resolve }))
+    mocks.refresh.mockReturnValue(new Promise((resolve) => { finishSync = () => resolve({ version: 'refreshed' }) }))
     mocks.api.mockReturnValueOnce(new Promise<CultivationData>((resolve) => { finishCalculation = resolve }))
-    render(content(true))
+    render(content())
     fireEvent.click(screen.getByRole('button', { name: copy.skland.refresh }))
     expect(screen.getByRole('status', { name: copy.v2.dataActivity.syncing })).toHaveAttribute('aria-busy', 'true')
     expect(mocks.api).not.toHaveBeenCalled()
@@ -59,21 +59,21 @@ describe('homework training recommendations', () => {
 
   it('recalculates from shared snapshot versions without refreshing upstream or replacing input drafts', async () => {
     mocks.snapshot.mockReturnValue({ data: { version: '1' }, busy: false, error: '', refresh: mocks.refresh })
-    const page = render(content(false))
+    const page = render(content())
     await screen.findByRole('heading', { name: text.suggestions })
     fireEvent.click(screen.getByText(text.parameters))
     fireEvent.change(screen.getByRole('spinbutton', { name: text.limit }), { target: { value: '12' } })
     mocks.snapshot.mockReturnValue({ data: { version: '2' }, busy: false, error: '', refresh: mocks.refresh })
-    page.rerender(content(false))
+    page.rerender(content())
     await waitFor(() => expect(mocks.api).toHaveBeenCalledTimes(2))
     expect(mocks.refresh).not.toHaveBeenCalled()
     expect(screen.getByRole('spinbutton', { name: text.limit })).toHaveValue(12)
   })
 
-  it.each([false, true])('calculates a cached snapshot once on entry (StrictMode: %s)', async (strict) => {
+  it('calculates a cached snapshot once on entry (StrictMode: %s)', async (strict) => {
     mocks.snapshot.mockReturnValue({ data: { version: 'cached' }, busy: false, error: '', refresh: mocks.refresh })
     mocks.api.mockResolvedValue({ ...sample(), snapshotVersion: 'cached' })
-    const page = content(true)
+    const page = content()
     render(strict ? <StrictMode>{page}</StrictMode> : page)
     await screen.findByRole('heading', { name: text.suggestions })
     expect(screen.getByRole('button', { name: copy.skland.refresh })).toBeEnabled()
@@ -82,9 +82,9 @@ describe('homework training recommendations', () => {
     expect(mocks.refresh).not.toHaveBeenCalled()
   })
 
-  it.each([false, true])('recommends from homework and imports targets without material or calendar UI in V2=%s', async (v2) => {
+  it('recommends from homework and imports targets without material or calendar UI', async () => {
     mocks.session.mockReturnValue({ ...mocks.session(), user: { id: 'doctor' } })
-    render(content(v2))
+    render(content())
     fireEvent.click(screen.getByRole('button', { name: copy.skland.refresh }))
     await screen.findByRole('button', { name: copy.cultivationProjects.importBatch })
     expect(screen.getAllByRole('heading', { level: 3 })[0]).toHaveTextContent('银灰')
@@ -108,7 +108,7 @@ describe('homework training recommendations', () => {
     expect(mocks.api).toHaveBeenCalledOnce()
   })
 
-  it.each([false, true])('shows training vouchers without stock and labels ownership and training rates in V2=%s', async (v2) => {
+  it('shows training vouchers without stock and labels ownership and training rates', async () => {
     const input = sample()
     input.community = { status: 'fresh', updatedAt: null, operators: { a: { owned: 200, sampleSize: 1000, elite: [0.1, 0.1, 0.8], skills: [], modules: {} } } }
     const voucher = { id: 'voucher', name: '特训邀请函', iconId: 'voucher', count: null, scope: '提升精英阶段', kind: 'elite' as const, expiresAt: null, available: true, sourceUrl: 'https://prts.wiki/w/test', recommendations: [{ key: 'a', operatorId: 'a', name: '银灰', demand: 10, communityRate: 0.8, items: { rock: 3 }, warnings: [] }] }
@@ -119,9 +119,9 @@ describe('homework training recommendations', () => {
       { ...voucher, id: 'mastery', name: '技巧集', kind: 'mastery', count: 1, recommendations: [{ ...voucher.recommendations[0], skill: 2, communityRate: 0.3 }] },
     ]
     mocks.api.mockResolvedValueOnce(input)
-    render(content(v2))
+    render(content())
     fireEvent.click(screen.getByRole('button', { name: copy.skland.refresh }))
-    if (v2) fireEvent.click(await screen.findByRole('button', { name: text.views.special }))
+    fireEvent.click(await screen.findByRole('button', { name: text.views.special }))
     fireEvent.click(await screen.findByRole('button', { name: /特训邀请函.*提升精英阶段/ }))
     expect(screen.queryByRole('button', { name: /材料自选包/ })).not.toBeInTheDocument()
     const recommendations = () => screen.getByRole('heading', { name: text.specialRecommendations }).nextElementSibling!
@@ -134,16 +134,16 @@ describe('homework training recommendations', () => {
     expect(screen.queryByText(/等效理智|森空岛不提供自选包库存|达到此目标/)).not.toBeInTheDocument()
   })
 
-  it.each([false, true])('uses the shared training strength when switching voucher preference in V2=%s', async (v2) => {
+  it('uses the shared training strength when switching voucher preference', async () => {
     const input = sample()
     input.specialItems = [{ id: 'voucher', name: '特训邀请函', iconId: 'voucher', count: null, scope: '提升精英阶段', kind: 'elite', expiresAt: null, available: true, sourceUrl: '', recommendations: [
       { key: 'a', operatorId: 'a', name: '银灰', demand: 30, communityRate: 0.95, communityScore: 0.2, items: {}, warnings: [] },
       { key: 'b', operatorId: 'b', name: '桃金娘', demand: 8, communityRate: 0.7, communityScore: 0.9, items: {}, warnings: [] },
     ] }]
     mocks.api.mockResolvedValueOnce(input)
-    render(content(v2))
+    render(content())
     fireEvent.click(screen.getByRole('button', { name: copy.skland.refresh }))
-    if (v2) fireEvent.click(await screen.findByRole('button', { name: text.views.special }))
+    fireEvent.click(await screen.findByRole('button', { name: text.views.special }))
     fireEvent.click(await screen.findByRole('button', { name: /特训邀请函.*提升精英阶段/ }))
     const rows = () => within(screen.getByRole('heading', { name: text.specialRecommendations }).nextElementSibling as HTMLElement).getAllByRole('listitem')
     expect(rows()[0]).toHaveTextContent('银灰')
@@ -155,7 +155,7 @@ describe('homework training recommendations', () => {
     expect(mocks.api).toHaveBeenCalledOnce()
   })
 
-  it.each([false, true])('lets users choose selector versions without claiming package stock in V2=%s', async (v2) => {
+  it('lets users choose selector versions without claiming package stock', async () => {
     const input = sample()
     input.community = { status: 'fresh', updatedAt: null, operators: { owned: { owned: 200, sampleSize: 1000, elite: [0, 0.1, 0.9], skills: [], modules: {} }, new: { owned: 100, sampleSize: 200, elite: [0, 0.5, 0.5], skills: [], modules: {} } } }
     const selector = { id: 'selector', name: '干员调用凭证', iconId: 'selector', count: null, scope: '可选择能天使、推进之王', kind: 'selector' as const, expiresAt: null, available: true, sourceUrl: 'https://prts.wiki/w/test', recommendations: [
@@ -164,19 +164,17 @@ describe('homework training recommendations', () => {
     ] }
     input.specialItems = [selector, { ...selector, id: 'selector2', scope: '可选择艾雅法拉', recommendations: [{ ...selector.recommendations[1], key: 'other', operatorId: 'other', name: '艾雅法拉', communityRate: null }] }]
     mocks.api.mockResolvedValueOnce(input)
-    render(content(v2))
+    render(content())
     fireEvent.click(screen.getByRole('button', { name: copy.skland.refresh }))
-    if (v2) fireEvent.click(await screen.findByRole('button', { name: text.views.special }))
+    fireEvent.click(await screen.findByRole('button', { name: text.views.special }))
     await screen.findByRole('button', { name: /干员调用凭证.*可选择能天使、推进之王/ })
-    if (v2) {
-      const search = screen.getByRole('searchbox', { name: text.specialSearch })
-      fireEvent.change(search, { target: { value: 'ganyuandiaoyong' } })
-      expect(screen.getAllByRole('button', { name: /干员调用凭证.*可选择/ })).toHaveLength(2)
-      fireEvent.change(search, { target: { value: 'AYFL' } })
-      expect(screen.queryByRole('button', { name: /干员调用凭证.*可选择能天使/ })).not.toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /干员调用凭证.*可选择艾雅法拉/ })).toBeInTheDocument()
-      fireEvent.change(search, { target: { value: '' } })
-    }
+    const search = screen.getByRole('searchbox', { name: text.specialSearch })
+    fireEvent.change(search, { target: { value: 'ganyuandiaoyong' } })
+    expect(screen.getAllByRole('button', { name: /干员调用凭证.*可选择/ })).toHaveLength(2)
+    fireEvent.change(search, { target: { value: 'AYFL' } })
+    expect(screen.queryByRole('button', { name: /干员调用凭证.*可选择能天使/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /干员调用凭证.*可选择艾雅法拉/ })).toBeInTheDocument()
+    fireEvent.change(search, { target: { value: '' } })
     const first = screen.getByRole('button', { name: /干员调用凭证.*可选择能天使、推进之王/ })
     const second = screen.getByRole('button', { name: /干员调用凭证.*可选择艾雅法拉/ })
     expect(first).toHaveAttribute('aria-pressed', 'false')
@@ -202,7 +200,7 @@ describe('homework training recommendations', () => {
     input.recommendation = { query: { scope: 'history', days: 0, coverage: 0.8, stageId: '', activity: '', category: '', profession: '', rarity: 0, rarityGroup: 'high', search: '', includeClosed: false, includeAlternatives: true, includeUncertain: false }, families: 3, withoutActions: 0,
       stages: Array.from({ length: 1002 }, (_, index) => ({ id: `main_${index}`, name: `测试关卡${index}`, activity: '测试活动', category: '主线' })), professions: ['WARRIOR'] }
     mocks.api.mockResolvedValue(input)
-    render(<MemoryRouter initialEntries={['/tools/cultivation-plan?cultivation_scope=history&cultivation_days=0']}><CultivationPlanPage /></MemoryRouter>)
+    render(<MemoryRouter initialEntries={['/tools/cultivation-plan?cultivation_scope=history&cultivation_days=0']}><Cultivation session={mocks.session()} /></MemoryRouter>)
     fireEvent.click(screen.getByRole('button', { name: copy.skland.refresh }))
     await screen.findByRole('heading', { name: text.suggestions })
     expect(mocks.api.mock.calls[0][1].json.recommendation).toMatchObject({ scope: 'history', days: 0 })
@@ -222,7 +220,7 @@ describe('homework training recommendations', () => {
     expect(stage).toHaveValue('')
   })
 
-  it.each([false, true])('keeps filters expanded when cleared and applies rarity groups in V2=%s', async (v2) => {
+  it('keeps filters expanded when cleared and applies rarity groups', async () => {
     const input = sample()
     Object.assign(input.candidates[0], {
       current: { elite: 2, level: 60, skillLevel: 7, masteries: { s1: 1 }, modules: {}, potential: 1 },
@@ -232,7 +230,7 @@ describe('homework training recommendations', () => {
     input.recommendation = { query: { scope: 'recent', days: 180, coverage: 0.8, stageId: '', activity: '', category: '', profession: '', rarity: 0, rarityGroup: 'high', search: '', includeClosed: false, includeAlternatives: true, includeUncertain: false }, families: 1, withoutActions: 0,
       stages: [{ id: 'main_01', name: '1-1', activity: '第一章', category: '主线' }], professions: [] }
     mocks.api.mockResolvedValue(input)
-    render(content(v2))
+    render(content())
     fireEvent.click(screen.getByRole('button', { name: copy.skland.refresh }))
     const conditions = (await screen.findByText(text.parameters)).closest('details')!
     expect(conditions.open).toBe(false)
@@ -271,13 +269,13 @@ describe('homework training recommendations', () => {
     expect(rarity).toHaveValue('low')
   })
 
-  it.each([false, true])('imports selected targets with their skill levels into the chosen profile in V2=%s', async (v2) => {
+  it('imports selected targets with their skill levels into the chosen profile', async () => {
     mocks.session.mockReturnValue({ ...mocks.session(), user: { id: 'doctor' } })
     const input = sample()
     input.candidates[0].target = { ...input.candidates[0].target, elite: 2, level: 60, skill: 3, skillLevel: 10, moduleId: 'mod_x', moduleLevel: 3 }
     input.candidates[0].skillId = 's3'
     mocks.api.mockResolvedValue(input)
-    render(content(v2))
+    render(content())
     fireEvent.change(screen.getByRole('combobox', { name: text.profile }), { target: { value: 'two' } })
     fireEvent.click(screen.getByRole('button', { name: copy.skland.refresh }))
     fireEvent.click(await screen.findByRole('button', { name: copy.cultivationProjects.importBatch }))
@@ -295,7 +293,7 @@ describe('homework training recommendations', () => {
   it('discards a late response when the selected profile changes', async () => {
     let finish: (value: CultivationData) => void = () => {}
     mocks.api.mockImplementationOnce(() => new Promise<CultivationData>((resolve) => { finish = resolve }))
-    render(content(false))
+    render(content())
     fireEvent.click(screen.getByRole('button', { name: copy.skland.refresh }))
     await waitFor(() => expect(mocks.api).toHaveBeenCalledOnce())
     fireEvent.change(screen.getByRole('combobox', { name: text.profile }), { target: { value: 'two' } })

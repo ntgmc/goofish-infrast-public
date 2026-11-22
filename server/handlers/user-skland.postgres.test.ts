@@ -5,7 +5,7 @@ import handler from './user-skland'
 import { closePool, query } from '../storage/postgres'
 import { ensureDatabaseSchema } from '../storage/schema'
 import { getItemBalance, grantItem } from '../storage/inventory-store'
-import { getProfileById, getProfileWorkspace, insertUserAccountForRegistration, saveUserProfile, saveUserSession, type UserGameAccountRecord } from '../storage/user-store'
+import { getProfileById, getProfileWorkspace, insertUserAccountForRegistration, saveUserProfile, saveUserSession, saveProfileWorkspace, type UserGameAccountRecord } from '../storage/user-store'
 
 let container: StartedPostgreSqlContainer
 let userId: string
@@ -177,6 +177,63 @@ it.each([{ code: 500, message: 'Service temporarily unavailable' }, { code: 0, m
   await query('delete from skland_snapshots where user_id = $1', [userId])
   tokenResponse = { code: 401, message: 'Unauthorized' }
   expect((await request('/import/refresh', { profile_id: target.id })).body.code).toBe('skland_credential_invalid')
+})
+
+it('reauthorizes the bound profile without changing its workspace and replays confirmation safely', async () => {
+  const target = await profile()
+  const first = await preview('', target.id)
+  await request('/login/confirm', { profile_id: target.id, confirmation_id: first.body.confirmation_id, idempotency_key: randomUUID() })
+  const original = (await getProfileById(target.id))!
+  const workspace = (await getProfileWorkspace(target.id))!
+  const saved = { ...workspace, elite_overrides: { char_002_amiya: 1 }, operators: [], config: workspace.config && { ...workspace.config, desc: 'Manual settings' } }
+  await saveProfileWorkspace(saved)
+  await saveUserProfile({ ...original, skland_binding: { ...original.skland_binding!, credential_status: 'invalid' } })
+  // Authorization uses the binding list, so an unavailable game-data API cannot block credential recovery.
+  pause = async () => { throw new Error('Game data unavailable') }
+  const pending = await request('/credential/preview', { profile_id: target.id, credential_text: 'new-fixture-cred', purpose: 'reauthorize' })
+  expect(pending.status).toBe(200)
+  expect((await getProfileById(target.id))?.skland_binding?.credential_status).toBe('invalid')
+  const body = { profile_id: target.id, confirmation_id: pending.body.confirmation_id, idempotency_key: randomUUID() }
+  const confirmed = await request('/login/confirm', body)
+  expect(confirmed.status).toBe(200)
+  expect(confirmed.body.active_profile.id).toBe(target.id)
+  expect(confirmed.body.skland_import).toBeUndefined()
+  expect((await getProfileById(target.id))?.skland_binding).toMatchObject({ credential_status: 'available',
+    bound_at: original.skland_binding!.bound_at, last_imported_at: original.skland_binding!.last_imported_at })
+  expect(await getProfileWorkspace(target.id)).toEqual(saved)
+  expect((await request('/login/confirm', body)).body.replayed).toBe(true)
+  expect(await getProfileWorkspace(target.id)).toEqual(saved)
+})
+
+it.each(['preview', 'confirmation'])('rejects another game UID during reauthorization %s', async (stage) => {
+  const target = await profile()
+  const first = await preview('', target.id)
+  await request('/login/confirm', { profile_id: target.id, confirmation_id: first.body.confirmation_id, idempotency_key: randomUUID() })
+  const original = (await getProfileById(target.id))!.skland_binding
+  const pending = stage === 'confirmation'
+    ? await request('/credential/preview', { profile_id: target.id, credential_text: 'fixture-cred', purpose: 'reauthorize' }) : null
+  uid = randomUUID()
+  const result = pending
+    ? await request('/login/confirm', { profile_id: target.id, confirmation_id: pending.body.confirmation_id, idempotency_key: randomUUID() })
+    : await request('/credential/preview', { profile_id: target.id, credential_text: 'other-fixture-cred', purpose: 'reauthorize' })
+  expect(result.status).toBe(pending ? 400 : 200)
+  if (pending) expect(result.body.code).toBe('skland_credential_invalid')
+  else expect(result.body.status).toBe('account_mismatch')
+  expect((await getProfileById(target.id))?.skland_binding).toEqual(original)
+})
+
+it('rejects a reauthorization cancelled or frozen before confirmation', async () => {
+  const target = await profile()
+  const first = await preview('', target.id)
+  await request('/login/confirm', { profile_id: target.id, confirmation_id: first.body.confirmation_id, idempotency_key: randomUUID() })
+  const pending = await request('/credential/preview', { profile_id: target.id, credential_text: 'new-fixture-cred', purpose: 'reauthorize' })
+  await request('/pending/cancel', { profile_id: target.id, pending_id: pending.body.confirmation_id })
+  expect((await request('/login/confirm', { profile_id: target.id, confirmation_id: pending.body.confirmation_id, idempotency_key: randomUUID() })).status).toBe(400)
+  const next = await request('/credential/preview', { profile_id: target.id, credential_text: 'new-fixture-cred', purpose: 'reauthorize' })
+  const current = (await getProfileById(target.id))!
+  await saveUserProfile({ ...current, status: 'frozen' })
+  expect((await request('/login/confirm', { profile_id: target.id, confirmation_id: next.body.confirmation_id, idempotency_key: randomUUID() })).status).toBe(409)
+  expect((await getProfileById(target.id))?.skland_binding?.encrypted_cred).toBe(current.skland_binding?.encrypted_cred)
 })
 
 it('reports credential verification only for a real upstream refresh and keeps it out of the stored snapshot', async () => {

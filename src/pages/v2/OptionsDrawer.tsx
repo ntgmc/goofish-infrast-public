@@ -6,6 +6,9 @@ import { BalanceIcon, BillingIcon, InventoryIcon, LoadingIcon, NextIcon as Arrow
 import SklandIcon from '../../components/SklandIcon'
 import AppearanceSettings from './AppearanceSettings'
 import ConfigEditor from '../../components/ConfigEditor'
+import SklandDataActions from '../../components/SklandDataActions'
+import { useSklandSnapshot } from '../../hooks/useSklandSnapshot'
+import { recordSklandSnapshotError } from '../../lib/skland-snapshot-client'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../components/ui/dialog'
 import { Popover, PopoverContent, PopoverTrigger } from '../../components/ui/popover'
 import { copy } from '../../copy'
@@ -61,6 +64,7 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
 }) {
   const opener = useRef<HTMLElement | null>(null)
   const featureState = useSiteFeatures()
+  const authorization = useSklandSnapshot(session.user?.id, session.activeProfile, false)
   const [lastPanel, setLastPanel] = useState(panel)
   if (panel !== null && panel !== lastPanel) setLastPanel(panel)
   const shownPanel = panel ?? lastPanel
@@ -91,7 +95,10 @@ export default function OptionsDrawer({ panel, onClose, onOpenProfile, onNavigat
         {isConfig && (
           <>
             <ConfigCapabilityPreview config={config} enabled={!canEditConfig}>
-            <ConfigEditor guideSklandImport showOrundumPreference profileId={session.activeProfile?.id} config={config} canEdit={canEditConfig} readOnly={configReadOnly} canEditIntermediateInventory={canUseIntermediateConfig}
+            <ConfigEditor guideSklandImport showOrundumPreference profileId={session.activeProfile?.id}
+              sklandAuthorizationMessage={authorization.needsAuthorization ? session.activeProfile?.skland_binding ? copy.skland.authorizationExpired : copy.skland.bindFirst : undefined}
+              sklandActions={authorization.needsAuthorization ? <SklandDataActions session={session} profile={session.activeProfile} /> : undefined}
+              onSklandError={(error) => { if (session.user && session.activeProfile) recordSklandSnapshotError(session.user.id, session.activeProfile, error) }} config={config} canEdit={canEditConfig} readOnly={configReadOnly} canEditIntermediateInventory={canUseIntermediateConfig}
               canSelectPreset={canUseIntermediateConfig} canEditFixedShiftHours={canEditConfig || Boolean(session.activeProfile && hasFreePreviewAccess(session.activeProfile))} permission={permission}
               note={session.activeProfile && hasFreePreviewAccess(session.activeProfile) && !canEditConfig
                 ? `${copy.common.components_ConfigEditor_024}${getProfileAccessLabel(session.activeProfile)}${copy.common.components_ConfigEditor_025}`

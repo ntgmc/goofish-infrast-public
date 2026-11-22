@@ -11,8 +11,9 @@ export function V2SectionLoading({ label = copy.common.pages_tool_AccountDashboa
   return <div className="v2-section-loading-region"><DataActivity label={label} /></div>
 }
 
-export default function V2LoadingScreen({ error, onRetry, retryLabel = routesCopy.v2.retry, children }: {
+export default function V2LoadingScreen({ error, onRetry, retryLabel = routesCopy.v2.retry, label = routesCopy.v2.loading, children }: {
   error?: string | null
+  label?: string
   onRetry?: () => void
   retryLabel?: string
   children?: ReactNode
@@ -29,7 +30,7 @@ export default function V2LoadingScreen({ error, onRetry, retryLabel = routesCop
     <main ref={screen} className="v2-app v2-loading-screen" tabIndex={-1} data-route-focus>
       <img className="v2-loading-brand" src="/assets/maatool-v2-icon.svg" width="64" height="64" alt={routesCopy.v2.brand} />
       {error ? <div className="v2-loading-status" role="alert"><p>{error}</p></div>
-        : <DataActivity label={routesCopy.v2.loading} />}
+        : <DataActivity label={label} />}
       {error && onRetry && <button type="button" className="v2-loading-retry" onClick={onRetry}>{retryLabel}</button>}
       {error && <nav className="v2-loading-links" aria-label={routesCopy.labels.help}>
         {(['help', 'support', 'status'] as const).filter((section) => v2SectionAvailable(section, features)).map((section) => <Link key={section} className="v2-loading-retry" to={v2Path(section)}>{sectionLabels[section]}</Link>)}

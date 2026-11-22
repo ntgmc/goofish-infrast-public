@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link, Navigate, useSearchParams } from 'react-router'
-import BrandLogo from '../components/BrandLogo'
-import ThemeSwitcher from '../components/ThemeSwitcher'
-import SessionLoader from '../components/SessionLoader'
-import SettingsSection from './tool/dashboard/SettingsSection'
+import V2LoadingScreen from './v2/V2LoadingScreen'
+import PublicPageLayout from './v2/PublicPageLayout'
+import AccountDataSettings from './v2/AccountDataSettings'
+import { useAccountSettings } from '../hooks/useAccountSettings'
+import { Notice } from './v2/components/WorkspaceUI'
 import { apiVoid } from '../lib/api-client'
 import { formatAccountDeletionDeadline } from '../lib/account-lifecycle-client'
 import { authPath } from '../lib/auth-navigation'
@@ -36,46 +37,34 @@ export default function AccountSafetyPage() {
   }
 
   if (scheduledFor && Number.isFinite(Date.parse(scheduledFor))) {
-    return (
-      <main className="tool-page" tabIndex={-1} data-route-focus>
-        <section className="tool-panel mx-auto max-w-2xl p-6 sm:p-8" aria-labelledby="deletion-accepted-title">
-          <div className="flex items-center justify-between gap-4"><BrandLogo size="md" /><ThemeSwitcher /></div>
-          <div className="mt-6" role="status">
-            <h1 id="deletion-accepted-title" className="display-title text-2xl text-ink-primary">{copy.features.delete_accepted_title}</h1>
-            <p className="mt-3 text-sm leading-6 text-ink-secondary">{copy.features.delete_signed_out}</p>
-            <p className="mt-3 text-sm leading-6 text-ink-secondary">{copy.features.delete_accepted_before}<strong>{formatAccountDeletionDeadline(scheduledFor)}</strong>{copy.features.delete_accepted_after}</p>
-          </div>
-          <Link to="/" className="tool-primary-action mt-6">{copy.features.delete_accepted_leave}</Link>
-        </section>
-      </main>
-    )
+    return <PublicPageLayout title={copy.features.delete_accepted_title}>
+      <section className="v2-safety-content" role="status">
+        <p>{copy.features.delete_signed_out}</p>
+        <p>{copy.features.delete_accepted_before}<strong>{formatAccountDeletionDeadline(scheduledFor)}</strong>{copy.features.delete_accepted_after}</p>
+        <Link to="/v2" className="v2-button v2-button-primary">{copy.features.delete_accepted_leave}</Link>
+      </section>
+    </PublicPageLayout>
   }
 
-  if (featureState.status === 'loading') return <SessionLoader label={copy.features.loading} />
-  if (featureState.status === 'ready' && featureState.features.site && featureState.features.login) {
+  if (featureState.status === 'loading') return <V2LoadingScreen />
+  if (featureState.status === 'ready' && featureState.features.site && featureState.features.login && featureState.features.v2) {
     return <Navigate to={authPath('login', '/v2?section=settings')} replace />
   }
 
-  return (
-    <main className="tool-page" tabIndex={-1} data-route-focus>
-      <div className="mx-auto max-w-2xl space-y-6">
-        <div className="flex items-center justify-between gap-4"><BrandLogo size="md" /><ThemeSwitcher /></div>
-        <section className="tool-panel p-6 sm:p-8">
-          <p className="tool-eyebrow">{copy.features.account_safety}</p>
-          <h1 className="display-title mt-3 text-2xl text-ink-primary">{copy.features.account_safety_title}</h1>
-          <p className="mt-3 text-sm leading-6 text-ink-secondary">{copy.features.account_safety_body}</p>
-          {error && <div className="tool-alert tool-alert--error mt-5" role="alert">{error}</div>}
-          {notice && <div className="tool-alert tool-alert--success mt-5" role="status">{notice}</div>}
-          <div className="mt-6 flex flex-wrap gap-3">
-            <button type="button" onClick={() => void logout()} disabled={busy || deletionState !== 'idle'} className="tool-secondary-action">{copy.features.logout}</button>
-            <Link to={authPath('forgot', '/v2?section=settings')} className="tool-secondary-action">{copy.features.recovery}</Link>
-          </div>
-        </section>
-        <fieldset disabled={busy} className="min-w-0">
-          <SettingsSection safetyOnly profiles={[]} onPayload={() => undefined} onDeletionStateChange={setDeletionState} />
-        </fieldset>
-        <Link to="/" className="tool-secondary-action">{copy.features.back_home}</Link>
+  return <PublicPageLayout title={copy.features.account_safety_title} description={copy.features.account_safety_body}>
+    <div className="v2-safety-content">
+      <Notice error>{error}</Notice><Notice>{notice}</Notice>
+      <div className="v2-actions">
+        <button type="button" onClick={() => void logout()} disabled={busy || deletionState !== 'idle'} className="v2-button v2-button-secondary">{copy.features.logout}</button>
+        <Link to={authPath('forgot', '/v2?section=settings')} className="v2-button v2-button-secondary">{copy.features.recovery}</Link>
       </div>
-    </main>
-  )
+      <fieldset disabled={busy}><SafetySettings onDeletionStateChange={setDeletionState} /></fieldset>
+      <Link to="/v2" className="v2-button v2-button-secondary">{copy.features.back_home}</Link>
+    </div>
+  </PublicPageLayout>
+}
+
+function SafetySettings({ onDeletionStateChange }: { onDeletionStateChange: (state: 'idle' | 'submitting' | 'accepted') => void }) {
+  const model = useAccountSettings({ profiles: [], onPayload: () => undefined, onDeletionStateChange })
+  return <AccountDataSettings model={model} safetyOnly />
 }

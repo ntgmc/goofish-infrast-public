@@ -8,26 +8,11 @@ import { DEFAULT_SITE_FEATURE_SETTINGS, type SiteFeatureKey } from './lib/site-f
 
 const apiJson = vi.hoisted(() => vi.fn())
 const apiVoid = vi.hoisted(() => vi.fn())
-const toolMount = vi.hoisted(() => vi.fn())
-const toolUnmount = vi.hoisted(() => vi.fn())
 vi.mock('./lib/api-client', async (importOriginal) => ({
   ...await importOriginal<typeof import('./lib/api-client')>(),
   apiJson,
   apiVoid,
 }))
-vi.mock('./pages/ToolPage', async () => {
-  const { useEffect } = await import('react')
-  return {
-    default: () => {
-      useEffect(() => {
-        toolMount()
-        return () => { toolUnmount() }
-      }, [])
-      return <main data-route-focus>Tool workspace</main>
-    },
-  }
-})
-vi.mock('./pages/DepotValuePage', () => ({ default: () => null }))
 vi.mock('./pages/AdminSetupPage', () => ({ default: () => null }))
 vi.mock('./pages/AdminPage', () => ({ default: () => null }))
 vi.mock('./pages/v2/V2Page', () => ({ default: () => <main>V2 test workspace</main> }))
@@ -37,8 +22,6 @@ import App from './App'
 describe('App public content routing', () => {
   beforeEach(() => {
     apiVoid.mockReset().mockResolvedValue(undefined)
-    toolMount.mockReset()
-    toolUnmount.mockReset()
     vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
     vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined)
     apiJson.mockReset().mockImplementation(async (url: string) => {
@@ -53,8 +36,6 @@ describe('App public content routing', () => {
   it.each([
     '/reset-password',
     '/account-safety',
-    '/tool/profiles',
-    '/tools/depot-value',
     '/admin/setup',
     '/admin/features',
   ])('does not load public content for non-content route %s', async (route) => {
@@ -68,6 +49,8 @@ describe('App public content routing', () => {
     '/v2',
     '/v2/benchmarks',
     '/v1',
+    '/tool/profiles',
+    '/tools/depot-value',
     '/changelog',
     '/faq',
     '/support',
@@ -83,21 +66,34 @@ describe('App public content routing', () => {
   })
 
   it('loads the unlisted value clock directly without mounting the workspace or requesting personal data', async () => {
+    const section = 'value-clock'
     const original = apiJson.getMockImplementation()!
     apiJson.mockImplementation((url: string) => {
       if (url === '/api/site/features') return Promise.resolve({ ...DEFAULT_SITE_FEATURE_SETTINGS, features: { ...DEFAULT_SITE_FEATURE_SETTINGS.features, base_value_dashboard: true } })
       if (url.startsWith('/api/site/value-clock')) return Promise.resolve({
-        schema_version: 1, view: 'production', series_id: 'production-v1', metric_version: 'production-sanity-v1', revision: 0,
+        schema_version: 1, view: section === 'value-clock' ? 'production' : 'gain', series_id: 'production-v1', metric_version: 'production-sanity-v1', revision: 0,
         tracking_started_at: null, server_now: '2026-11-22T00:00:00Z', as_of: '2026-11-22T00:00:00Z', valid_until: null,
-        day_started_at: '2026-11-21T16:00:00Z', day_ends_at: '2026-11-22T16:00:00Z', totals: null, today_totals: null, rates_per_second: null, active_accounts: 0, status: 'not_started',
+        day_started_at: '2026-11-21T16:00:00Z', day_ends_at: '2026-11-22T16:00:00Z', totals: null, today_totals: null, rates_per_second: null, active_accounts: 0, status: section === 'value-clock' ? 'not_started' : 'empty',
+        comparison: { baseline_kind: 'previous_plan', has_recorded_comparison: false, active_comparable_accounts: 0, active_production_accounts: 1, current_daily_sanity: 0, baseline_daily_sanity: 0, daily_gain_sanity: 0, gain_ratio: null },
       })
       return original(url)
     })
-    render(<MemoryRouter initialEntries={['/v2?section=value-clock']}><App /></MemoryRouter>)
+    render(<MemoryRouter initialEntries={[`/v2?section=${section}`]}><App /></MemoryRouter>)
     expect(await screen.findByRole('heading', { name: copy.valueClock.title })).toBeVisible()
-    expect(await screen.findByText(copy.valueClock.notStarted)).toBeVisible()
+    expect((await screen.findAllByText(copy.valueClock.notStarted))[0]).toBeVisible()
     expect(screen.queryByText('V2 test workspace')).not.toBeInTheDocument()
     expect(apiJson.mock.calls.some(([url]) => url === '/api/site/public-content' || url.startsWith('/api/auth/') || url.startsWith('/api/user/'))).toBe(false)
+  })
+
+  it('does not open the closed optimization gain clock route', async () => {
+    apiJson.mockImplementation(async (url: string) => {
+      if (url === '/api/site/features') return { ...DEFAULT_SITE_FEATURE_SETTINGS, features: { ...DEFAULT_SITE_FEATURE_SETTINGS.features, base_value_dashboard: true } }
+      if (url === '/api/site/public-content') return cloneDefaultPublicContentSettings()
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    render(<MemoryRouter initialEntries={['/v2?section=optimization-gain-clock']}><App /></MemoryRouter>)
+    expect(await screen.findByText('V2 test workspace')).toBeVisible()
+    expect(apiJson.mock.calls.some(([url]) => url.includes('value-clock'))).toBe(false)
   })
 
   it('uses the V2 loading screen and workspace from the first homepage render', async () => {
@@ -109,36 +105,19 @@ describe('App public content routing', () => {
     await act(async () => resolveFeatures(DEFAULT_SITE_FEATURE_SETTINGS))
     expect(await screen.findByText('V2 test workspace')).toBeInTheDocument()
     await waitFor(() => expect(apiJson.mock.calls.some(([url]) => url === '/api/site/public-content')).toBe(true))
-    expect(toolMount).not.toHaveBeenCalled()
   })
 
-  it('preserves the V1 homepage and its original workspace entry', async () => {
-    const router = createMemoryRouter([{ path: '*', element: <App /> }], { initialEntries: ['/v1'] })
-    render(<RouterProvider router={router} />)
-    expect(await screen.findByRole('heading', { name: copy.public.pages_LandingPage_023 })).toBeInTheDocument()
-    expect(screen.getByRole('complementary', { name: copy.features.v1_migration.label })).toBeInTheDocument()
-    expect(await screen.findByRole('link', { name: copy.v2.testEntry })).toHaveAttribute('href', '/v2')
-    await act(async () => screen.getByRole('button', { name: copy.public.pages_LandingPage_026 }).click())
-    expect(await screen.findByText('Tool workspace')).toBeInTheDocument()
-    expect(router.state.location.pathname).toBe('/tool/profiles')
-  })
-
-  it.each(['/v1', '/tool/profiles', '/tool/setup/config?profile_id=profile-1', '/tool/optimize/plans?profile_id=profile-1'])('keeps disabled V1 visits at %s until the user chooses V2', async (route) => {
-    const original = apiJson.getMockImplementation()!
-    apiJson.mockImplementation((url: string) => url === '/api/site/features'
-      ? Promise.resolve({ ...DEFAULT_SITE_FEATURE_SETTINGS, features: { ...DEFAULT_SITE_FEATURE_SETTINGS.features, v1: false } })
-      : original(url))
+  it.each([
+    ['/v1', '/v2'], ['/tool/profiles', '/v2?section=profiles'],
+    ['/tool/setup/config?profile_id=profile-1', '/v2?profile_id=profile-1&panel=config'],
+    ['/tool/optimize/plans?profile_id=profile-1#saved', '/v2?section=plans&profile_id=profile-1#saved'],
+    ['/tools/depot-value?profile_id=profile-1', '/v2?section=depot&profile_id=profile-1'],
+    ['/tool/missing', '/v2?section=profiles'],
+  ])('opens retired route %s in the corresponding V2 page', async (route, target) => {
     const router = createMemoryRouter([{ path: '*', element: <App /> }], { initialEntries: [route] })
     render(<RouterProvider router={router} />)
-    expect(await screen.findByRole('heading', { name: copy.features.v1_migration.closed_title })).toBeInTheDocument()
-    expect(router.state.location.pathname + router.state.location.search).toBe(route)
-    expect(toolMount).not.toHaveBeenCalled()
-    expect(screen.queryByRole('complementary', { name: copy.features.v1_migration.label })).not.toBeInTheDocument()
-    const link = screen.getByRole('link', { name: copy.v2.testEntry })
-    expect(link).toHaveAttribute('href', route.includes('profile_id') ? '/v2?profile_id=profile-1' : '/v2')
-    await act(async () => link.click())
     expect(await screen.findByText('V2 test workspace')).toBeInTheDocument()
-    expect(router.state.location.pathname).toBe('/v2')
+    expect(router.state.location.pathname + router.state.location.search + router.state.location.hash).toBe(target)
   })
 
   it('reuses loaded public content across public navigation and history', async () => {
@@ -152,22 +131,6 @@ describe('App public content routing', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/faq'))
 
     expect(apiJson.mock.calls.filter(([url]) => url === '/api/site/public-content')).toHaveLength(1)
-  })
-
-  it('keeps one tool session across tool routes and releases it when leaving', async () => {
-    const router = createMemoryRouter([{ path: '*', element: <App /> }], { initialEntries: ['/faq'] })
-    render(<RouterProvider router={router} />)
-    await screen.findByRole('heading', { level: 1 })
-
-    await act(async () => router.navigate('/tool/profiles'))
-    expect(await screen.findByText('Tool workspace')).toBeInTheDocument()
-    await act(async () => router.navigate('/tool/settings'))
-
-    expect(toolMount).toHaveBeenCalledTimes(1)
-    expect(screen.getAllByText('Tool workspace')).toHaveLength(1)
-    await act(async () => router.navigate('/faq'))
-    expect(toolUnmount).toHaveBeenCalledTimes(1)
-    expect(screen.queryByText('Tool workspace')).not.toBeInTheDocument()
   })
 
   it('keeps the existing V2 route accessible without indexing it', async () => {
@@ -199,7 +162,7 @@ describe('App public content routing', () => {
   })
 
   it.each([
-    ['/', 'v2'], ['/v2', 'v2'], ['/v2/benchmarks', 'v2'], ['/tools/manual-schedule', 'manual_schedule'], ['/tools/cultivation-plan', 'cultivation_plan'],
+    ['/', 'v2'], ['/v2', 'v2'], ['/v2/benchmarks', 'v2'], ['/tool/profiles', 'v2'], ['/tools/manual-schedule', 'v2'],
     ['/faq', 'faq'], ['/support', 'support'], ['/pricing', 'pricing'], ['/changelog', 'changelog'],
     ['/thanks', 'thanks'], ['/status', 'service_status'],
   ] satisfies Array<[string, SiteFeatureKey]>)('blocks direct visits to the disabled page %s', async (route, feature) => {
@@ -219,10 +182,9 @@ describe('App public content routing', () => {
       ? Promise.resolve({ ...DEFAULT_SITE_FEATURE_SETTINGS, features: { ...DEFAULT_SITE_FEATURE_SETTINGS.features,
         v2: false, pricing: false, changelog: false, thanks: false, service_status: false, faq: false } })
       : original(url))
-    render(<MemoryRouter initialEntries={['/v1']}><App /></MemoryRouter>)
-    await screen.findByRole('button', { name: '开始排班' })
-    await waitFor(() => expect(screen.queryByRole('link', { name: copy.v2.testEntry })).not.toBeInTheDocument())
-    for (const href of ['/v2', '/pricing', '/changelog', '/thanks', '/status', '/faq']) {
+    render(<MemoryRouter initialEntries={['/privacy']}><App /></MemoryRouter>)
+    await screen.findByRole('heading', { level: 1 })
+    for (const href of ['/pricing', '/changelog', '/thanks', '/status', '/faq']) {
       expect(document.querySelector(`a[href="${href}"]`)).toBeNull()
     }
     expect(document.querySelector('a[href="/privacy"]')).toBeInTheDocument()

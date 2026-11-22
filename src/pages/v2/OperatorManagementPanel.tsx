@@ -5,6 +5,8 @@ import SklandBindingDialog, { type SklandPayload } from '../../components/Skland
 import SklandIcon from '../../components/SklandIcon'
 import { copy, CURRENT_LOCALE } from '../../copy'
 import { ApiError, apiJson } from '../../lib/api-client'
+import { useSklandSnapshot } from '../../hooks/useSklandSnapshot'
+import { recordSklandSnapshotError, notifySklandAuthorization } from '../../lib/skland-snapshot-client'
 import { filterSearch } from '../../lib/search'
 import { useSiteFeatures } from '../../lib/site-feature-context'
 import type { LicenseConfig, LicenseOperator } from '../../lib/types'
@@ -32,14 +34,14 @@ export default function OperatorManagementPanel({ session, config, operators, bu
   const [action, setAction] = useState<'refresh' | 'file' | null>(null)
   const [notice, setNotice] = useState<Notice | null>(null)
   const [verifiedAt, setVerifiedAt] = useState<string | null>(null)
-  const [credentialInvalid, setCredentialInvalid] = useState(false)
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
   const fileInput = useRef<HTMLInputElement>(null)
   const mounted = useRef(true)
   useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   const profile = session.activeProfile
   const binding = profile?.skland_binding
-  const invalid = binding?.credential_status === 'invalid' || credentialInvalid
+  const snapshot = useSklandSnapshot(session.user?.id, profile, false)
+  const invalid = Boolean(binding && snapshot.needsAuthorization)
   const canUpload = !profile || !hasFreePreviewAccess(profile)
   const disabled = busy || action !== null || sklandOpen
   const sortedOperators = useMemo(() => sortOperatorsForPreview(operators)
@@ -79,7 +81,7 @@ export default function OperatorManagementPanel({ session, config, operators, bu
       const payload = caught instanceof ApiError ? caught.data as Partial<SklandPayload> | null : null
       if (payload?.user) session.applyAuthPayload(payload as SklandPayload)
       const needsRebind = payload?.code === 'skland_credential_invalid' || payload?.recovery_action === 'rebind' || payload?.recovery_action === 'bind_first'
-      if (payload?.code === 'skland_credential_invalid') setCredentialInvalid(true)
+      if (session.user) recordSklandSnapshotError(session.user.id, profile, caught)
       setNotice({ kind: 'error', message: needsRebind ? text.credentialInvalid : text.refreshFailed,
         detail: caught instanceof Error ? caught.message : undefined, recovery: needsRebind ? 'rebind' : 'retry' })
     } finally { if (mounted.current) setAction(null) }
@@ -148,7 +150,6 @@ export default function OperatorManagementPanel({ session, config, operators, bu
           </dl>
           <div className="v2-operator-sync-actions">
             <button type="button" className="v2-text-button" onClick={() => void copyUid()} aria-label={text.copyUid}>{copyState === 'copied' ? text.copied : text.copyUid}</button>
-            {features.skland && binding && !invalid && <button type="button" className="v2-text-button" disabled={disabled} onClick={openBinding}>{text.reauthorize}</button>}
           </div>
           {copyState !== 'idle' && <p role="status" className="v2-muted">{copyState === 'failed' ? text.copyFailed : text.copied}</p>}
         </details>}
@@ -171,18 +172,21 @@ export default function OperatorManagementPanel({ session, config, operators, bu
         </div>
       </section>
     </div>
-    <SklandBindingDialog open={sklandOpen} profile={profile} onOpenChange={setSklandOpen}
+    <SklandBindingDialog open={sklandOpen} profile={profile} purpose={binding ? 'reauthorize' : undefined} onOpenChange={setSklandOpen}
       onPayload={(payload) => {
         if (!mounted.current || !payload.user) return
-        session.applyAuthPayload(payload)
-        if (!payload.workspace?.config) session.setConfigOverride(config)
+        if (binding) session.applySklandAuthorizationPayload(payload)
+        else {
+          session.applyAuthPayload(payload)
+          if (!payload.workspace?.config) session.setConfigOverride(config)
+        }
       }}
       onCompleted={() => {
         if (!mounted.current) return
         setSklandOpen(false)
-        setCredentialInvalid(false)
+        if (session.user && profile) notifySklandAuthorization(session.user.id, profile)
         setVerifiedAt(null)
-        setNotice({ kind: 'success', message: copy.v2.importSuccess })
+        setNotice({ kind: 'success', message: binding ? copy.skland.authorized : copy.v2.importSuccess })
       }} />
   </>
 }

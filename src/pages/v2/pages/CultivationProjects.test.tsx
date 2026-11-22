@@ -17,7 +17,7 @@ import type { UpgradeSuggestion } from '../../../lib/types'
 
 const mocks = vi.hoisted(() => ({ api: vi.fn(), result: vi.fn(), refresh: vi.fn(), snapshot: vi.fn() }))
 vi.mock('../../../hooks/useSklandSnapshot', () => ({ useSklandSnapshot: mocks.snapshot }))
-vi.mock('../../../lib/api-client', () => ({ apiJson: mocks.api }))
+vi.mock('../../../lib/api-client', async (original) => ({ ...await original<typeof import('../../../lib/api-client')>(), apiJson: mocks.api }))
 vi.mock('../../tool/optimize/optimization-api', () => ({ fetchResultHistoryDetail: mocks.result }))
 const text = { ...copy.cultivationProjects, import: copy.skland.refresh, refresh: copy.skland.refresh }
 const data = (projects: CultivationProject[] = []): CultivationData => ({
@@ -58,6 +58,7 @@ function session(id = 'mine'): V2Session {
 beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn()
   localStorage.clear()
+  mocks.refresh.mockResolvedValue({ version: 'refreshed' })
   mocks.snapshot.mockReturnValue({ data: null, busy: false, error: '', refresh: mocks.refresh, available: true, expired: false })
   mocks.api.mockImplementation(async (_url, options) => data(options.json.projects))
   mocks.result.mockImplementation(async (_profile, id) => ({ id, config: CONFIG_PRESETS['243'], result: {
@@ -70,7 +71,7 @@ it('keeps saved goals mounted while syncing and calculating their first material
   const goal: CultivationProject = { operatorId: 'char_test', elite: 2, level: 60, skill: 1, skillLevel: 7, paused: false, deadline: '' }
   localStorage.setItem('maatool:cultivation-projects:user1:mine', JSON.stringify([goal]))
   let finishSync!: () => void, finishCalculation!: (data: CultivationData) => void
-  mocks.refresh.mockReturnValue(new Promise<void>((resolve) => { finishSync = resolve }))
+  mocks.refresh.mockReturnValue(new Promise((resolve) => { finishSync = () => resolve({ version: 'refreshed' }) }))
   mocks.api.mockReturnValueOnce(new Promise<CultivationData>((resolve) => { finishCalculation = resolve }))
   const view = render(<MemoryRouter><CultivationProjects session={session()} onConfig={vi.fn()} /></MemoryRouter>)
   const row = view.container.querySelector('.v2-project-list > li')
@@ -120,7 +121,7 @@ it('resumes a cancelled snapshot calculation and ignores the old request while i
   view.rerender(page())
   await waitFor(() => expect(mocks.api).toHaveBeenCalledTimes(2))
   await act(async () => finishFirst({ ...data(), snapshotVersion: 'cached' }))
-  expect(screen.getByRole('button', { name: text.refresh })).toBeDisabled()
+  expect(screen.getByRole('button', { name: copy.skland.refreshing })).toBeDisabled()
   expect(screen.getByRole('status', { name: copy.v2.dataActivity.calculating })).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: text.add })).not.toBeInTheDocument()
   await act(async () => finishSecond({ ...data(), snapshotVersion: 'cached' }))

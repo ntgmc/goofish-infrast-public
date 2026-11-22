@@ -18,6 +18,7 @@ type SklandBindingDialogProps = {
     note?: string
   }
   autoStart?: boolean
+  purpose?: 'reauthorize'
   onOpenChange: (open: boolean) => void
   onPayload: (payload: SklandPayload) => void
   onCompleted?: (payload: SklandPayload) => void
@@ -38,6 +39,7 @@ export default function SklandBindingDialog({
   context = 'workspace',
   claimProfileMeta,
   autoStart = false,
+  purpose,
   onOpenChange,
   onPayload,
   onCompleted,
@@ -59,7 +61,7 @@ export default function SklandBindingDialog({
     close,
     selectMode,
     setMessage,
-  } = useSklandBinding({ open, profile, context, claimProfileMeta, autoStart, onOpenChange, onPayload, onCompleted })
+  } = useSklandBinding({ open, profile, context, claimProfileMeta, autoStart, purpose, onOpenChange, onPayload, onCompleted })
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const firstAccountRef = useRef<HTMLInputElement>(null)
   const returnFocusRef = useRef<HTMLElement | null>(null)
@@ -73,10 +75,10 @@ export default function SklandBindingDialog({
   const currentStep = stepForStatus(sklandLogin.status)
   const hasError = sklandLogin.status === 'error' || sklandLogin.status === 'account_mismatch' || sklandLogin.status === 'frozen'
   const confirmDisabled = busy || sklandLogin.status !== 'confirm_required' || !sklandLogin.confirmationId
-  const title = isFreePreviewClaim
+  const title = purpose ? copy.skland.authorizationTitle : isFreePreviewClaim
     ? copy.workspace.components_SklandBindingDialog_006
     : isLifetimeVoucherUse ? copy.workspace.components_SklandBindingDialog_lifetime_title : copy.workspace.components_SklandBindingDialog_007
-  const description = isDepot
+  const description = purpose ? copy.skland.authorizationDescription : isDepot
     ? copy.workspace.components_SklandBindingDialog_008
     : isFreePreviewClaim
       ? copy.workspace.components_SklandBindingDialog_009
@@ -109,13 +111,18 @@ export default function SklandBindingDialog({
             <DialogTitle id="skland-binding-title" className="flex items-center gap-2 text-ink-primary"><SklandIcon size={20} />{title}</DialogTitle>
             <DialogDescription id="skland-binding-description" className="mt-1">{description}</DialogDescription>
           </div>
-          <button ref={closeButtonRef} type="button" onClick={close} className="v2-modal-close tool-secondary-action shrink-0 px-3 py-2 text-sm" aria-label={copy.workspace.components_SklandBindingDialog_011}>
+          <button ref={closeButtonRef} type="button" onClick={close} className="v2-modal-close tool-secondary-action shrink-0 px-3 py-2 text-sm" aria-label={purpose ? copy.skland.closeAuthorization : copy.workspace.components_SklandBindingDialog_011}>
             <CloseIcon size={20} aria-hidden="true" /></button>
         </div>
 
         <div className="v2-modal-body">
+        {purpose && profile?.skland_binding && <section className="mt-4 border-b border-surface-3 pb-4" aria-label={copy.skland.authorizationAccount}>
+          <p className="text-xs font-semibold text-ink-secondary">{copy.skland.authorizationAccount}</p>
+          <p className="mt-2 break-words text-base font-semibold text-ink-primary">{profile.skland_binding.nickname}</p>
+          <p className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink-secondary"><span className="break-all">UID {profile.skland_binding.uid}</span><span>{profile.skland_binding.channel_name}</span></p>
+        </section>}
         <ol className="skland-binding-steps mt-5 grid gap-2 text-xs font-semibold text-ink-secondary sm:grid-cols-3">
-          {[copy.workspace.components_SklandBindingDialog_013, copy.workspace.components_SklandBindingDialog_014, copy.workspace.components_SklandBindingDialog_015].map((label, index) => (
+          {[copy.workspace.components_SklandBindingDialog_013, copy.workspace.components_SklandBindingDialog_014, purpose ? copy.skland.confirmAuthorization : copy.workspace.components_SklandBindingDialog_015].map((label, index) => (
             <li key={label} aria-current={currentStep === index + 1 ? 'step' : undefined} className={'tool-inset px-3 py-2 ' + (currentStep === index + 1 ? 'border-brand-500 bg-brand-500/10 text-brand-300' : 'text-ink-secondary')}>
               {index + 1}. {label}
             </li>
@@ -181,6 +188,7 @@ export default function SklandBindingDialog({
             preview={sklandLogin.preview}
             status={sklandLogin.status}
             isDepot={isDepot}
+            reauthorizing={Boolean(purpose)}
           />
         )}
 
@@ -216,7 +224,7 @@ export default function SklandBindingDialog({
           )}
           {sklandLogin.status === 'confirm_required' && (
             <button type="button" onClick={confirmSklandLogin} aria-busy={busy} disabled={confirmDisabled} className="tool-primary-action">
-              {isDepot ? copy.workspace.components_SklandBindingDialog_023 : copy.workspace.components_SklandBindingDialog_024}
+              {purpose ? copy.skland.confirmAuthorization : isDepot ? copy.workspace.components_SklandBindingDialog_023 : copy.workspace.components_SklandBindingDialog_024}
             </button>
           )}
         </div>
@@ -363,19 +371,19 @@ function BookmarkletModePanel({
   )
 }
 
-function PreviewPanel({ preview, status, isDepot }: { preview: SklandPreview; status: SklandLoginState['status']; isDepot: boolean }) {
+function PreviewPanel({ preview, status, isDepot, reauthorizing }: { preview: SklandPreview; status: SklandLoginState['status']; isDepot: boolean; reauthorizing: boolean }) {
   const isMismatch = status === 'account_mismatch'
   return (
     <section className="tool-inset mt-5 p-4">
-      <p className="tool-status tool-status--current">{copy.workspace.components_SklandBindingDialog_055}</p>
+      <p className="tool-status tool-status--current">{reauthorizing ? copy.skland.authorizedAccountPreview : copy.workspace.components_SklandBindingDialog_055}</p>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <InfoTile label={copy.workspace.components_SklandBindingDialog_056} value={preview.nickname} />
         <InfoTile label="UID" value={preview.uid} />
         <InfoTile label={copy.workspace.components_SklandBindingDialog_057} value={preview.channel_name} />
-        <InfoTile label={isDepot ? copy.workspace.components_SklandBindingDialog_058 : copy.workspace.components_SklandBindingDialog_059} value={`${preview.operator_count}${copy.workspace.components_SklandBindingDialog_060}`} />
+        {!reauthorizing && <InfoTile label={isDepot ? copy.workspace.components_SklandBindingDialog_058 : copy.workspace.components_SklandBindingDialog_059} value={`${preview.operator_count}${copy.workspace.components_SklandBindingDialog_060}`} />}
       </div>
       <p className={'tool-alert mt-3 ' + (isMismatch ? 'tool-alert--error' : 'tool-alert--warning')} role={isMismatch ? 'alert' : 'status'}>
-        {isMismatch ? copy.workspace.components_SklandBindingDialog_061 : copy.workspace.components_SklandBindingDialog_062}
+        {isMismatch ? copy.workspace.components_SklandBindingDialog_061 : reauthorizing ? copy.skland.authorizationDescription : copy.workspace.components_SklandBindingDialog_062}
       </p>
     </section>
   )

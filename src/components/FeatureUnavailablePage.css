@@ -1,0 +1,196 @@
+.feature-unavailable-page {
+  min-height: 100dvh;
+  padding: var(--space-md) var(--page-gutter);
+  background: var(--color-v2-canvas);
+  color: var(--color-v2-ink);
+  font-family: var(--font-body);
+}
+
+.feature-unavailable-frame {
+  display: flex;
+  width: min(100%, 64rem);
+  min-height: calc(100dvh - 2 * var(--space-md));
+  margin-inline: auto;
+  flex-direction: column;
+}
+
+.feature-unavailable-header,
+.feature-unavailable-brand,
+.feature-unavailable-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.feature-unavailable-header {
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.feature-unavailable-brand {
+  min-width: 0;
+  max-width: 100%;
+  min-height: 44px;
+  flex-shrink: 0;
+  border-radius: var(--radius-v2-control);
+  color: var(--color-v2-ink);
+  text-decoration: none;
+}
+
+.feature-unavailable-brand img {
+  flex: none;
+}
+
+.feature-unavailable-brand > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.feature-unavailable-brand strong,
+.feature-unavailable-brand small {
+  display: block;
+}
+
+.feature-unavailable-brand strong {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.35;
+}
+
+.feature-unavailable-brand small {
+  color: var(--color-v2-secondary);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+
+.feature-unavailable-header .tool-secondary-action {
+  height: auto;
+  margin-inline-start: auto;
+  min-height: 44px;
+  border-radius: var(--radius-v2-control);
+  background: var(--color-v2-surface);
+}
+
+.feature-unavailable-main {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  padding-block: var(--space-xl);
+}
+
+.feature-unavailable-panel {
+  width: min(100%, 40rem);
+  min-width: 0;
+  border: 1px solid var(--color-v2-line);
+  border-radius: var(--radius-v2-panel);
+  background: var(--color-v2-surface);
+}
+
+.feature-unavailable-content {
+  min-width: 0;
+  padding: clamp(1.25rem, 4vw, 2.5rem);
+}
+
+.feature-unavailable-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  place-items: center;
+  border-radius: var(--radius-v2-control);
+  background: var(--color-v2-accent-soft);
+  color: var(--color-v2-accent);
+}
+
+.feature-unavailable-panel.is-error .feature-unavailable-icon {
+  background: var(--color-v2-error-soft);
+  color: var(--color-v2-error);
+}
+
+.feature-unavailable-eyebrow {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-2xs);
+  margin: 0;
+  color: var(--color-v2-secondary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.feature-unavailable-title {
+  margin: var(--space-md) 0 0;
+  color: var(--color-v2-ink);
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 1.25rem + 1vw, 2rem);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+
+.feature-unavailable-body {
+  margin: var(--space-xs) 0 0;
+  color: var(--color-v2-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.feature-unavailable-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-top: var(--space-lg);
+}
+
+.feature-unavailable-actions :is(.tool-primary-action, .tool-secondary-action) {
+  min-width: 0;
+  max-width: 100%;
+  border-radius: var(--radius-v2-control);
+  overflow-wrap: anywhere;
+  white-space: normal;
+  text-align: center;
+  transform: none;
+  transition: background-color var(--dur-fast), border-color var(--dur-fast), color var(--dur-fast);
+}
+
+.feature-unavailable-actions .tool-primary-action {
+  border: 1px solid var(--color-v2-accent);
+}
+
+.feature-unavailable-actions .tool-secondary-action {
+  border-color: var(--color-v2-control);
+  background: var(--color-v2-surface);
+}
+
+.feature-unavailable-actions .tool-secondary-action:hover {
+  background: var(--color-v2-hover);
+}
+
+.feature-unavailable-actions svg {
+  flex: none;
+}
+
+.feature-unavailable-actions span,
+.feature-unavailable-eyebrow span {
+  min-width: 0;
+  text-wrap: balance;
+}
+
+@media (max-width: 40rem) {
+  .feature-unavailable-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .feature-unavailable-content {
+    padding: min(1.5rem, 6vw);
+  }
+}

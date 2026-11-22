@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="查看 MaaTool 已保存基建排班的累计预计产出、每分钟价值和今日统计。">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-__SCRIPT_HASH__'; style-src 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'">
+  <title>基建价值时钟 · AkTools</title>
+  <link rel="icon" href="data:,">
+  <style>/* __SHARED_STYLES__ */
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--color-v2-canvas); }
+    .value-clock { display: flex; flex-direction: column; }
+    .value-clock-shell { width: 100%; flex: 1; }
+    .clock-brand { font-size: 1.1rem; font-weight: 650; letter-spacing: -.04em; }
+    .clock-footer { display: flex; justify-content: center; flex-wrap: wrap; gap: .5rem 1.5rem; margin-top: 2rem; padding-top: 1rem; color: var(--color-v2-muted); font-size: .75rem; line-height: 1.7; text-align: center; }
+    .clock-footer a { display: inline-flex; align-items: center; min-height: 44px; color: inherit; text-decoration-thickness: 1px; text-underline-offset: .2em; }
+    .clock-footer span { align-self: center; }
+    [hidden] { display: none !important; }
+    .value-clock-total { white-space: nowrap; }
+    .value-clock-rate strong { white-space: nowrap; }
+    .value-clock-total:empty::before { content: '—'; }
+    .value-clock-data-note { min-height: 2.75rem; }
+    .value-clock-status-text { overflow-wrap: anywhere; }
+    @media (max-width: 30rem) { .clock-footer { flex-direction: column; align-items: center; gap: 0; } }
+  </style>
+</head>
+<body>
+  <main class="value-clock" id="clock" aria-labelledby="clock-title">
+    <div class="value-clock-shell">
+      <header class="value-clock-masthead"><span class="clock-brand">AKTOOLS</span><h1 id="clock-title">基建价值时钟</h1></header>
+      <div class="value-clock-toolbar">
+        <p class="value-clock-status" role="status"><span class="value-clock-status-mark" id="status-mark" aria-hidden="true"></span><span class="value-clock-status-text" id="status">正在读取统计</span></p>
+        <div class="value-clock-actions"><button type="button" class="value-clock-action" id="pause">暂停</button><button type="button" class="value-clock-action" id="fullscreen">全屏</button></div>
+      </div>
+      <section class="value-clock-hero" aria-labelledby="headline" aria-busy="true" id="readings">
+        <h2 class="value-clock-eyebrow" id="headline"><span>博士歇会儿，</span><span>基建还在打工。</span></h2>
+        <p class="value-clock-total-label">全站累计产出价值</p>
+        <div class="value-clock-total" id="total" role="img" aria-label="全站累计产出价值，正在读取"><span class="value-clock-number" aria-hidden="true"><span class="value-clock-number-integer" id="integer">—</span><span class="value-clock-number-fraction" id="fraction"></span></span></div>
+        <p class="value-clock-unit">等效理智</p>
+        <p class="value-clock-rate">每分钟再攒<strong id="rate">—</strong><span>等效理智</span></p>
+      </section>
+      <dl class="value-clock-resources" aria-label="累计预计资源产出">
+        <div><dt>龙门币净收入</dt><dd id="lmd">—</dd></div><div><dt>作战经验</dt><dd id="experience">—</dd></div><div><dt>合成玉</dt><dd id="orundum">—</dd></div>
+      </dl>
+      <dl class="value-clock-secondary"><div><dt>今天又攒了</dt><dd><span id="today">—</span><small>等效理智</small></dd></div><div><dt>正在打工的账号</dt><dd><span id="accounts">—</span><small>个</small></dd></div></dl>
+      <div class="value-clock-data-note">
+        <p id="error-note" role="status" hidden><span id="error-text"></span> <button type="button" class="value-clock-action" id="retry">重新读取</button></p>
+        <p id="paused-note" role="status" hidden>动态显示已暂停，统计继续累计</p><p id="calibrated-note" role="status" hidden>统计已校准</p>
+        <details class="value-clock-disclosure"><summary>了解统计口径</summary><div class="value-clock-methodology">
+          <p>基于 MaaTool 已保存基建排班估算产出，从各账号最早保存的方案起累计，保存新方案后自动切换。同一游戏账号同时只按一份方案累计。</p>
+          <p>总价值采用 MaaTool 统一的净等效理智估值，包含支持房间等产出。龙门币为收入减支出，作战经验以经验点数计，合成玉受碎片供应约束。</p>
+          <p>今日按北京时间零点起算。库存耗尽或数据超过有效期时停止增长。</p>
+          <p>当前完整读数：<span id="complete">—</span> 等效理智</p><p id="tracking-row" hidden>历史统计起点：<time id="tracking"></time></p><p id="updated-row" hidden>最近更新：<time id="updated"></time></p>
+        </div></details>
+      </div>
+      <noscript><p>请启用 JavaScript 读取 MaaTool 的最新统计。</p></noscript>
+    </div>
+    <footer class="clock-footer"><span>© 2026 AkTools</span><a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">粤ICP备2026089247号</a><a href="https://beian.mps.gov.cn/#/query/webSearch?code=44010402003782" target="_blank" rel="noopener noreferrer">粤公网安备44010402003782号</a></footer>
+  </main>
+  <script>/* __CLOCK_SCRIPT__ */</script>
+</body>
+</html>

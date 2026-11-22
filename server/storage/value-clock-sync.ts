@@ -59,7 +59,23 @@ export async function syncValueClockHistory(client: QueryClient): Promise<void> 
         experience_points numeric, orundum numeric, gold_produced numeric,
         gold_consumed numeric, shards_produced numeric, shards_consumed numeric
       )`, [JSON.stringify(intervals)])
+    await client.query(`insert into value_clock_intervals(id, identity, profile_id, result_id, view, comparison_id, started_at, ends_at,
+        sanity, lmd_received, lmd_spent, lmd_net, experience_points, orundum,
+        gold_produced, gold_consumed, shards_produced, shards_consumed)
+      select 'gain:' || c.id, p.identity, p.profile_id, p.result_id, 'gain', c.id,
+        greatest(p.started_at, c.confirmed_at), least(p.ends_at, c.ends_at, c.inventory_ends_at),
+        (c.daily->>'sanity')::numeric, (c.daily->>'lmd_received')::numeric,
+        (c.daily->>'lmd_spent')::numeric, (c.daily->>'lmd_net')::numeric,
+        (c.daily->>'experience_points')::numeric, (c.daily->>'orundum')::numeric,
+        (c.daily->>'gold_produced')::numeric, (c.daily->>'gold_consumed')::numeric,
+        (c.daily->>'shards_produced')::numeric, (c.daily->>'shards_consumed')::numeric
+      from value_clock_intervals p join value_clock_comparisons c
+        on c.profile_id = p.profile_id and c.current_result_id = p.result_id and c.identity = p.identity
+      where p.identity = $1 and p.view = 'production' and c.confirmed_at is not null
+        and c.source_fingerprint = value_clock_comparison_source(c.profile_id, c.current_result_id, c.baseline_result_id)
+        and (least(p.ends_at, c.ends_at, c.inventory_ends_at) is null
+          or least(p.ends_at, c.ends_at, c.inventory_ends_at) > greatest(p.started_at, c.confirmed_at))`, [identity])
   }
   await client.query(`update value_clock_series set revision = revision + 1,
-    started_at = (select min(started_at) from value_clock_intervals) where id = 'production-v1'`)
+    started_at = (select min(started_at) from value_clock_intervals where view = 'production') where id = 'production-v1'`)
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { NextIcon as ArrowRight, SuccessIcon as Check, LoadingIcon as RefreshCw, ConfigIcon as Settings2, OperatorsIcon as Users, GenerateIcon, ExpandIcon } from '../../../components/icons'
 import { copy, CURRENT_LOCALE } from '../../../copy'
 import { SCHEDULE_MODE_LABELS, normalizeScheduleMode } from '../../../lib/config'
@@ -13,12 +13,18 @@ import GenerationProgressDemo from '../GenerationProgressDemo'
 import FeedbackButton from '../../../components/FeedbackDialog'
 import { Facts, Notice, SectionTitle } from '../components/WorkspaceUI'
 import PageHelp from './PageHelp'
+import SklandDataActions from '../../../components/SklandDataActions'
+import type { V2Session } from '../OptionsDrawer'
+import { useSklandSnapshot } from '../../../hooks/useSklandSnapshot'
 
 const text = copy.optimize
 
-export default function Generation({ workflow: w, progress: progressContent, disabledReason, preparationStep, onOperators, onNavigate, onConfig }: { workflow: V2Workflow; progress?: ReactNode; disabledReason?: string | null; preparationStep?: number; onOperators: () => void; onNavigate: (section: V2Section) => void; onConfig: () => void }) {
+export default function Generation({ session, workflow: w, progress: progressContent, disabledReason, preparationStep, onOperators, onNavigate, onConfig }: { session: V2Session; workflow: V2Workflow; progress?: ReactNode; disabledReason?: string | null; preparationStep?: number; onOperators: () => void; onNavigate: (section: V2Section) => void; onConfig: () => void }) {
   const { features } = useSiteFeatures()
   const action = useRef<HTMLDivElement>(null)
+  const [authorizing, setAuthorizing] = useState(false)
+  const [authorizedError, setAuthorizedError] = useState<V2Workflow['inlineError']>(null)
+  const authorization = useSklandSnapshot(session.user?.id, session.activeProfile, false)
   useEffect(() => {
     const element = action.current
     if (!element || typeof ResizeObserver === 'undefined') return
@@ -31,6 +37,9 @@ export default function Generation({ workflow: w, progress: progressContent, dis
   const exportNotice = getMaaExportNotice(w.activeConfig.schedule_mode, features.maa_export, w)
   const saving = w.configSyncStatus === 'pending' || w.configSyncStatus === 'saving'
   const error = w.inlineError?.scope === 'generate' ? w.inlineError : null
+  const authorizationRecovered = Boolean(error && error === authorizedError)
+  const needsAuthorization = error?.retry !== 'save' && ((!authorizationRecovered && (error?.recoveryAction === 'reauthorize' || error?.code === 'skland_credential_invalid'))
+    || Boolean(session.activeProfile?.skland_binding && authorization.needsAuthorization))
   const busy = w.loading || w.licenseSyncing || (error?.retry === 'save' && saving)
   const disabled = busy || !w.configValidation.ok || w.resultIsCurrent || Boolean(disabledReason)
   const progress = w.progress?.mode === 'generate' ? w.progress : null
@@ -52,7 +61,7 @@ export default function Generation({ workflow: w, progress: progressContent, dis
   return <div className="v2-generation-workspace">
     <div className="v2-generation-status-line">
       <div className="v2-generation-state"><span className="v2-status-dot" /><strong>{readyLabel}</strong>{w.configChanged && <span>{text.pages_tool_optimize_GenerateControlBar_009}</span>}</div>
-      <PageHelp key={w.profile.id} page="generation" profileId={w.profile.id} inventoryIssue={Boolean(w.inventoryError)} credentialInvalid={w.profile.skland_binding?.credential_status === 'invalid'} errorCode={error?.code} recoveryAction={error?.recoveryAction} failure={Boolean(error)} jobId={error?.jobId} saveFailed={error?.retry === 'save'} running={busy && Boolean(progress?.jobId) && !progress?.completedAt} onRetrySave={w.retryConfigSave} onRetryJob={!busy ? () => void w.handleGenerate() : undefined} onConfig={onConfig} />
+      <PageHelp key={w.profile.id} page="generation" profileId={w.profile.id} inventoryIssue={Boolean(w.inventoryError)} credentialInvalid={authorization.needsAuthorization} errorCode={authorizationRecovered ? undefined : error?.code} recoveryAction={authorizationRecovered ? 'retry' : error?.recoveryAction} failure={Boolean(error)} jobId={error?.jobId} saveFailed={error?.retry === 'save'} running={busy && Boolean(progress?.jobId) && !progress?.completedAt} onRetrySave={w.retryConfigSave} onRetryJob={!busy ? () => void w.handleGenerate() : undefined} onConfig={onConfig} onAuthorize={() => setAuthorizing(true)} />
     </div>
     <div className="v2-generation-flow">
       <section className="v2-generation-preparation"><SectionTitle title={copy.v2.prepare} />
@@ -76,9 +85,10 @@ export default function Generation({ workflow: w, progress: progressContent, dis
         </div>
         <GenerationProgressDemo />
         {w.resultIsCurrent && <p className="v2-muted">{text.pages_tool_optimize_GenerateControlBar_031}</p>}
-        <Notice error>{error && <>{error.message}<div className="v2-actions"><button type="button" className="v2-button v2-button-secondary" disabled={busy || saving} onClick={() => error.retry === 'save' ? w.retryConfigSave() : void w.handleGenerate()}>{saving ? text.generation.saving : error.retry === 'save' ? text.generation.retry_save : copy.v2.generationPage.retry}</button>{error.retry !== 'save' && <button type="button" className="v2-text-button" onClick={onOperators}>{copy.v2.operators}</button>}{error.jobId && <FeedbackButton key={error.jobId} failureJobId={error.jobId} className="v2-button v2-button-secondary" />}</div></>}</Notice>
+        <Notice error>{error && <>{authorizationRecovered ? copy.skland.authorized : error.message}<div className="v2-actions">{needsAuthorization ? <SklandDataActions session={session} profile={session.activeProfile} open={authorizing} onOpenChange={setAuthorizing} authorizationRequired onAuthorized={() => setAuthorizedError(error)} /> : <button type="button" className="v2-button v2-button-secondary" disabled={busy || saving} onClick={() => error.retry === 'save' ? w.retryConfigSave() : void w.handleGenerate()}>{saving ? text.generation.saving : error.retry === 'save' ? text.generation.retry_save : copy.v2.generationPage.retry}</button>}{error.retry !== 'save' && <button type="button" className="v2-text-button" onClick={onOperators}>{copy.v2.operators}</button>}{error.jobId && <FeedbackButton key={error.jobId} failureJobId={error.jobId} className="v2-button v2-button-secondary" />}</div></>}</Notice>
       </div>
     </div>
+    {!error && authorizing && <SklandDataActions session={session} profile={session.activeProfile} open={authorizing} onOpenChange={setAuthorizing} />}
     {progressContent && <div className="v2-generation-progress">{progressContent}</div>}
     <section className="v2-generation-history"><SectionTitle title={text.pages_tool_optimize_OverviewSection_012} action={<button className="v2-text-button" onClick={() => onNavigate('plans')}>{copy.v2.history}<ArrowRight size={16} /></button>} />
       {latest ? <><h3>{latest.name}</h3><p>{formatWorkspaceDate(latest.created_at)} · {formatResultHistorySummary(latest)}</p><div className="v2-actions"><button className="v2-button v2-button-secondary" onClick={() => void w.handleViewHistory(latest)}>{text.pages_tool_optimize_OverviewSection_018}</button>{features.maa_export && <button className="v2-text-button" disabled={w.workspaceBusyAction === `download:${latest.id}` || !latest.maa_exportable} onClick={() => void w.handleDownloadHistory(latest)}>{w.workspaceBusyAction === `download:${latest.id}` ? copy.inventory.export_downloading : text.pages_tool_optimize_OverviewSection_019}</button>}<button className="v2-text-button" disabled={w.loading || !latest.has_config} onClick={() => void w.handleUseHistoryConfig(latest)}>{copy.v2.historyPage.useResultConfig}</button></div></> : <p>{copy.v2.generationPage.historyEmpty}</p>}

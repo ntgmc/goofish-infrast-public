@@ -1,6 +1,6 @@
 # 优化增益时钟 Handoff
 
-状态：待实现的产品与技术方案。本文描述一个独立 V2 页面；接口与字段为拟新增约定，不代表线上已经具备收益归因能力。
+状态：实现代码和数据结构已保留，但页面入口与相关 API 当前关闭。`/v2?section=optimization-gain-clock` 不再识别，公开快照和个人比较 API 返回不可用；后续重新开放时继续使用本文记录的实现。数据库迁移版本为 `2026-11-22.4`。
 
 本页回答：**采用网站方案后，相比同条件的原排班，预计额外获得了多少基建价值？**
 
@@ -18,10 +18,10 @@
 
 ## 2. 入口与文案
 
-- section：`optimization-gain-clock`。
-- 公开地址：`/v2?section=optimization-gain-clock`。
-- 与其余三页使用同一组普通导航链接；登录、全屏、开关和暂停显示行为沿用共享约定。
-- 页面匿名可读。个人区只有在身份明确时读取，不因访客打开而加载用户历史。
+- section：`optimization-gain-clock`（当前关闭，不在 V2 区段表中识别）。
+- 公开地址：暂不提供。
+- 页面和个人流程代码保留在仓库中，但不挂载、不加载用户会话；相关 API 当前返回 `404 feature_unavailable`。
+- 页面匿名可读。点击“设置我的原排班”后才加载会话与个人面板；身份明确后读取该档案的历史与对照。登录返回保留本页和展开状态。
 
 | 位置 | 建议文案 |
 | --- | --- |
@@ -41,7 +41,7 @@
 ## 3. 信息架构与布局
 
 ```text
-优化增益时钟                         四页导航       全屏展示
+优化增益时钟                                      全屏展示
 
                      相比原排班，多积累了多少
 
@@ -93,7 +93,7 @@
 
 不能直接相减“一个月前旧练度的结果”和“今天新练度的结果”。应固定评估上下文，用原来的人员安排重新模拟，再与同上下文的网站方案比较。重新模拟只核算，不替用户优化原排班。
 
-现有[方案比较](../src/pages/v2/pages/ScheduleComparison.tsx)及 [`schedule-comparison.ts`](../src/lib/schedule-comparison.ts)可作为入口和指标复用参考；生产模拟仍走现有服务端能力，不能复制一份前端计算逻辑。若现有比较输出尚未持久化，需要补充可由服务端验证的比较记录。
+原排班从当前档案的活动或归档历史中选择，记录时间不得晚于当前方案。需要导入原安排时，先通过[手动排班模拟](../src/pages/v2/pages/Tools.tsx)保存，再生成新方案。两侧使用当前方案保存的配置、当前档案干员和同版本服务端模拟；原来的人员、无人机与菲亚梅塔安排必须与来源历史一致。比较记录冻结核算结果及上下文指纹，原排班不重新优化。
 
 ### 计算与权限
 
@@ -171,15 +171,16 @@
 
 从未建立有效对照时，响应为 `status: "empty"`、`has_recorded_comparison: false`，差额向量为 `null`，覆盖人数仍返回真实计数。已经建立但差额为零时，返回真实零向量；有历史对照但当前全部结束时，保留历史累计并将当前速率归零。
 
-个人读取在共享用户接口中返回 `comparison_state`、比较结果引用、比较确认时间、当前／原方案的每日价值、带符号差额及失效原因。公开接口不返回这些个人引用。
+实现代码中的 `GET /api/user/value-clock/comparisons?profile_id=…` 原计划返回档案设置、当前方案和已生效比较；当前个人比较 API 已关闭并返回 `404 feature_unavailable`。
 
-拟新增 `POST /api/user/value-clock/comparisons`，接收 `profile_id`、`current_result_id`、`baseline_result_id`、`confirmed_previous_plan: true` 和 `request_id`。它核验已有结果的归属、原安排来源与评估上下文，成功返回不可变的 `comparison_id`、两侧每日值和差额；同一幂等请求不重复建记录。结果不具备同条件证明时返回 `409 comparison_reassessment_required` 及可操作原因，不偷偷提交任务。
+实现代码中的同一路径 `POST` 原计划使用两种明确动作；当前个人比较 API 已关闭：
 
-需要重新核算时，沿用现有显式模拟任务流程，并保留原安排的来源引用及冻结上下文；任务成功后保存可由服务端核验的两侧结果，再申请比较记录。比较接口只核验现有计算，不另实现求解器。
+- `action: "verify"`：提交 `profile_id`、`current_result_id`、`baseline_result_id`、`current_job_id`、`baseline_job_id`、`confirmed_previous_plan: true` 和 `request_id`。服务端验证两份成功模拟的归属、原人员安排、干员和配置、计算与数据版本、心情和库存，返回不可变的比较 `id` 及每日数值。缺少同条件证据时返回 `409 comparison_reassessment_required`，不会提交任务。
+- `action: "activate"`：提交 `profile_id`、`comparison_id` 和设置 `revision`。事务核对当前方案及身份仍匹配、比较未到期，结束旧比较并从服务端当前时刻确认新比较。旧版本返回 `409 comparison_revision_conflict`；同一确认重试不重复累计。
 
-设置或更换原排班通过后续比较接口，提交 `comparison_id`、来源结果和当前 revision。服务端核对该比较仍对应当前历史方案区间。提交不允许客户端自带差额；设置过程中的读取失败不重复创建比较任务或覆盖已有有效对照。
+两份核算由“核算原排班”显式提交到现有手动模拟任务流程，不保存为新的当前方案。稳定的任务幂等键与比较请求键保存在当前标签页的草稿内；收起后重新点击核算可继续读取已提交的任务。读取或确认失败不自动重新计算；取消、切换账号或退出后不接收旧身份的迟到响应。
 
-持久层在共享数值区间附加比较来源与差额即可，不为本页新建第二套时间累计系统。每天汇总保留总产出与增益的不同列或明确视图，避免两者混写。公开快照在同一锚点计算差额、人数和对照两侧，刷新周期、停止估算条件、隐藏页行为与[共享契约](value-clock-handoff.md)相同。
+比较来源和冻结值保存在 `value_clock_comparisons`，档案确认版本在 `value_clock_comparison_settings`。总产出与差额共用 `value_clock_intervals`、`value_clock_days`、`value_clock_daily_totals`，按 `view` 隔离；历史更改在同一同步事务中重建两类区间。来源时间、配置或结果内容改变会使旧比较失效，重命名和归档保留比较。有限库存沿用历史快照最早锚点，重新确认不会补充库存。公开快照在同一锚点计算差额、人数和两侧日产出，刷新和停止估算遵循[共享契约](value-clock-handoff.md)。
 
 ## 7. 个人设置流程
 
@@ -203,10 +204,10 @@
 
 ## 9. 实施入口
 
-- 页面与导航：V2 `navigation.ts`、`WorkspaceSections.tsx`、`pages/Tools.tsx` 与新增独立页面。
+- 页面：[`OptimizationGainClock.tsx`](../src/pages/v2/pages/OptimizationGainClock.tsx) 与按需加载的 [`OptimizationGainPersonal.tsx`](../src/pages/v2/pages/OptimizationGainPersonal.tsx)；`App.tsx` 和 V2 `navigation.ts` 负责直达入口。
 - 原安排选择与模拟：现有 `pages/ScheduleComparison.tsx`、历史详情查询、手动排班模拟提交路径；复用权限和任务恢复。
 - 指标：`src/lib/production-sanity.ts`、`src/lib/schedule-comparison.ts`、`src/lib/types.ts`；值从服务端冻结结果进入共享账本。
-- API 与持久：共享价值时钟 handler/store，加上比较记录的有效性核验及对历史方案区间的事务更新。
+- API 与持久：共享价值时钟 handler/store、[`比较核验`](../server/value-clock-comparison.ts)、[`比较事务`](../server/storage/value-clock-comparison-store.ts) 与 [`个人 handler`](../server/handlers/user-value-clock.ts)。
 - 文案：现有 `src/copy/zh-CN/`，不要在组件中散落新文案。
 
 具体新增文件按现有职责划分，不建立独立收益服务或重复的会话／查询层。

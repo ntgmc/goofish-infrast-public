@@ -27,7 +27,7 @@ describe('StatusPage', () => {
     await waitForStatus()
 
     expect(screen.getAllByText('运行正常').length).toBeGreaterThan(0)
-    const componentSection = screen.getByText('服务组件', { selector: 'p' }).closest('section')
+    const componentSection = screen.getByRole('region', { name: '服务组件' })
     expect(componentSection).not.toBeNull()
     expect(componentSection).toHaveTextContent('正常')
     expect(componentSection).toHaveTextContent('森空岛导入')
@@ -128,7 +128,7 @@ describe('StatusPage', () => {
     expect(screen.getByText('队列延迟')).toBeInTheDocument()
     expect(screen.getByText('已恢复。')).toBeInTheDocument()
     expect(screen.getAllByRole('gridcell').every((cell) => !cell.hasAttribute('tabindex'))).toBe(true)
-    expect(document.querySelector('.service-status-history-axis')).toHaveTextContent('17时')
+    expect(document.querySelector('.v2-service-hours')).toHaveTextContent('17')
   })
 
   it('shows every active incident and only the three most recent resolved incidents', async () => {
@@ -145,8 +145,6 @@ describe('StatusPage', () => {
     render(<MemoryRouter><StatusPage /></MemoryRouter>)
     await waitForStatus()
 
-    expect(screen.getByText('进行中的事件')).toBeInTheDocument()
-    expect(screen.getByText('最近已解决')).toBeInTheDocument()
     expect(screen.getByText('进行中一')).toBeInTheDocument()
     expect(screen.getByText('进行中二')).toBeInTheDocument()
     expect(screen.getByText('最近解决一')).toBeInTheDocument()

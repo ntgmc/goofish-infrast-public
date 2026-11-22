@@ -5,6 +5,7 @@ import { useTaskDraft } from '../lib/task-drafts'
 import { accountTrainingRequirements, analyzeAccountTraining, defaultTrainingSettings, estimateAccountTrainingDays, type TrainingAccountData, type TrainingSettings } from '../lib/training-ratio-account'
 import { copy } from '../copy'
 import { useSklandSnapshot } from '../hooks/useSklandSnapshot'
+import { recordSklandSnapshotError } from '../lib/skland-snapshot-client'
 import { analyzeTrainingBalance, estimateTrainingRecovery } from '../lib/training-ratio'
 import { readProjectIncome } from '../lib/cultivation-projects'
 import { useResultHistoryDetailQuery } from './tool/optimize/result-history-query'
@@ -74,6 +75,9 @@ export function useTrainingRatio(session: ReturnType<typeof useToolSession>) {
     enabled: snapshot.available && source === 'imported' && Boolean(data),
     queryFn: ({ signal }) => apiJson<TrainingAccountData>('/api/cultivation-plan', { method: 'POST', json: { profile_id: profileId, training: true }, signal, timeoutMs: 90000, fallbackMessage: copy.trainingRatio.targetsFailed }),
   })
+  useEffect(() => {
+    if (account.error && session.user && profile) recordSklandSnapshotError(session.user.id, profile, account.error)
+  }, [account.error, session.user?.id, profile?.id]) // eslint-disable-line react-hooks/exhaustive-deps
   const accountData = snapshot.available && data ? account.data : undefined
   const requirements = accountData ? accountTrainingRequirements(accountData, settings) : null
   const accountBalance = accountData && requirements && !requirements.issues.length ? analyzeAccountTraining(accountData.inventory, requirements) : null

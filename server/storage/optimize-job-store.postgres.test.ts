@@ -406,6 +406,37 @@ describe('PostgreSQL optimization job admission', () => {
     }
   })
 
+  it.each(['succeeded', 'failed', 'cancelled', 'dead_lettered', 'queued', 'running'] as const)(
+    'keeps the last worker for %s jobs without assigning a waiting retry', async (status) => {
+      const store = createPostgresOptimizeJobStore()
+      const job = await store.createJob(input())
+      try {
+        await query(
+          `insert into optimize_job_attempts
+            (job_id, attempt_no, worker_id, lock_token, status, started_at, heartbeat_at, finished_at)
+           values ($1, 1, 'previous-worker', 'first-lock', 'failed', now(), now(), now()),
+                  ($1, 2, 'last-worker', 'second-lock', 'succeeded', now(), now(), now())`,
+          [job.id],
+        )
+        await query(
+          `update optimize_jobs set status = $2, attempt_count = 2,
+             worker_id = case when $2 = 'running' then 'current-worker' else null end,
+             finished_at = now(), updated_at = now() where id = $1`,
+          [job.id, status],
+        )
+        const snapshot = await getAdminOptimizationQueueSnapshot(undefined, 20, job.id)
+        const rows = [...snapshot.queued_jobs, ...snapshot.running_jobs, ...snapshot.recent_jobs]
+        expect(rows.find((row) => row.id === job.id)?.worker_id).toBe(
+          status === 'queued' ? null : status === 'running' ? 'current-worker' : 'last-worker',
+        )
+        await query("update optimize_jobs set status = 'cancelled', attempt_count = 0, worker_id = null where id = $1", [job.id])
+        expect((await getAdminOptimizationQueueSnapshot(undefined, 20, job.id)).recent_jobs[0]?.worker_id).toBeNull()
+      } finally {
+        await query('delete from optimize_jobs where id = $1', [job.id])
+      }
+    },
+  )
+
   it('counts only burst workers for variable costs while retaining all live capacity', async () => {
     const prefix = `billing-${randomUUID()}`
     const workers = [

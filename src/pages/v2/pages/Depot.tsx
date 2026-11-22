@@ -1,11 +1,12 @@
 import GuestAccountLink from '../../../components/GuestAccountLink'
 import { useTaskDraft } from '../../../lib/task-drafts'
-import { RefreshIcon as ArrowRight, ExportImageIcon as Download, JsonImportIcon as FileJson } from '../../../components/icons'
+import { ExportImageIcon as Download, JsonImportIcon as FileJson } from '../../../components/icons'
 import { copy } from '../../../copy'
 import { DataActivity } from '../components/DataActivity'
 import { TweenValue } from '../../../components/NumberMotion'
-import { useDepotValue, formatProfileLabel, formatNumber, formatRankingNote, formatPricingStatus, formatContributionStatus, formatOptionalDate, formatUnitSanityLabel, getUtf8ByteLength } from '../../DepotValuePage'
+import { useDepotValue, formatProfileLabel, formatNumber, formatRankingNote, formatPricingStatus, formatContributionStatus, formatOptionalDate, formatUnitSanityLabel, getUtf8ByteLength } from '../../../hooks/useDepotValue'
 import SklandBindingDialog from '../../../components/SklandBindingDialog'
+import SklandDataActions from '../../../components/SklandDataActions'
 import SklandIcon from '../../../components/SklandIcon'
 import type { V2Session } from '../OptionsDrawer'
 import { EmptyState, Facts, Loading, Notice, SectionTitle } from '../components/WorkspaceUI'
@@ -18,7 +19,7 @@ export default function Depot({ session }: { session: V2Session }) {
   const result = m.result
   return <div className="v2-depot-workspace"><div className="v2-depot-import"><section className="v2-depot-source"><SectionTitle title={text.pages_DepotValuePage_014} description={text.pages_DepotValuePage_015} /><div className="v2-view-switch" role="group" aria-label={copy.v2.toolSource}><button aria-pressed={source === 'skland'} onClick={() => setSource('skland')}><SklandIcon />{text.pages_DepotValuePage_024}</button><button aria-pressed={source === 'upload'} onClick={() => setSource('upload')}><FileJson size={18} />{text.pages_DepotValuePage_016}</button></div>
     <div className="v2-depot-skland" hidden={source !== 'skland'}>{m.authLoading ? <Loading label={text.pages_DepotValuePage_027} /> : m.authError ? <Notice error>{text.pages_DepotValuePage_080} · {m.authError}<button className="v2-text-button" onClick={session.retryAuth}>{text.pages_DepotValuePage_086}</button></Notice> : !m.auth?.user ? <GuestAccountLink inset label={copy.v2.guestAccount.depot} description={text.pages_DepotValuePage_028} /> : <>
-      {m.sklandProfiles.length > 0 ? <><label className="v2-field"><span>{copy.v2.account}</span><select className="v2-input" value={m.selectedSklandProfile?.id ?? m.selectedProfileId} onChange={(event) => m.setSelectedProfileId(event.target.value)}>{m.sklandProfiles.map((profile) => <option key={profile.id} value={profile.id}>{formatProfileLabel(profile)}</option>)}</select></label>{m.selectedSklandProfile?.skland_binding?.credential_status === 'invalid' && <Notice error>{text.pages_DepotValuePage_032}</Notice>}<button className="v2-button v2-button-primary" disabled={m.loading !== null || m.profilePreparing} aria-busy={m.loading === 'skland'} onClick={() => void m.analyzeSkland()}>{m.loading === 'skland' ? text.pages_DepotValuePage_029 : m.selectedSklandProfile?.skland_binding?.credential_status === 'invalid' ? text.pages_DepotValuePage_030 : copy.skland.refresh}<ArrowRight size={16} /></button></> : <button className="v2-button v2-button-primary" disabled={m.loading !== null || m.profilePreparing} onClick={() => void m.openSklandBinding()}>{m.profilePreparing ? text.pages_DepotValuePage_033 : text.pages_DepotValuePage_034}</button>}
+      {m.sklandProfiles.length > 0 ? <><label className="v2-field"><span>{copy.v2.account}</span><select className="v2-input" value={m.selectedSklandProfile?.id ?? m.selectedProfileId} onChange={(event) => m.setSelectedProfileId(event.target.value)}>{m.sklandProfiles.map((profile) => <option key={profile.id} value={profile.id}>{formatProfileLabel(profile)}</option>)}</select></label><div className="v2-actions"><SklandDataActions session={session} profile={m.selectedSklandProfile} onRefresh={() => void m.analyzeSkland()} refreshing={m.loading === 'skland'} refreshDisabled={m.loading !== null || m.profilePreparing} /></div></> : <button className="v2-button v2-button-primary" disabled={m.loading !== null || m.profilePreparing} onClick={() => void m.openSklandBinding()}>{m.profilePreparing ? text.pages_DepotValuePage_033 : text.pages_DepotValuePage_034}</button>}
       <label className="v2-coupon-option"><input type="checkbox" checked={m.sampleConsent} onChange={(event) => m.setSampleConsent(event.target.checked)} /><span>{text.pages_DepotValuePage_087}</span></label>
       <p className="v2-muted">{text.pages_DepotValuePage_035}</p>
     </>}</div>

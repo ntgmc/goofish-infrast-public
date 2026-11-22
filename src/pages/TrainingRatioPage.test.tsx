@@ -23,7 +23,7 @@ function withProduction(id = 'first', resultId = 'plan1') {
   return { ...session(id), workspace: { profile_id: id, latest_result: { id: resultId, name: resultId, source: 'generated' } } } as ReturnType<typeof useToolSession>
 }
 const production = (lmd: number, exp: number) => ({ result: { daily_production: { manufacturing: { 'Battle Record': exp / 1000 }, trading: { LMD: lmd } } } }) as unknown as WorkspaceResultHistoryItem
-const view = (current = session()) => <MemoryRouter><TrainingRatioPage session={current} embedded /></MemoryRouter>
+const view = (current = session()) => <MemoryRouter><TrainingRatioPage session={current} /></MemoryRouter>
 const data = { uid: 'first', version: '1', game: { state: 'fresh', fetchedAt: new Date().toISOString(), error: null },
   inventory: { state: 'fresh', fetchedAt: new Date().toISOString(), error: null, items: { '4001': 200000, '2004': 50 }, lmd: 200000, exp: 100000 }, retryAt: null } as SklandSnapshot
 const account: TrainingAccountData = { snapshotVersion: '1', importedAt: '', inventory: { lmd: 200000, exp: 100000 }, levels, warnings: [], operators: [{

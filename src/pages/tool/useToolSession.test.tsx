@@ -59,6 +59,41 @@ describe('useToolSession config synchronization', () => {
     vi.useRealTimers()
   })
 
+  it('merges authorization for another selected tool profile without replacing the active workspace or config draft', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(authPayload(baseConfig))))
+    const { result } = renderHook(() => useToolSession(null, false, false))
+    await waitFor(() => expect(result.current.authStatus).toBe('authenticated'))
+    act(() => result.current.setConfigOverride({ ...baseConfig, desc: 'Unsaved draft' }))
+    const workspace = result.current.workspace
+    const response = authPayload({ ...baseConfig, desc: 'Other workspace' }, 'profile-2')
+    response.profiles.unshift({ ...result.current.activeProfile!, skland_binding: undefined })
+    act(() => result.current.applySklandAuthorizationPayload(response))
+    expect(result.current.activeProfile?.id).toBe('profile-1')
+    expect(result.current.workspace).toBe(workspace)
+    expect(result.current.configOverride?.desc).toBe('Unsaved draft')
+    expect(result.current.profiles.map((profile) => profile.id)).toEqual(['profile-1', 'profile-2'])
+  })
+
+  it('updates authorization metadata from another tab while keeping this tab on its current profile', async () => {
+    const channels: Array<{ onmessage?: (event: MessageEvent) => void }> = []
+    vi.stubGlobal('BroadcastChannel', class {
+      onmessage?: (event: MessageEvent) => void
+      constructor() { channels.push(this) }
+      postMessage() {}
+      close() {}
+    })
+    const fetch = vi.fn(async () => jsonResponse(authPayload(baseConfig)))
+    vi.stubGlobal('fetch', fetch)
+    const { result } = renderHook(() => useToolSession(null, false, false))
+    await waitFor(() => expect(result.current.authStatus).toBe('authenticated'))
+    const response = authPayload(baseConfig)
+    response.profiles[0].skland_binding = { uid: 'uid', credential_status: 'available' } as NonNullable<AuthSuccessResponse['profiles'][number]['skland_binding']>
+    fetch.mockResolvedValueOnce(jsonResponse(response))
+    act(() => channels.find((channel) => channel.onmessage)?.onmessage?.(new MessageEvent('message', { data: { authorization: { userId: 'user-1', profileId: 'profile-1' } } })))
+    await waitFor(() => expect(result.current.activeProfile?.skland_binding?.credential_status).toBe('available'))
+    expect(fetch).toHaveBeenLastCalledWith('/api/auth/me?profile_id=profile-1', expect.any(Object))
+  })
+
   it.each(['logout', 'switch', 'replacement'])('ignores stale workspace data after %s and tells callers to skip navigation', async (mode) => {
     let resolve!: (value: Response) => void
     const pending = new Promise<Response>((done) => { resolve = done })

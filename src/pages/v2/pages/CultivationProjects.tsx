@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import GuestAccountLink from '../../../components/GuestAccountLink'
-import { NextIcon as ArrowRight, AddIcon as Plus, RefreshIcon, SaveIcon, CultivationIcon, ResourceCalendarIcon, DailyOutputIcon } from '../../../components/icons'
+import SklandDataActions from '../../../components/SklandDataActions'
+import { NextIcon as ArrowRight, AddIcon as Plus, SaveIcon, CultivationIcon, ResourceCalendarIcon, DailyOutputIcon } from '../../../components/icons'
 import { copy } from '../../../copy'
 import OperatorPicker from '../../../components/OperatorPicker'
 import { AnimatedValue } from '../../../components/MotionPrimitives'
@@ -37,7 +38,7 @@ export default function CultivationProjects({ session, onConfig }: { session: V2
   if (session.authLoading) return <Loading label={copy.v2.loading} />
   if (session.authStatus === 'error') return <Notice error>{session.authError?.message ?? text.authFailed}<button className="v2-text-button" onClick={session.retryAuth}>{text.retry}</button></Notice>
   if (!session.user) return <GuestAccountLink label={copy.v2.guestAccount.projects} description={copy.v2.guestAccount.projectsHelp} />
-  if (!profile?.skland_binding || profile.status !== 'active' || profile.archived_at) return <EmptyState title={text.noBinding} action={<Link className="v2-button v2-button-primary" to={v2Path('profiles', profile?.id)}>{text.profiles}</Link>} />
+  if (!profile?.skland_binding || profile.status !== 'active' || profile.archived_at) return <EmptyState title={text.noBinding} action={<div className="v2-actions"><SklandDataActions session={session} profile={profile} /><Link className="v2-button v2-button-secondary" to={v2Path('profiles', profile?.id)}>{text.profiles}</Link></div>} />
   return <ProjectWorkspace key={`${session.user.id}:${profile.id}`} session={session} profile={profile} onConfig={onConfig} />
 }
 
@@ -81,7 +82,7 @@ function ProjectWorkspace({ session, profile, onConfig }: { session: V2Session; 
     setApplied(true)
   }
   return <div className="v2-projects">
-    <div className="v2-tool-source v2-project-source"><div><span className="v2-label">{text.account} · {profile.display_name}</span><p>{text.description}</p>{features.cultivation_plan && <Link className="v2-text-button" to={v2Path('cultivation', profile.id)}>{text.suggestionsEntry}<ArrowRight size={14} /></Link>}</div><button className="v2-button v2-button-primary" disabled={m.busy} aria-busy={m.busy} onClick={() => void m.load()}>{copy.skland.refresh}<RefreshIcon size={16} aria-hidden="true" /></button>
+    <div className="v2-tool-source v2-project-source"><div><span className="v2-label">{text.account} · {profile.display_name}</span><p>{text.description}</p>{features.cultivation_plan && <Link className="v2-text-button" to={v2Path('cultivation', profile.id)}>{text.suggestionsEntry}<ArrowRight size={14} /></Link>}</div><div className="v2-actions"><SklandDataActions session={session} profile={profile} onRefresh={() => void m.load()} refreshing={m.busy} /></div>
       <div className="v2-data-feedback"><DataRefresh pending={m.busy} revision={m.data} error={Boolean(m.error)}
         label={m.phase === 'syncing' ? copy.v2.dataActivity.syncing : copy.v2.dataActivity.calculating} /></div>
     </div>

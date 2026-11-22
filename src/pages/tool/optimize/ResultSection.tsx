@@ -1,178 +1,13 @@
-import { Component, lazy, Suspense, type ErrorInfo, type FormEvent, type ReactNode } from 'react'
+import { Component, type ErrorInfo, type ReactNode } from 'react'
 import InternalLink from '../../../components/InternalLink'
-import type { LicenseOperator, OptimizeResult, UpgradeSuggestion, WorkspaceResultHistoryItem } from '../../../lib/types'
-import ScheduleProgress, { type ScheduleProgressState } from '../../../components/ScheduleProgress'
-import { isMaaJsonDownloadable } from '../../../lib/workspace-history'
-import { dashboardPath } from '../../../lib/app-routes'
+import type { OptimizeResult } from '../../../lib/types'
+import { v2Path } from '../../v2/navigation'
 import { resolveActivePurchaseChannel } from '../../../lib/purchase'
 import { usePublicContent } from '../../../lib/public-content-context'
-import { ResultFallback } from './feedback'
-import type { OptimizePhase } from './types'
-import { copy } from '../../../copy/index'
-import { LockedResultPreview } from './PaidCapabilityPreview'
+import { copy } from '../../../copy'
 import { recordDebugError } from '../../../lib/debug-diagnostics'
-import type { ResultPanelProps } from '../../../components/result-panel/types'
-import type { CultivationProjectScope } from '../../../lib/cultivation-project-import'
 import { useSiteFeatures } from '../../../lib/site-feature-context'
 import { isStaleChunkError } from '../../../lib/chunk-reload'
-
-
-const ResultPanel = lazy(() => import('../../../components/ResultPanel'))
-const UpgradeSuggestions = lazy(() => import('../../../components/UpgradeSuggestions'))
-
-export default function ResultSection({
-  phase,
-  historyItem,
-  currentResult,
-  finalResult,
-  operators,
-  suggestions,
-  loading,
-  progress,
-  previewProfile,
-  canViewUpgradeSuggestions,
-  upgradeCdk,
-  upgradeLoading,
-  upgradeError,
-  onUpgradeCdkChange,
-  onUpgradePreviewProfile,
-  onDownloadMAA,
-  onDownloadFullResult,
-  maaDownloadBusy = false,
-  fullResultDownloadBusy = false,
-  fullDataAvailable = true,
-  manualEditProfile,
-  manualSimulationBaseline,
-  projectScope,
-}: {
-  phase: OptimizePhase;
-  historyItem: WorkspaceResultHistoryItem | null;
-  currentResult: OptimizeResult | null;
-  finalResult: OptimizeResult | null;
-  operators: LicenseOperator[];
-  suggestions: UpgradeSuggestion[];
-  loading: boolean;
-  progress: ScheduleProgressState | null;
-  previewProfile: boolean;
-  canViewUpgradeSuggestions: boolean;
-  upgradeCdk: string;
-  upgradeLoading: boolean;
-  upgradeError: string | null;
-  onUpgradeCdkChange: (value: string) => void;
-  onUpgradePreviewProfile: (event: FormEvent) => void;
-  onDownloadMAA?: () => void;
-  onDownloadFullResult?: () => void;
-  maaDownloadBusy?: boolean;
-  fullResultDownloadBusy?: boolean;
-  fullDataAvailable?: boolean;
-  manualEditProfile?: ResultPanelProps['manualEditProfile'];
-  manualSimulationBaseline?: ResultPanelProps['manualSimulationBaseline'];
-  projectScope?: CultivationProjectScope;
-}) {
-  const suggestionsSlot = suggestions.length > 0 ? (
-    <Suspense fallback={<ResultFallback />}>
-      <UpgradeSuggestions suggestions={suggestions} embedded projectScope={projectScope} />
-    </Suspense>
-  ) : !canViewUpgradeSuggestions ? (
-    <LockedCapabilityPreview
-      title={copy.optimize.pages_tool_optimize_ResultSection_016}
-      description={copy.optimize.pages_tool_optimize_ResultSection_017}
-    />
-  ) : null
-  const manualPreviewSlot = previewProfile ? (
-    <LockedCapabilityPreview
-      title={copy.optimize.paid_preview.manual_title}
-      description={copy.optimize.paid_preview.manual_description}
-    />
-  ) : undefined
-
-  return (
-    <section className="min-w-0" data-tour-target="optimize-result-content">
-      {previewProfile && phase === 'idle' && !loading && <LockedResultPreview />}
-      {phase === 'idle' && loading && progress && (
-        <ScheduleProgress progress={progress} variant="focus" />
-      )}
-
-      {phase === 'idle' && !(loading && progress) && (
-        <div className="tool-panel border-dashed px-5 py-10 text-center">
-          <p className="text-base font-semibold text-ink-primary">{copy.optimize.pages_tool_optimize_ResultSection_001}</p>
-          <p className="mt-2 text-sm leading-6 text-ink-secondary">
-            {copy.optimize.pages_tool_optimize_ResultSection_002}</p>
-        </div>
-      )}
-
-      <ResultErrorBoundary
-        resetKey={`${phase}:${historyItem?.id ?? progress?.jobId ?? 'none'}`}
-        onDownloadDiagnostic={onDownloadFullResult}
-        diagnosticDownloadBusy={fullResultDownloadBusy}
-      >
-      <div data-tour-target="optimize-result-actions">
-      {phase === 'history' && historyItem && (
-        <Suspense fallback={<ResultFallback />}>
-          <UpgradeSuggestionStatusNotice result={historyItem.result} />
-          <ResultPanel
-            result={historyItem.result}
-            operators={operators}
-            previewLimit={previewProfile ? historyItem.result.preview_limit : undefined}
-            onDownload={onDownloadMAA && isMaaJsonDownloadable(historyItem.result) ? onDownloadMAA : undefined}
-            onDownloadFullResult={onDownloadFullResult}
-            downloadBusy={maaDownloadBusy}
-            fullResultDownloadBusy={fullResultDownloadBusy}
-            fullDataAvailable={fullDataAvailable}
-            manualEditProfile={manualEditProfile}
-            manualSimulationBaseline={historyItem.config ? { id: historyItem.id, config: historyItem.config } : undefined}
-            manualPreviewSlot={manualPreviewSlot}
-            suggestionsSlot={suggestionsSlot}
-          />
-          {previewProfile && <PreviewUpgradePanel cdk={upgradeCdk} loading={upgradeLoading} error={upgradeError} onCdkChange={onUpgradeCdkChange} onSubmit={onUpgradePreviewProfile} />}
-        </Suspense>
-      )}
-
-      {phase === 'suggestions' && currentResult && (
-        <Suspense fallback={<ResultFallback />}>
-          <UpgradeSuggestionStatusNotice result={currentResult} />
-          <ResultPanel
-            result={currentResult}
-            operators={operators}
-            previewLimit={previewProfile ? currentResult.preview_limit : undefined}
-            onDownload={onDownloadMAA}
-            onDownloadFullResult={onDownloadFullResult}
-            downloadBusy={maaDownloadBusy}
-            fullResultDownloadBusy={fullResultDownloadBusy}
-            fullDataAvailable={fullDataAvailable}
-            manualEditProfile={manualEditProfile}
-            manualPreviewSlot={manualPreviewSlot}
-            manualSimulationBaseline={manualSimulationBaseline}
-            suggestionsSlot={suggestionsSlot}
-          />
-          {previewProfile && <PreviewUpgradePanel cdk={upgradeCdk} loading={upgradeLoading} error={upgradeError} onCdkChange={onUpgradeCdkChange} onSubmit={onUpgradePreviewProfile} />}
-        </Suspense>
-      )}
-
-      {phase === 'final' && finalResult && (
-        <Suspense fallback={<ResultFallback />}>
-          <ResultPanel
-            result={finalResult}
-            operators={operators}
-            previewLimit={previewProfile ? finalResult.preview_limit : undefined}
-            onDownload={onDownloadMAA}
-            onDownloadFullResult={onDownloadFullResult}
-            downloadBusy={maaDownloadBusy}
-            fullResultDownloadBusy={fullResultDownloadBusy}
-            fullDataAvailable={fullDataAvailable}
-            manualEditProfile={manualEditProfile}
-            manualSimulationBaseline={manualSimulationBaseline}
-            manualPreviewSlot={manualPreviewSlot}
-            suggestionsSlot={suggestionsSlot}
-          />
-          {previewProfile && <PreviewUpgradePanel cdk={upgradeCdk} loading={upgradeLoading} error={upgradeError} onCdkChange={onUpgradeCdkChange} onSubmit={onUpgradePreviewProfile} />}
-        </Suspense>
-      )}
-      </div>
-      </ResultErrorBoundary>
-    </section>
-  )
-}
 
 export function LockedCapabilityPreview({ title, description, className = '' }: { title: string; description: string; className?: string }) {
   const { features } = useSiteFeatures()
@@ -217,7 +52,7 @@ export function LockedCapabilityPreview({ title, description, className = '' }: 
                 {copy.optimize.pages_tool_optimize_ResultSection_018}
               </InternalLink>
             )}
-            <InternalLink to={dashboardPath('redeem')} className="tool-secondary-action">
+            <InternalLink to={v2Path('add-account')} className="tool-secondary-action">
               {copy.optimize.pages_tool_optimize_ResultSection_019}
             </InternalLink>
           </div>
@@ -318,40 +153,5 @@ export function UpgradeSuggestionStatusNotice({ result }: { result: OptimizeResu
       {quick && <p className="mb-1">{copy.optimize.quickUpgradeNotice}</p>}
       {message}
     </div>
-  )
-}
-
-export function PreviewUpgradePanel({
-  cdk,
-  loading,
-  error,
-  onCdkChange,
-  onSubmit,
-}: {
-  cdk: string;
-  loading: boolean;
-  error: string | null;
-  onCdkChange: (value: string) => void;
-  onSubmit: (event: FormEvent) => void;
-}) {
-  return (
-    <form onSubmit={onSubmit} className="tool-panel mt-5 border-brand-600/25 p-5 sm:p-6">
-      <h3 className="text-base font-semibold text-ink-primary">{copy.optimize.pages_tool_optimize_ResultSection_003}</h3>
-      <p className="mt-2 text-sm leading-6 text-ink-secondary">{copy.optimize.pages_tool_optimize_ResultSection_004}</p>
-      {error && <div className="tool-alert tool-alert--error mt-4" role="alert">{error}</div>}
-      <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-        <input
-          value={cdk}
-          onChange={(event) => onCdkChange(event.currentTarget.value)}
-          className="tool-field flex-1 font-mono uppercase tracking-wide"
-          placeholder="MAA-XXXX-XXXX-XXXX"
-          aria-label={copy.optimize.pages_tool_optimize_ResultSection_005}
-          required
-        />
-        <button type="submit" disabled={loading} className="tool-primary-action">
-          {loading ? copy.optimize.pages_tool_optimize_ResultSection_006 : copy.optimize.pages_tool_optimize_ResultSection_007}
-        </button>
-      </div>
-    </form>
   )
 }

@@ -1,14 +1,12 @@
 import { Link, useNavigate } from 'react-router'
 import GuestAccountLink from '../components/GuestAccountLink'
-import { NextIcon as ArrowRight, BalancedResourcesIcon as Check, RefreshIcon as RefreshCw, ResourceRatioIcon as Scale, ResourceStockIcon as Wallet } from '../components/icons'
-import BrandLogo from '../components/BrandLogo'
-import ThemeSwitcher from '../components/ThemeSwitcher'
+import SklandDataActions from '../components/SklandDataActions'
+import { NextIcon as ArrowRight, BalancedResourcesIcon as Check, ResourceRatioIcon as Scale, ResourceStockIcon as Wallet } from '../components/icons'
 import ProductIcon from '../components/ProductIcon'
 import { Tabs } from '../components/ui/tabs'
 import { copy } from '../copy'
 import { useSiteFeatures } from '../lib/site-feature-context'
-import { profileScopedPath } from '../lib/app-routes'
-import { useToolSession } from './tool/useToolSession'
+import type { useToolSession } from './tool/useToolSession'
 import { trainingAmount, useTrainingRatio } from './useTrainingRatio'
 import { v2Path } from './v2/navigation'
 import TrainingRatioGoals from './TrainingRatioGoals'
@@ -27,15 +25,11 @@ function ResourceStock({ inventory }: { inventory: { lmd: number; exp: number } 
   </div>)}</dl>
 }
 
-export default function TrainingRatioPage({ session, embedded = false }: { session?: Session; embedded?: boolean } = {}) {
-  return session ? <TrainingRatioContent key={`${session.user?.id}:${session.activeProfile?.id}`} session={session} embedded={embedded} /> : <StandaloneTrainingRatio />
-}
-function StandaloneTrainingRatio() {
-  const session = useToolSession()
-  return <TrainingRatioPage session={session} />
+export default function TrainingRatioPage({ session }: { session: Session }) {
+  return <TrainingRatioContent key={`${session.user?.id}:${session.activeProfile?.id}`} session={session} />
 }
 
-function TrainingRatioContent({ session, embedded }: { session: Session; embedded: boolean }) {
+function TrainingRatioContent({ session }: { session: Session }) {
   const m = useTrainingRatio(session)
   const navigate = useNavigate()
   const { features } = useSiteFeatures()
@@ -50,11 +44,8 @@ function TrainingRatioContent({ session, embedded }: { session: Session; embedde
     : !m.accountBalance || !required ? m.data ? text.targetsLoading : text.noDemand
       : !required.exp ? required.lmd ? text.onlyLmd : text.noDemand
         : required.lmd ? `${number(required.lmd / required.exp)}∶1` : text.onlyExp
-  const Root = embedded ? 'div' : 'main'
-  return <div className={`training-ratio${embedded ? ' training-ratio--embedded' : ' training-ratio--standalone'}`}>
-    {!embedded && <header className="training-ratio-header"><Link to="/tool/tools" aria-label={text.back}><BrandLogo /></Link><div><Link to="/tool/tools">{text.back}</Link><ThemeSwitcher /></div></header>}
-    <Root>
-      {!embedded && <h1>{text.title}</h1>}
+  return <div className="training-ratio training-ratio--embedded">
+    <div>
       <p className="training-ratio-lead">{text.description}</p>
       <section className="training-ratio-reference" aria-label={accountMode ? text.accountReference : text.reference}><div><span>{accountMode ? text.accountReference : text.reference}</span><strong><ProductIcon product="LMD" size={40} />{accountMode ? reference : text.referenceValue}<ProductIcon product="Battle Record" size={40} /></strong><span className="training-ratio-range"><Scale size={16} aria-hidden="true" />{accountMode ? text.accountRange : text.referenceRange}</span></div><p>{accountMode ? text.accountReferenceHint : text.referenceHint}</p></section>
       <div className="training-ratio-columns">
@@ -66,8 +57,8 @@ function TrainingRatioContent({ session, embedded }: { session: Session; embedde
             <Tabs.Trigger value="manual">{text.manual}</Tabs.Trigger>
           </Tabs.List>
           <Tabs.Content value="imported" forceMount hidden={m.source !== 'imported'}>
-          {session.user && session.profiles.length > 0 && <label className="training-ratio-field"><span>{text.account}</span><select className="tool-field" value={profile?.id ?? ''} onChange={(event) => navigate(embedded ? v2Path('training-ratio', event.target.value) : profileScopedPath('/tools/training-ratio', event.target.value))}><option value="" disabled>{text.account}</option>{session.profiles.filter((row) => row.status === 'active' && !row.archived_at).map((row) => <option key={row.id} value={row.id}>{row.display_name}</option>)}</select></label>}
-          {m.canImport ? <div className="training-ratio-actions"><button type="button" className="tool-secondary-action training-ratio-import" disabled={m.busy} aria-busy={m.busy} onClick={() => void m.load()}><RefreshCw size={16} aria-hidden="true" />{m.busy ? copy.skland.refreshing : copy.skland.refresh}</button></div> : session.authLoading ? <p role="status" aria-busy="true" className="tool-loading-status">{text.accountLoading}</p> : session.authStatus === 'error' ? <p role="alert">{session.authError?.message ?? copy.v2.loginServiceUnavailable} <button type="button" className="training-ratio-link" onClick={session.retryAuth}>{copy.v2.retry}</button></p>
+          {session.user && session.profiles.length > 0 && <label className="training-ratio-field"><span>{text.account}</span><select className="tool-field" value={profile?.id ?? ''} onChange={(event) => navigate(v2Path('training-ratio', event.target.value))}><option value="" disabled>{text.account}</option>{session.profiles.filter((row) => row.status === 'active' && !row.archived_at).map((row) => <option key={row.id} value={row.id}>{row.display_name}</option>)}</select></label>}
+          {session.user && profile ? <div className="training-ratio-actions v2-actions"><SklandDataActions session={session} profile={profile} onRefresh={() => void m.load()} refreshing={m.busy} /></div> : session.authLoading ? <p role="status" aria-busy="true" className="tool-loading-status">{text.accountLoading}</p> : session.authStatus === 'error' ? <p role="alert">{session.authError?.message ?? copy.v2.loginServiceUnavailable} <button type="button" className="training-ratio-link" onClick={session.retryAuth}>{copy.v2.retry}</button></p>
             : session.authStatus === 'anonymous' ? <GuestAccountLink inset label={copy.v2.guestAccount.training} description={copy.v2.guestAccount.trainingHelp} />
               : <p>{text.bindingHint} <Link className="training-ratio-link" to={v2Path('profiles', profile?.id)}>{text.accountEntry}<ArrowRight size={14} aria-hidden="true" /></Link></p>}
           {m.data && <><ResourceStock inventory={m.data.inventory} /><p>{text.importedAt} {new Date(m.data.importedAt).toLocaleString('zh-CN')}</p></>}
@@ -107,6 +98,6 @@ function TrainingRatioContent({ session, embedded }: { session: Session; embedde
         </section>
       </div>
       <TrainingRatioEvidence accountMode={accountMode} projectHref={features.cultivation_projects ? v2Path('cultivation-projects', profile?.id) : undefined} />
-    </Root>
+    </div>
   </div>
 }

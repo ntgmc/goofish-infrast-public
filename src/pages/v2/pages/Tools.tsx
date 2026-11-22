@@ -12,7 +12,7 @@ import ManualScheduleEditor from '../../../components/result-panel/ManualSchedul
 import ManualBlankScheduleSetup from '../../../components/ManualBlankScheduleSetup'
 import OperatorSkillPreview from '../../../components/result-panel/OperatorSkillPreview'
 import { OperatorAvatarTile } from '../../../components/result-panel/OperatorAvatarStrip'
-import { useManualTool } from '../../ManualSchedulePage'
+import { useManualTool } from '../../../hooks/useManualTool'
 import { Field, Loading, Notice, SectionTitle } from '../components/WorkspaceUI'
 import ManualResultExport from '../ManualResultExport'
 import type { V2Workflow } from '../WorkspaceSections'
@@ -55,7 +55,7 @@ export function ManualTool({ session, workflow, onDirtyChange, onOpenProfile, on
   const location = useLocation()
   const navigate = useNavigate()
   const loginPath = authPath('login', `${location.pathname}${location.search}${location.hash}`)
-  const m = useManualTool({ session, embedded: true, onDirtyChange })
+  const m = useManualTool({ session, onDirtyChange })
   const text = copy.tools.manualSchedule
   const operatorsPath = (profileId: string) => `${v2Path('overview', profileId)}&panel=operators`
   return <div className="v2-manual-workspace"><p className="v2-lead">{text.description}</p>{session.authStatus !== 'anonymous' && <p className="v2-muted">{text.access}</p>}

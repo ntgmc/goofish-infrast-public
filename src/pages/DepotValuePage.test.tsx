@@ -6,11 +6,12 @@ import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AuthMeResponse, DepotValueResponse } from '../lib/types'
 import { copy } from '../copy'
-import DepotValuePage, { useDepotValue } from './DepotValuePage'
+import { useDepotValue } from '../hooks/useDepotValue'
+import Depot from './v2/pages/Depot'
+import type { V2Session } from './v2/OptionsDrawer'
 
 const mocks = vi.hoisted(() => ({
   apiJson: vi.fn(),
-  apiJsonOrNull: vi.fn(),
   snapshot: vi.fn(),
   refresh: vi.fn(),
 }))
@@ -18,7 +19,6 @@ vi.mock('../hooks/useSklandSnapshot', () => ({ useSklandSnapshot: mocks.snapshot
 
 vi.mock('../lib/api-client', async (original) => ({ ...await original<typeof import('../lib/api-client')>(),
   apiJson: mocks.apiJson,
-  apiJsonOrNull: mocks.apiJsonOrNull,
 }))
 
 vi.mock('../components/SklandBindingDialog', () => ({
@@ -27,7 +27,7 @@ vi.mock('../components/SklandBindingDialog', () => ({
 
 beforeEach(() => {
   mocks.apiJson.mockReset()
-  mocks.apiJsonOrNull.mockReset()
+  mocks.refresh.mockResolvedValue({ version: 'refreshed' })
   mocks.snapshot.mockReturnValue({ data: null, busy: false, error: '', refresh: mocks.refresh })
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
   HTMLElement.prototype.scrollIntoView = vi.fn()
@@ -39,12 +39,12 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe('DepotValuePage', () => {
+describe('V2 depot analysis', () => {
   it('automatically analyzes shared inventory without contributing a statistical sample', async () => {
     mocks.snapshot.mockReturnValue({ data: { version: '1' }, busy: false, error: '', refresh: mocks.refresh })
-    mocks.apiJsonOrNull.mockResolvedValue(authPayload())
     mocks.apiJson.mockResolvedValue(depotResult())
-    renderHook(() => useDepotValue())
+    const session = depotSession()
+    renderHook(() => useDepotValue(session))
     await waitFor(() => expect(mocks.apiJson).toHaveBeenCalledWith('/api/depot-value', expect.objectContaining({
       json: { source: 'skland', profile_id: 'profile-1', sample_consent: false },
     })))
@@ -55,8 +55,8 @@ describe('DepotValuePage', () => {
     mocks.refresh.mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve }))
     const auth = authPayload()
     auth.profiles!.push({ ...auth.profiles![0], id: 'profile-2', skland_binding: { ...auth.profiles![0].skland_binding!, uid: 'other' } })
-    mocks.apiJsonOrNull.mockResolvedValue(auth)
-    const page = renderHook(() => useDepotValue())
+    const session = depotSession(auth)
+    const page = renderHook(() => useDepotValue(session))
     await waitFor(() => expect(page.result.current.selectedSklandProfile?.id).toBe('profile-1'))
     let pending!: Promise<void>
     act(() => { pending = page.result.current.analyzeSkland() })
@@ -68,9 +68,9 @@ describe('DepotValuePage', () => {
 
   it('cancels delayed result scrolling after leaving the page', async () => {
     vi.useFakeTimers()
-    mocks.apiJsonOrNull.mockResolvedValue(authPayload())
     mocks.apiJson.mockResolvedValue(depotResult())
-    const page = renderHook(() => useDepotValue())
+    const session = depotSession()
+    const page = renderHook(() => useDepotValue(session))
     await act(async () => { await Promise.resolve() })
     expect(page.result.current.selectedSklandProfile?.id).toBe('profile-1')
     await act(async () => { await page.result.current.analyzeSkland() })
@@ -82,21 +82,17 @@ describe('DepotValuePage', () => {
   })
 
   it('shows auth service failures separately from logged-out state and retries', async () => {
-    const user = userEvent.setup()
-    mocks.apiJsonOrNull.mockRejectedValue(new TypeError('network lost'))
-
-    renderPage()
-
-    expect(await screen.findByRole('alert')).toHaveTextContent('登录状态加载失败，请重试。')
-    expect(screen.queryByText('登录或注册后会自动创建一个仅用于仓库分析的免费档案，然后继续绑定森空岛。'))
-      .not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: '重试登录状态' }))
-    await waitFor(() => expect(mocks.apiJsonOrNull).toHaveBeenCalledTimes(2))
+    const session = { ...depotSession(), user: null, authError: new Error('network lost'), retryAuth: vi.fn() }
+    render(<MemoryRouter><Depot session={session} /></MemoryRouter>)
+    await userEvent.setup().click(screen.getByRole('button', { name: copy.tools.pages_DepotValuePage_024 }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('network lost')
+    expect(screen.queryByText(copy.v2.guestAccount.depot)).not.toBeInTheDocument()
+    await userEvent.setup().click(screen.getByRole('button', { name: copy.tools.pages_DepotValuePage_086 }))
+    expect(session.retryAuth).toHaveBeenCalledOnce()
   })
 
   it('defaults sample contribution on, allows opting out before analysis, and renders pricing provenance', async () => {
     const user = userEvent.setup()
-    mocks.apiJsonOrNull.mockResolvedValue(authPayload())
     mocks.apiJson.mockResolvedValue(depotResult())
 
     renderPage()
@@ -119,7 +115,11 @@ describe('DepotValuePage', () => {
 })
 
 function renderPage() {
-  return render(<MemoryRouter><DepotValuePage /></MemoryRouter>)
+  return render(<MemoryRouter><Depot session={depotSession()} /></MemoryRouter>)
+}
+
+function depotSession(payload = authPayload()): V2Session {
+  return { ...payload, authStatus: 'authenticated', authLoading: false, authError: null, activeProfile: payload.profiles![0], applyAuthPayload: vi.fn(), announcementUnreadCount: 0 } as unknown as V2Session
 }
 
 function authPayload(): AuthMeResponse {

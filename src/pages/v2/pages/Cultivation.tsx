@@ -1,15 +1,16 @@
 import { useMemo, useState } from 'react'
 import GuestAccountLink from '../../../components/GuestAccountLink'
+import SklandDataActions from '../../../components/SklandDataActions'
 import { useTaskDraft } from '../../../lib/task-drafts'
 import { useSiteFeatures } from '../../../lib/site-feature-context'
 import { allocateCultivationMaterials } from '../../../lib/cultivation-planner'
 import { matchesSearch } from '../../../lib/search'
-import { RefreshIcon, UndoIcon, ExcludeIcon, NextIcon, ExternalLinkIcon } from '../../../components/icons'
+import { UndoIcon, ExcludeIcon, NextIcon, ExternalLinkIcon } from '../../../components/icons'
 import { copy } from '../../../copy'
 import { AnimatedValue } from '../../../components/MotionPrimitives'
 import { DataRefresh, DataSkeleton } from '../components/DataActivity'
 import { defaultCultivationQuery, type CultivationCandidate, type CultivationData, type CultivationOptions } from '../../../lib/cultivation-contract'
-import { useCultivation } from '../../CultivationPlanPage'
+import { useCultivation } from '../../../hooks/useCultivation'
 import CultivationProjectImport from '../../../components/CultivationProjectImport'
 import { projectFromCultivationCandidate, type CultivationProjectScope } from '../../../lib/cultivation-project-import'
 import { number, CultivationTraining, CultivationEvidence } from '../../cultivation/CultivationResults'
@@ -39,10 +40,10 @@ export default function Cultivation({ session, upgradeSuggestions }: { session: 
       <div className="v2-cultivation-source-controls">
         {session.authStatus === 'authenticated' && m.profiles.length ? <>
           <label className="v2-field"><span>{text.profile}</span><select className="v2-input" value={m.profileId} onChange={(event) => m.setChosenProfile(event.target.value)}>{m.profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.display_name}</option>)}</select></label>
-          <button type="button" className="v2-button v2-button-primary" disabled={m.busy} aria-busy={m.busy} onClick={() => void m.load()}><RefreshIcon size={16} aria-hidden="true" />{copy.skland.refresh}</button>
+          <div className="v2-actions"><SklandDataActions session={session} profile={m.profiles.find((profile) => profile.id === m.profileId)} onRefresh={() => void m.load()} refreshing={m.busy} /></div>
         </> : session.authLoading ? <Loading label={text.loading} /> : session.authStatus === 'error' ? null
           : !session.user ? <GuestAccountLink label={copy.v2.guestAccount.cultivation} description={copy.v2.guestAccount.cultivationHelp} />
-            : <div className="v2-cultivation-access"><p>{text.noProfile}</p><Link className="v2-button v2-button-secondary" to={v2Path('profiles', session.activeProfile?.id)}>{copy.v2.manageProfiles}</Link></div>}
+            : <div className="v2-cultivation-access"><p>{text.noProfile}</p><SklandDataActions session={session} profile={session.activeProfile} /><Link className="v2-button v2-button-secondary" to={v2Path('profiles', session.activeProfile?.id)}>{copy.v2.manageProfiles}</Link></div>}
         {projectScope && <Link className="v2-text-button v2-cultivation-project-link" to={v2Path('cultivation-projects', m.profileId)}>{copy.cultivationProjects.title}<NextIcon size={14} aria-hidden="true" /></Link>}
       </div>
       <div className="v2-data-feedback"><DataRefresh key={m.profileId} pending={m.busy} revision={m.data} error={Boolean(m.error)}

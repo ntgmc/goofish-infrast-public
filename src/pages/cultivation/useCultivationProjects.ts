@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { copy } from '../../copy'
 import { apiJson } from '../../lib/api-client'
 import { useSklandSnapshot } from '../../hooks/useSklandSnapshot'
+import { recordSklandSnapshotError } from '../../lib/skland-snapshot-client'
 import type { CultivationData } from '../../lib/cultivation-contract'
 import { allocateProjectMaterials, buildProjectRoute, projectDaysEarlier, readProjectIncome, validProjectDate, type CultivationProject } from '../../lib/cultivation-projects'
 import { readCultivationProjects, saveCultivationProjects, subscribeCultivationProjects } from '../../lib/cultivation-project-import'
@@ -90,14 +91,17 @@ export function useCultivationProjects(session: V2Session, profile: UserGameAcco
     setPhase(refresh ? 'syncing' : 'calculating')
     setError(null)
     try {
-      if (refresh) await snapshot.refresh()
+      if (refresh && !await snapshot.refresh()) return
       if (controller.signal.aborted) return
       setPhase('calculating')
       const result = await apiJson<CultivationData>('/api/cultivation-plan', { method: 'POST', json: { profile_id: profile.id, projects: nextProjects },
         signal: controller.signal, timeoutMs: 90000, fallbackMessage: text.failed })
       if (!controller.signal.aborted) setData(result)
     } catch (caught) {
-      if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : text.failed)
+      if (!controller.signal.aborted) {
+        recordSklandSnapshotError(userId, profile, caught)
+        setError(caught instanceof Error ? caught.message : text.failed)
+      }
     } finally {
       if (request.current === controller) { request.current = null; setPhase(null) }
     }
@@ -118,7 +122,7 @@ export function useCultivationProjects(session: V2Session, profile: UserGameAcco
     return () => { cancelled = true }
   }, [snapshot.data?.version, snapshot.available, snapshot.expired, busy, projects, data]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { projects, setProjects, data, busy: busy || snapshot.busy, phase: phase ?? (snapshot.busy ? 'syncing' : null), error: error || snapshot.error || null, load, storageError, dailySanity, setDailySanity, startDate, setStartDate, allOpen, setAllOpen,
+  return { projects, setProjects, data, busy: busy || snapshot.busy, phase: phase ?? (snapshot.busy ? 'syncing' : null), error: snapshot.error || error || null, load, storageError, dailySanity, setDailySanity, startDate, setStartDate, allOpen, setAllOpen,
     history, normalId, setNormalId, temporaryId, setTemporaryId, production: currentProduction, productionInvalid, normalIncome, temporaryIncome,
     retryProduction: () => { if (normalId) void normalQuery.refetch({ cancelRefetch: false }); if (temporaryId) void temporaryQuery.refetch({ cancelRefetch: false }) }, validSettings, materials, plans, pendingRefresh }
 }

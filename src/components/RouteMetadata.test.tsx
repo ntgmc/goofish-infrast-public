@@ -82,7 +82,7 @@ describe('RouteMetadata', () => {
     expect(document.head.querySelector<HTMLLinkElement>('link[rel="icon"]')).toHaveAttribute('href', '/assets/maatool-v2-icon.svg')
 
     await act(async () => router.navigate('/v1'))
-    expect(document.title).toBe('MAA 基建排班优化器 | MaaTool · V1')
+    expect(document.title).toBe('MaaTool 工作台')
     expect(metaByName('robots')).toBe('noindex, nofollow')
     expect(document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.href).toBe(currentUrl('/v1'))
 

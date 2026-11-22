@@ -2342,13 +2342,16 @@ export async function getAdminOptimizationQueueSnapshot(
 function adminOptimizationQueueSelect(): string {
   return `select
       job.id, job.status, job.priority, job.permission, job.source,
-      job.attempt_count, job.failure_count, job.worker_id, job.heartbeat_at,
+      job.attempt_count, job.failure_count,
+      coalesce(job.worker_id, case when job.status in ('succeeded', 'failed', 'cancelled', 'dead_lettered') then attempt.worker_id end) as worker_id,
+      job.heartbeat_at,
       job.next_attempt_at, job.expires_at, job.cancel_requested_at,
       job.created_at, job.started_at, job.finished_at, job.updated_at,
       job.failure_kind, job.public_error_code,
       profile.id as profile_id, profile.display_name as profile_display_name,
       account.id as user_id, account.email as user_email
     from optimize_jobs job
+    left join optimize_job_attempts attempt on attempt.job_id = job.id and attempt.attempt_no = job.attempt_count
     left join user_game_accounts profile on profile.id = job.profile_id
     left join user_accounts account on account.id = profile.user_id`
 }

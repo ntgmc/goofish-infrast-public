@@ -32,6 +32,7 @@ import { scenarioComparisonFactorsSchema } from '../optimization/jobs/runtime-co
 import { workspaceAssistantRequestSchema } from '../../src/lib/workspace-assistant'
 import { manualPlansSchema } from '../../src/lib/manual-schedule'
 import { manualScheduleSourceSchema } from '../../src/lib/manual-schedule-tool'
+import { valueClockComparisonRequestSchema } from '../../src/lib/value-clock-comparison'
 
 export const REQUEST_BODY_LIMITS = Object.freeze({
   none: 0,
@@ -149,6 +150,7 @@ export const requestSchemas = {
   depotValue: depotValueRequestSchema,
   adminPublicContentImage: imageUploadSchema,
   scheduleExplanation: strict({ profile_id: shortString(128), result_id: shortString(128), accepted_points: aiAcceptedPointsSchema }),
+  valueClockComparison: valueClockComparisonRequestSchema,
   workspaceAssistant: workspaceAssistantRequestSchema,
   userFeedback: z.union([feedbackRequestSchema, optimizationFailureFeedbackRequestSchema]),
   userFeedbackReply: feedbackReplySchema,
@@ -504,9 +506,10 @@ export const requestSchemas = {
   }),
   sklandProfile: strict({ profile_id: shortString(128) }),
   sklandSnapshotRefresh: strict({ profile_id: shortString(128), force: z.boolean().optional() }),
-  sklandScan: strict({ profile_id: shortString(128), scan_id: shortString(256) }),
+  sklandScan: strict({ profile_id: shortString(128), scan_id: shortString(256), purpose: z.literal('reauthorize').optional() }),
   sklandCredential: strict({
     profile_id: shortString(128),
+    purpose: z.literal('reauthorize').optional(),
     credential_text: z.string().min(1).max(16 * 1024),
     source: z.enum(['manual', 'bookmarklet']).optional(),
   }),
@@ -866,6 +869,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/user/onboarding-tasks/claim', route({ POST: json('standard', requestSchemas.onboardingTaskClaim) })],
   ['/api/user/results', route({ GET: none() }, ['profile_id', 'scope', 'cursor', 'limit'])],
   ['/api/user/schedule-explanation', route({ GET: none(), POST: json('standard', requestSchemas.scheduleExplanation) }, ['profile_id', 'result_id'])],
+  ['/api/user/value-clock/comparisons', route({ GET: none(), POST: json('standard', requestSchemas.valueClockComparison) }, ['profile_id'])],
   ['/api/user/workspace-assistant', route({ GET: none(), POST: json('standard', requestSchemas.workspaceAssistant) }, ['profile_id', 'task'])],
   ['/api/user/maa-export', route({ POST: json('standard', requestSchemas.maaExport) })],
   ['/api/user/full-result-export', route({ POST: json('standard', requestSchemas.fullResultExport) })],

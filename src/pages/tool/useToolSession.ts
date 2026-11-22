@@ -16,7 +16,7 @@ import { normalizeConfig, validateScheduleConfig } from '../../lib/config'
 import { createAccountLicense, isSchedulableProfile } from './tool-utils'
 import { usePublicAnnouncementsQuery } from '../../lib/announcement-query'
 import { copy } from '../../copy/index'
-import { syncSklandSnapshotSession } from '../../lib/skland-snapshot-client'
+import { resetSklandProfileSnapshot, syncSklandSnapshotSession } from '../../lib/skland-snapshot-client'
 import { useTaskDraft } from '../../lib/task-drafts'
 import { canonicalJson } from '../../lib/crypto'
 
@@ -118,6 +118,36 @@ export function useToolSession(requestedProfileId?: string | null, rememberLastP
     setAuthError(null)
     setAuthStatus(payload ? 'authenticated' : 'anonymous')
   }, [applyAuthPayloadInternal, invalidateWorkspaceRequest])
+
+  const applySklandAuthorizationPayload = useCallback((payload: AuthSuccessResponse) => {
+    if (payload.user.id !== user?.id) return
+    syncSklandSnapshotSession(payload)
+    setProfiles(payload.profiles)
+    setActiveProfile((current) => payload.profiles.find((profile) => profile.id === current?.id) ?? current)
+  }, [user?.id])
+
+  useEffect(() => {
+    if (!user || typeof BroadcastChannel === 'undefined') return
+    const channel = new BroadcastChannel('maatool:skland-snapshot')
+    let request: AbortController | undefined
+    channel.onmessage = (event: MessageEvent<unknown>) => {
+      const value = event.data as { authorization?: { userId?: unknown; profileId?: unknown } } | null
+      const changed = value?.authorization
+      if (changed?.userId !== user.id || typeof changed.profileId !== 'string') return
+      request?.abort()
+      const controller = new AbortController()
+      request = controller
+      const currentId = activeProfileRef.current?.id
+      void apiJson<AuthSuccessResponse>(`/api/auth/me${currentId ? `?profile_id=${encodeURIComponent(currentId)}` : ''}`, { signal: controller.signal })
+        .then((payload) => {
+          if (controller.signal.aborted || payload.user?.id !== user.id) return
+          applySklandAuthorizationPayload(payload)
+          const profile = payload.profiles.find((profile) => profile.id === changed.profileId)
+          if (profile?.skland_binding?.credential_status === 'available') resetSklandProfileSnapshot(user.id, profile)
+        }).catch(() => undefined)
+    }
+    return () => { request?.abort(); channel.close() }
+  }, [user?.id, applySklandAuthorizationPayload]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const retryAuth = useCallback(() => {
     setAuthError(null)
@@ -358,6 +388,7 @@ export function useToolSession(requestedProfileId?: string | null, rememberLastP
     openingProfileId,
     workspaceLoadError,
     applyAuthPayload,
+    applySklandAuthorizationPayload,
     refreshProfileWorkspace,
     applyWorkspaceSnapshot,
     persistWorkspacePatch,

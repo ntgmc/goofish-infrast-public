@@ -7,7 +7,8 @@ import { CONFIG_PRESETS, normalizeConfig } from '../lib/config'
 import { createBlankManualSchedule } from '../lib/manual-schedule-tool'
 import { getFacilityIds } from '../lib/facility-layout'
 import type { UserGameAccount } from '../lib/types'
-import ManualSchedulePage from './ManualSchedulePage'
+import { ManualTool } from './v2/pages/Tools'
+import type { V2Session } from './v2/OptionsDrawer'
 import { copy } from '../copy/index'
 
 const mocks = vi.hoisted(() => ({ session: vi.fn(), submit: vi.fn(), snapshot: vi.fn() }))
@@ -38,7 +39,7 @@ beforeEach(() => {
   mocks.snapshot.mockResolvedValue({ status: 'succeeded', result: { ...createBlankManualSchedule(config), total_efficiency: 175 } })
 })
 afterEach(cleanup)
-const page = () => render(<MemoryRouter><ManualSchedulePage /></MemoryRouter>)
+const page = () => render(<MemoryRouter><ManualTool session={mocks.session() as V2Session} onDirtyChange={vi.fn()} onOpenProfile={vi.fn()} onNavigate={vi.fn()} /></MemoryRouter>)
 
 async function chooseFiammetta(user: ReturnType<typeof userEvent.setup>, name: string) {
   await user.click(screen.getByRole('button', { name: '恢复心情对象' }))
@@ -244,7 +245,7 @@ describe('manual schedule tool', () => {
     expect(screen.getByText(/请先在此档案中导入干员/)).toBeVisible()
     await userEvent.setup().click(screen.getByText(copy.tools.manualSchedule.blankSettings))
     expect(screen.getByRole('button', { name: '从零开始排班' })).toBeDisabled()
-    expect(within(screen.getByRole('main')).getByRole('link', { name: '前往导入干员' }))
-      .toHaveAttribute('href', '/tool/setup/operators?profile_id=manual-profile')
+    expect(screen.getByRole('link', { name: copy.tools.manualSchedule.setup }))
+      .toHaveAttribute('href', '/v2?profile_id=manual-profile&panel=operators')
   })
 })

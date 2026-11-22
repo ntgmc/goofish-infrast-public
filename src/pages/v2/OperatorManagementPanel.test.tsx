@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { SklandPayload } from '../../components/SklandBindingDialog'
 import { copy } from '../../copy'
 import { ApiError, apiJson } from '../../lib/api-client'
+import { syncSklandSnapshotSession } from '../../lib/skland-snapshot-client'
 import { DEFAULT_SITE_FEATURES } from '../../lib/site-features'
 import { MotionPreferenceProvider } from '../../lib/motion-preference'
 import OperatorManagementPanel from './OperatorManagementPanel'
@@ -29,8 +30,9 @@ beforeEach(() => {
     } },
     flushConfigSave: vi.fn(async () => true), applyAuthPayload: vi.fn(), setConfigOverride: vi.fn(),
   } as unknown as V2Session
+  syncSklandSnapshotSession({ user: session.user!, profiles: [session.activeProfile!] })
 })
-afterEach(() => { cleanup(); vi.restoreAllMocks() })
+afterEach(() => { cleanup(); syncSklandSnapshotSession(null); vi.restoreAllMocks() })
 
 function panel(operators = SAMPLE_OPERATORS, onImportOperators = vi.fn(async () => undefined)) {
   return <MotionPreferenceProvider><OperatorManagementPanel key={session.activeProfile!.id} session={session}

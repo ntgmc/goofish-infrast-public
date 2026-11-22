@@ -12,7 +12,7 @@
 | 查找 V2 页面、购买配置和后台入口 | [V2 工作台与管理后台](v2-workspace.md) |
 | 修改界面文案和付费能力预览 | [文案目录](../src/copy/README.md)、[产品文案](product-copy.md) |
 | 维护前端请求与缓存 | [查询缓存](frontend-queries.md)、[列表交互性能](frontend-performance.md) |
-| 开发基建价值大屏（待实现方案） | [价值时钟与共享账本](value-clock-handoff.md)、[优化增益时钟](optimization-gain-clock-handoff.md) |
+| 维护基建价值与优化增益大屏（增益当前关闭） | [价值时钟与共享账本](value-clock-handoff.md)、[优化增益时钟](optimization-gain-clock-handoff.md) |
 | 开发资源流水线与观察窗口（待实现方案） | [全站基建工厂](production-factory-handoff.md)、[围观价值窗口](value-window-handoff.md) |
 
 ## 功能与数据
@@ -35,7 +35,7 @@
 | 选择测试和完成检查 | [验证规范](agent-validation.md) |
 | 放置和维护文档 | [README 与文档规范](readme-guidelines.md) |
 | 修改后台操作、权限与并发校验 | [管理操作约定](admin-operations.md) |
-| 核对运营指标和工具事件 | [运营统计](operations-overview.md)、[工具操作观测](tool-behavior-observation.md) |
+| 核对运营指标 | [运营统计](operations-overview.md) |
 | 定位慢请求、SQL 与运行时开销 | [性能观测](performance-observation.md) |
 | 部署反向代理 | [Nginx 配置](nginx-deployment.md) |
 | 发布和验证产物 | [发布工件](release-artifacts.md) |

@@ -6,14 +6,12 @@ import { CONFIG_PRESETS, normalizeConfig } from '../../../lib/config'
 import { getFacilityIds } from '../../../lib/facility-layout'
 import type { AuthSuccessResponse, OptimizeJobAccepted, UserGameAccount, UserWorkspace, WorkspaceResultHistoryItem, WorkspaceResultHistorySummary } from '../../../lib/types'
 import { copy } from '../../../copy'
-import { tourStorageKey } from '../../../components/GuidedTour'
 import { SCHEDULE_PROGRESS_COMPLETION_DURATION_MS } from '../../../components/ScheduleProgress'
 import { useToolSession } from '../useToolSession'
 import { createAccountLicense } from '../tool-utils'
 import Comparison from '../../v2/pages/Comparison'
 import type { V2Workflow } from '../../v2/WorkspaceSections'
 import { SAMPLE_RESULT } from '../../v2/test-fixtures/sample-252'
-import OptimizeWorkflowPage from './OptimizeWorkflowPage'
 import { useOptimizeWorkflow, type Props } from './useOptimizeWorkflow'
 import { buildOptimizeJobStorageKey, writeActiveOptimizeJob } from './job-progress'
 import { buildOptimizeSignature } from './workflow-utils'
@@ -81,11 +79,9 @@ it.each(['late', 'ordered', 'view', 'leave'])('keeps the latest history choice a
   }
 })
 
-it.each(['V1', 'V2'])('requires explicit coupon selection in %s and preserves included entitlements', async (version) => {
+it('requires explicit coupon selection and preserves included entitlements', async () => {
   for (const permission of ['recommended', 'advanced'] as const) {
     const requests: Array<{ use_items?: string[] }> = []
-    localStorage.setItem(tourStorageKey('optimize-overview', 2), 'done')
-    localStorage.setItem(tourStorageKey('optimize-tab-lab', 1), 'done')
     vi.stubGlobal('fetch', vi.fn(async (input, init) => {
       if (String(input) === '/api/optimization/jobs' && init?.method === 'POST') {
         requests.push(JSON.parse(String(init.body)))
@@ -97,8 +93,8 @@ it.each(['V1', 'V2'])('requires explicit coupon selection in %s and preserves in
     const hook = renderHook(() => useOptimizeWorkflow(props))
     await waitFor(() => expect(hook.result.current.inventoryLoaded).toBe(true))
     expect(hook.result.current.scenarioCouponRequired).toBe(permission === 'recommended')
-    const page = render(<MemoryRouter>{version === 'V1' ? <OptimizeWorkflowPage {...props} /> : <Comparison workflow={hook.result.current as V2Workflow} onConfig={() => {}} />}</MemoryRouter>)
-    const run = await screen.findByRole('button', { name: version === 'V2' ? copy.v2.comparison.run : new RegExp(copy.optimize.pages_tool_optimize_ScenarioLabSection_011) })
+    const page = render(<MemoryRouter><Comparison workflow={hook.result.current as V2Workflow} onConfig={() => {}} /></MemoryRouter>)
+    const run = await screen.findByRole('button', { name: copy.v2.comparison.run })
     if (permission === 'recommended') {
       expect(run).toBeDisabled()
       const coupon = screen.getByRole('checkbox', { name: new RegExp(copy.inventory.scenario_coupon) })

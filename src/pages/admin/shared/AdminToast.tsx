@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 
 const DEFAULT_DURATION_MS = 5000
 
@@ -17,7 +18,7 @@ export function AdminToast({ message, onDismiss, duration = DEFAULT_DURATION_MS 
     return () => window.clearTimeout(timeout)
   }, [duration, message])
 
-  return (
+  return createPortal(
     <div
       className="admin-toast pointer-events-none fixed inset-x-4 top-4 z-[70] flex justify-center sm:inset-x-auto sm:right-6 sm:top-6"
       role="status"
@@ -36,6 +37,7 @@ export function AdminToast({ message, onDismiss, duration = DEFAULT_DURATION_MS 
           <span aria-hidden="true">×</span>
         </button>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

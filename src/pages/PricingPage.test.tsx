@@ -1,107 +1,71 @@
 // @vitest-environment jsdom
-import '@testing-library/jest-dom/vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_SITE_FEATURES } from '../lib/site-features'
-
-const featureState = vi.hoisted(() => ({
-  status: 'ready' as 'loading' | 'ready' | 'error',
-  meteredBilling: true,
-}))
-vi.mock('../lib/site-feature-context', () => ({
-  useSiteFeatures: () => ({ status: featureState.status, features: { ...DEFAULT_SITE_FEATURES, metered_billing: featureState.meteredBilling }, updatedAt: null, retry: vi.fn() }),
-}))
+import { copy } from '../copy'
 import PricingPage from './PricingPage'
 import { cloneDefaultPublicContentSettings, PUBLIC_PRICING_PLAN_IDS } from '../lib/public-content'
 import * as publicContentContext from '../lib/public-content-context'
 
-afterEach(() => {
-  cleanup()
-  vi.restoreAllMocks()
-  featureState.status = 'ready'
-  featureState.meteredBilling = true
+const featureState = vi.hoisted(() => ({ status: 'ready', meteredBilling: true }))
+vi.mock('../lib/site-feature-context', () => ({
+  useSiteFeatures: () => ({ status: featureState.status, features: { ...DEFAULT_SITE_FEATURES, metered_billing: featureState.meteredBilling }, updatedAt: null, retry: vi.fn() }),
+}))
+let content = cloneDefaultPublicContentSettings()
+beforeEach(() => {
+  content = cloneDefaultPublicContentSettings()
+  vi.spyOn(publicContentContext, 'usePublicContent').mockImplementation(() => ({ content, status: 'ready', isFallback: false, refresh: async () => undefined }))
 })
+afterEach(() => { cleanup(); vi.restoreAllMocks(); featureState.status = 'ready'; featureState.meteredBilling = true })
 
-describe('PricingPage', () => {
-  it('uses the configured manual upgrade listing and disables it when cleared', () => {
-    const content = cloneDefaultPublicContentSettings()
+const text = copy.public
+
+describe('public V2 pricing', () => {
+  it('opens the configured upgrade listing and disables purchases when cleared', () => {
     content.pricing.lifetime_upgrade = { ...content.pricing.lifetime_upgrade, purchase_url: 'https://example.com/lifetime-upgrade', service_fee: '5 元' }
-    vi.spyOn(publicContentContext, 'usePublicContent').mockReturnValue({
-      content,
-      status: 'ready',
-      isFallback: false,
-      refresh: async () => undefined,
-    })
-
-    const { rerender } = render(<MemoryRouter><PricingPage /></MemoryRouter>)
-    const link = screen.getByRole('link', { name: '前往闲鱼补差价' })
-    expect(link).toHaveAttribute('href', 'https://example.com/lifetime-upgrade')
-    expect(link).toHaveAttribute('target', '_blank')
-    expect(link).toHaveAttribute('rel', 'noopener noreferrer')
-    expect(screen.getByText(/另收 5 元手续费/)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: '提交反馈确认补款' })).toHaveAttribute('href', '/support')
-
+    const page = render(<MemoryRouter><PricingPage /></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: text.pricing_upgrade_purchase }))
+    const dialog = within(screen.getByRole('dialog'))
+    expect(dialog.getByRole('link', { name: text.purchase.open })).toHaveAttribute('href', 'https://example.com/lifetime-upgrade')
+    expect(dialog.getByRole('link', { name: text.purchase.open })).toHaveAttribute('rel', 'noopener noreferrer')
+    expect(dialog.getByText(/另收 5 元手续费/)).toBeInTheDocument()
+    expect(dialog.getByRole('link', { name: text.pricing_upgrade_contact })).toHaveAttribute('href', '/v2?section=support')
+    fireEvent.click(screen.getByRole('button', { name: copy.v2.close }))
     content.pricing.lifetime_upgrade.purchase_url = ''
-    rerender(<MemoryRouter><PricingPage /></MemoryRouter>)
-    expect(screen.queryByRole('link', { name: '前往闲鱼补差价' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '升级商品待上架' })).toBeDisabled()
+    page.rerender(<MemoryRouter><PricingPage /></MemoryRouter>)
+    expect(screen.getByRole('button', { name: text.pricing_upgrade_unavailable })).toBeDisabled()
   })
 
-  it('shows automatic archive gifts and disables unconfigured purchases without using the global purchase URL', () => {
+  it('keeps archive gifts and unavailable purchase states visible', () => {
     render(<MemoryRouter><PricingPage /></MemoryRouter>)
-    const buttons = screen.getAllByRole('button', { name: '暂未开放购买' })
-    expect(buttons).toHaveLength(4)
-    buttons.forEach((button) => {
-      expect(button).toBeDisabled()
-    })
-    expect(screen.getAllByText('赠送 1 个封存资格，绑定后自动生效，续费不叠加。')).toHaveLength(3)
-    expect(screen.getByText('赠送 3 个封存资格，绑定后自动生效。')).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: text.pricing_purchase_unavailable })).toHaveLength(4)
+    expect(screen.getAllByText(text.pricing_cards.archive_gift(1)).length).toBeGreaterThanOrEqual(3)
+    expect(screen.getAllByText(text.pricing_cards.archive_gift(3)).length).toBeGreaterThanOrEqual(1)
   })
 
-  it('links each plan to its purchase and redemption with nearby terms, disabling only cleared purchases', () => {
-    const content = cloneDefaultPublicContentSettings()
+  it('opens each configured plan with purchase terms and V2 redemption', () => {
     const ids = PUBLIC_PRICING_PLAN_IDS.filter((id) => id !== 'free_preview')
-    const labels = ['购买 30 天', '购买 90 天', '购买 365 天', '购买终身卡']
     ids.forEach((id) => { content.pricing.plans[id].purchase_url = `https://example.com/${id}` })
-    vi.spyOn(publicContentContext, 'usePublicContent').mockReturnValue({
-      content, status: 'ready', isFallback: false, refresh: async () => undefined,
-    })
-    const { rerender } = render(<MemoryRouter><PricingPage /></MemoryRouter>)
-    ids.forEach((id, index) => {
-      const link = screen.getByRole('link', { name: labels[index] })
+    render(<MemoryRouter><PricingPage /></MemoryRouter>)
+    for (const id of ids) {
+      const button = screen.getByRole('button', { name: text.pricing_purchase_labels[id] })
+      expect(button).toHaveAccessibleDescription(expect.stringContaining(content.pricing.plans[id].account_scope))
+      fireEvent.click(button)
+      const dialog = within(screen.getByRole('dialog'))
+      const link = dialog.getByRole('link', { name: text.purchase.open })
       expect(link).toHaveAttribute('href', `https://example.com/${id}`)
       expect(link).toHaveAttribute('target', '_blank')
       expect(link).toHaveAttribute('rel', 'noopener noreferrer')
-      expect(link).toHaveAccessibleDescription(expect.stringContaining(content.pricing.plans[id].account_scope))
-      expect(link).toHaveAccessibleDescription(expect.stringContaining('权益在兑换成功后生效，限时方案随即开始连续计时。'))
-    })
-    const redemptionLinks = screen.getAllByRole('link', { name: '已有 CDK，去兑换' })
-    expect(redemptionLinks).toHaveLength(4)
-    redemptionLinks.forEach((link) => expect(link).toHaveAttribute('href', '/tool/redeem?mode=cdk'))
-    content.pricing.plans.single_account_half_year.purchase_url = ''
-    rerender(<MemoryRouter><PricingPage /></MemoryRouter>)
-    expect(screen.queryByRole('link', { name: '购买 90 天' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '暂未开放购买' })).toBeDisabled()
-    expect(screen.getByRole('link', { name: '购买 30 天' })).toBeInTheDocument()
+      expect(dialog.getByRole('link', { name: text.purchase.redeem_action })).toHaveAttribute('href', '/v2?section=add-account&mode=cdk')
+      fireEvent.click(screen.getByRole('button', { name: copy.v2.close }))
+    }
   })
 
-  it('removes the entire metered section when metered billing is closed', () => {
-    featureState.meteredBilling = false
-    render(<MemoryRouter><PricingPage /></MemoryRouter>)
-    expect(screen.queryByRole('heading', { name: '按次排班' })).not.toBeInTheDocument()
-    expect(screen.queryByText('1200–1800 积分/次')).not.toBeInTheDocument()
-    expect(screen.queryByText(/按次档案包含高级版单次结果/)).not.toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: '积分如何扣除' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('table', { name: '商用等级与单次费用' })).not.toBeInTheDocument()
-  })
-
-  it.each(['loading', 'error', 'ready'] as const)('does not restore retired pricing with a stale enabled setting while %s', (status) => {
+  it.each(['loading', 'error', 'ready'])('keeps retired metered billing closed while %s', (status) => {
     featureState.status = status
     render(<MemoryRouter><PricingPage /></MemoryRouter>)
     expect(screen.queryByText(/积分|商用版|按次排班|按次计费/)).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '个人维护方案' })).toBeInTheDocument()
-    expect(screen.queryByText('1200–1800 积分/次')).not.toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: '商用版规则' })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: text.pricing_choice.intro })).toBeInTheDocument()
   })
 })

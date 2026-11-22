@@ -90,6 +90,7 @@ type UseSklandBindingOptions = {
     note?: string
   }
   autoStart?: boolean
+  purpose?: 'reauthorize'
   onOpenChange: (open: boolean) => void
   onPayload: (payload: SklandPayload) => void
   onCompleted?: (payload: SklandPayload) => void
@@ -104,6 +105,7 @@ export function useSklandBinding({
   context = 'workspace',
   claimProfileMeta,
   autoStart = false,
+  purpose,
   onOpenChange,
   onPayload,
   onCompleted,
@@ -234,7 +236,7 @@ export function useSklandBinding({
       const data = await apiJson<SklandPayload>(`${endpointPrefix}/login/complete`, {
         method: 'POST',
         signal: flow.signal,
-        json: { ...profilePayload(), scan_id: scanId },
+        json: { ...profilePayload(), ...(purpose && { purpose }), scan_id: scanId },
         fallbackMessage: copy.workspace.hooks_useSklandBinding_005,
       })
       if (!isCurrentFlow(flow.generation)) return
@@ -260,7 +262,7 @@ export function useSklandBinding({
     } finally {
       if (isCurrentFlow(flow.generation)) setBusy(false)
     }
-  }, [applyCompletedPayload, busy, captureFlow, endpointPrefix, isCurrentFlow, isDepot, isProfilelessBinding, profile, profilePayload, showPayloadState])
+  }, [applyCompletedPayload, busy, captureFlow, endpointPrefix, isCurrentFlow, isDepot, isProfilelessBinding, profile, profilePayload, purpose, showPayloadState])
 
   const startSklandLogin = useCallback(async () => {
     if (!profile && !isProfilelessBinding) {
@@ -363,7 +365,7 @@ export function useSklandBinding({
       const data = await apiJson<SklandPayload>(`${endpointPrefix}/credential/preview`, {
         method: 'POST',
         signal: flow.signal,
-        json: { ...profilePayload(), credential_text: credentialText, source },
+        json: { ...profilePayload(), ...(purpose && { purpose }), credential_text: credentialText, source },
         fallbackMessage: copy.workspace.hooks_useSklandBinding_018,
       })
       if (!isCurrentFlow(flow.generation)) return
@@ -381,7 +383,7 @@ export function useSklandBinding({
     } finally {
       if (isCurrentFlow(flow.generation)) setBusy(false)
     }
-  }, [endpointPrefix, invalidateFlow, isCurrentFlow, isDepot, isProfilelessBinding, profile, profilePayload, showPayloadState])
+  }, [endpointPrefix, invalidateFlow, isCurrentFlow, isDepot, isProfilelessBinding, profile, profilePayload, purpose, showPayloadState])
 
   const selectAccount = useCallback((uid: string) => {
     setSklandLogin((current) => ({ ...current, selectedUid: uid }))
@@ -426,7 +428,7 @@ export function useSklandBinding({
     setSklandLogin((current) => ({
       ...current,
       status: 'importing',
-      message: isDepot ? copy.workspace.hooks_useSklandBinding_025 : copy.workspace.hooks_useSklandBinding_026,
+      message: purpose ? copy.skland.authorizing : isDepot ? copy.workspace.hooks_useSklandBinding_025 : copy.workspace.hooks_useSklandBinding_026,
     }))
     try {
       const data = await apiJson<SklandPayload>(`${endpointPrefix}/login/confirm`, {
@@ -451,19 +453,19 @@ export function useSklandBinding({
         confirmationId: null,
         preview: null,
         status: 'imported',
-        message: formatImportedMessage(data, isDepot),
+        message: purpose ? copy.skland.authorized : formatImportedMessage(data, isDepot),
       }))
     } catch (caught) {
       if (!isCurrentFlow(flow.generation) || isAbortError(caught)) return
       setSklandLogin((current) => ({
         ...current,
         status: 'error',
-        message: errorWithRecovery(caught, isDepot ? copy.workspace.hooks_useSklandBinding_029 : copy.workspace.hooks_useSklandBinding_030),
+        message: errorWithRecovery(caught, purpose ? copy.skland.authorizationFailed : isDepot ? copy.workspace.hooks_useSklandBinding_029 : copy.workspace.hooks_useSklandBinding_030),
       }))
     } finally {
       if (isCurrentFlow(flow.generation)) setBusy(false)
     }
-  }, [applyCompletedPayload, captureFlow, endpointPrefix, isCurrentFlow, isDepot, isProfilelessBinding, profile, profileReferencePayload, sklandLogin.confirmationId])
+  }, [applyCompletedPayload, captureFlow, endpointPrefix, isCurrentFlow, isDepot, isProfilelessBinding, profile, profileReferencePayload, purpose, sklandLogin.confirmationId])
 
   const cancelPending = useCallback(() => {
     const pendingId = sklandLogin.confirmationId ?? sklandLogin.selectionId
