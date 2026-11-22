@@ -1,6 +1,6 @@
 {
-  "version": "2026-11-20.2",
-  "evaluatedAt": "2026-11-20",
+  "version": "2026-11-22.6",
+  "evaluatedAt": "2026-11-22",
   "snapshot": {
     "game": "63c7cec73c3858d0ae913f85cc89af3cef4d744f",
     "assets": "3fc3d11079a66f30c19f919ed78c53d0fcd527db"
@@ -10,6 +10,26 @@
       "label": "游戏基建技能快照",
       "url": "https://github.com/Kengxxiao/ArknightsGameData/tree/63c7cec73c3858d0ae913f85cc89af3cef4d744f/zh_CN/gamedata/excel",
       "use": "技能效果与解锁条件"
+    },
+    {
+      "label": "PRTS 会客室机制",
+      "url": "https://prts.wiki/w/罗德岛基建/会客室",
+      "use": "进驻、稀有度和精英阶段的搜集速度加成"
+    },
+    {
+      "label": "PRTS 晓歌",
+      "url": "https://prts.wiki/w/晓歌",
+      "use": "补缺倾向的技能原文；未披露命中概率与同类叠加算法"
+    },
+    {
+      "label": "PRTS 信仰搅拌机",
+      "url": "https://prts.wiki/w/信仰搅拌机",
+      "use": "菲亚梅塔宿舍支援条件"
+    },
+    {
+      "label": "一图流会客室公开实现",
+      "url": "https://github.com/Arknights-yituliu/frontend-v2-plus/blob/275fbbb6424683493adb2bfca5043d6eba29b178/src/utils/mower/theoretical-output/engine/engine/supportFacilities/receptionClues.ts",
+      "use": "交叉核对星级、精英阶段与涣散成员的被动加成；不作为线索概率实测"
     }
   ],
   "reviews": [
@@ -2506,9 +2526,9 @@
       "skills": [
         "workshop_formula_rub[000]"
       ],
-      "score": 90,
+      "score": 82,
       "usage": "低级精英材料",
-      "reason": "原始2心情精英配方额外40%与自身50%合计90%，适合大量低级材料加工。",
+      "reason": "原始2心情精英配方额外40%与自身50%合计90%，适合大量低级材料；其余配方仍只有50%，日常覆盖受限。",
       "conditions": "",
       "provisional": false
     },
@@ -2596,9 +2616,9 @@
       "skills": [
         "hire_spd_cost[200]"
       ],
-      "score": 76,
+      "score": 86,
       "usage": "公开招募",
-      "reason": "联络速度与心情续航共同评价；额外消耗会缩短有效工作时长，减耗有利于长期值班。",
+      "reason": "45%联络速度属于高效主力，按8小时换班使用，额外心情消耗只小幅影响续航便利。",
       "conditions": "",
       "provisional": false
     },
@@ -2616,9 +2636,9 @@
       "skills": [
         "workshop_formula_device[060]"
       ],
-      "score": 80,
+      "score": 72,
       "usage": "定向材料",
-      "reason": "指定材料的高副产品率，适合该材料需求集中时使用；覆盖范围小于通用加工技能。",
+      "reason": "酮凝集类配方副产品加成80%，适合集中加工该类材料；日常评分计入其余精英配方无加成的限制。",
       "conditions": "仅限技能描述指定材料。",
       "provisional": false
     },
@@ -2646,9 +2666,9 @@
       "skills": [
         "workshop_formula_device[000]"
       ],
-      "score": 85,
+      "score": 80,
       "usage": "定向材料",
-      "reason": "指定材料的高副产品率，适合该材料需求集中时使用；覆盖范围小于通用加工技能。",
+      "reason": "装置类配方副产品加成90%，适合集中加工装置；覆盖范围小于全部精英材料80%的选择。",
       "conditions": "仅限技能描述指定材料。",
       "provisional": false
     },
@@ -2696,30 +2716,30 @@
       "skills": [
         "meet_spd&cost_condChar[001]"
       ],
-      "score": 15,
+      "score": 10,
       "usage": "独处线索",
-      "reason": "要求单人在会客室工作且消耗较高，需和双人正常值班比较，不能只看个人速度。",
-      "conditions": "只按独处场景评价；线索必得效果需满足额外连续工作条件。",
+      "reason": "15%加速要求另一成员不工作；可保留涣散搭档的星级与精英加成，但失去其正常进驻5%与技能速度。",
+      "conditions": "仅自身处于工作状态时生效。",
       "provisional": false
     },
     {
       "skills": [
         "meet_spd&cost_condChar[011]"
       ],
-      "score": 45,
+      "score": 25,
       "usage": "独处线索",
-      "reason": "要求单人在会客室工作且消耗较高，需和双人正常值班比较，不能只看个人速度。",
-      "conditions": "只按独处场景评价；线索必得效果需满足额外连续工作条件。",
+      "reason": "35%独处加速可配涣散搭档，保留其星级与精英加成；仍损失第二人正常进驻5%与技能速度。",
+      "conditions": "仅自身处于工作状态时生效。",
       "provisional": false
     },
     {
       "skills": [
         "meet_spd&condChar_mustget[100]"
       ],
-      "score": 80,
+      "score": 35,
       "usage": "定向线索",
-      "reason": "满足连续消耗门槛后可定向补线索，解决指定线索短缺；周期长、需要独处。",
-      "conditions": "不能在8小时短班中默认触发；需连续消耗超过16心情。",
+      "reason": "达到连续心情消耗门槛后可保证下一条为罗德岛线索；另一成员需不工作，涣散搭档仍可提供星级与精英加成。",
+      "conditions": "仅自身工作，连续消耗超过16点心情后，下一次线索必定为罗德岛。",
       "provisional": false
     },
     {
@@ -2756,9 +2776,9 @@
       "skills": [
         "workshop_formula_device[030]"
       ],
-      "score": 85,
+      "score": 80,
       "usage": "定向材料",
-      "reason": "指定材料的高副产品率，适合该材料需求集中时使用；覆盖范围小于通用加工技能。",
+      "reason": "聚酸酯类配方副产品加成90%，适合集中加工聚酸酯；覆盖范围小于全部精英材料80%的选择。",
       "conditions": "仅限技能描述指定材料。",
       "provisional": false
     },
@@ -2816,30 +2836,30 @@
       "skills": [
         "meet_spd&cost_condChar[020]"
       ],
-      "score": 15,
+      "score": 10,
       "usage": "独处线索",
-      "reason": "要求单人在会客室工作且消耗较高，需和双人正常值班比较，不能只看个人速度。",
-      "conditions": "只按独处场景评价；线索必得效果需满足额外连续工作条件。",
+      "reason": "15%加速要求另一成员不工作；可保留涣散搭档的星级与精英加成，但失去其正常进驻5%与技能速度。",
+      "conditions": "仅自身处于工作状态时生效。",
       "provisional": false
     },
     {
       "skills": [
         "meet_spd&cost_condChar[021]"
       ],
-      "score": 45,
+      "score": 25,
       "usage": "独处线索",
-      "reason": "要求单人在会客室工作且消耗较高，需和双人正常值班比较，不能只看个人速度。",
-      "conditions": "只按独处场景评价；线索必得效果需满足额外连续工作条件。",
+      "reason": "35%独处加速可配涣散搭档，保留其星级与精英加成；仍损失第二人正常进驻5%与技能速度。",
+      "conditions": "仅自身处于工作状态时生效。",
       "provisional": false
     },
     {
       "skills": [
         "meet_spd&cost_condChar[000]"
       ],
-      "score": 50,
+      "score": 40,
       "usage": "独处线索",
-      "reason": "要求单人在会客室工作且消耗较高，需和双人正常值班比较，不能只看个人速度。",
-      "conditions": "只按独处场景评价；线索必得效果需满足额外连续工作条件。",
+      "reason": "50%独处加速可配涣散搭档，保留其星级与精英加成；按完整一班、额外心情消耗和整站速度评价。",
+      "conditions": "仅自身处于工作状态时生效。",
       "provisional": false
     },
     {
@@ -2866,9 +2886,9 @@
       "skills": [
         "manu_formula_spd&cost[001]"
       ],
-      "score": 54,
+      "score": 58,
       "usage": "赤金",
-      "reason": "生产力可用，但额外心情消耗降低持续工作表现，同档无代价技能更优。",
+      "reason": "25%赤金生产力适合正常轮班，额外0.25心情消耗只小幅影响续航。",
       "conditions": "",
       "provisional": false
     },
@@ -2906,9 +2926,9 @@
       "skills": [
         "workshop_formula_device[070]"
       ],
-      "score": 80,
+      "score": 72,
       "usage": "定向材料",
-      "reason": "指定材料的高副产品率，适合该材料需求集中时使用；覆盖范围小于通用加工技能。",
+      "reason": "晶体类配方副产品加成80%，适合集中加工晶体；日常评分计入其余精英配方无加成的限制。",
       "conditions": "仅限技能描述指定材料。",
       "provisional": false
     },
@@ -3036,9 +3056,9 @@
       "skills": [
         "manu_prod_spd&limit&cost[100]"
       ],
-      "score": 43,
+      "score": 46,
       "usage": "通用生产",
-      "reason": "生产力可用，但额外心情消耗降低持续工作表现，同档无代价技能更优。",
+      "reason": "20%生产力适合常规补班，额外0.25心情消耗只小幅影响续航。",
       "conditions": "",
       "provisional": false
     },
@@ -3086,9 +3106,9 @@
       "skills": [
         "workshop_formula_device[021]"
       ],
-      "score": 85,
+      "score": 75,
       "usage": "定向材料",
-      "reason": "指定材料的高副产品率，适合该材料需求集中时使用；覆盖范围小于通用加工技能。",
+      "reason": "90%副产品加成只限异铁组这一配方，适合集中需求；材料覆盖比整个异铁系列更窄。",
       "conditions": "仅限技能描述指定材料。",
       "provisional": false
     },
@@ -3133,9 +3153,9 @@
       "skills": [
         "manu_formula_spd&limit&cost[100]"
       ],
-      "score": 82,
+      "score": 85,
       "usage": "经验",
-      "reason": "35%经验生产力突出，额外心情消耗要求及时安排轮休。",
+      "reason": "35%经验生产力属于高效主力，正常轮休下，额外0.25心情消耗只小幅影响评级。",
       "conditions": "",
       "provisional": false
     },
@@ -3163,9 +3183,9 @@
       "skills": [
         "workshop_formula_device[020]"
       ],
-      "score": 85,
+      "score": 80,
       "usage": "定向材料",
-      "reason": "指定材料的高副产品率，适合该材料需求集中时使用；覆盖范围小于通用加工技能。",
+      "reason": "异铁类配方副产品加成90%，适合集中加工异铁；覆盖范围小于全部精英材料80%的选择。",
       "conditions": "仅限技能描述指定材料。",
       "provisional": false
     },
@@ -3213,9 +3233,9 @@
       "skills": [
         "manu_prod_spd&limit&cost[101]"
       ],
-      "score": 43,
+      "score": 46,
       "usage": "通用生产",
-      "reason": "生产力可用，但额外心情消耗降低持续工作表现，同档无代价技能更优。",
+      "reason": "20%生产力适合常规补班，额外0.25心情消耗只小幅影响续航。",
       "conditions": "",
       "provisional": false
     },
@@ -3223,9 +3243,9 @@
       "skills": [
         "manu_prod_spd&limit&cost[110]"
       ],
-      "score": 68,
+      "score": 70,
       "usage": "通用生产",
-      "reason": "30%生产力是有效补班选择，额外心情消耗使续航略逊于无代价30%干员。",
+      "reason": "30%生产力可作为制造主力，额外0.25心情消耗只小幅影响续航。",
       "conditions": "",
       "provisional": false
     },
@@ -3233,9 +3253,9 @@
       "skills": [
         "hire_spd_cost[220]"
       ],
-      "score": 48,
+      "score": 53,
       "usage": "公开招募",
-      "reason": "联络速度与心情续航共同评价；额外消耗会缩短有效工作时长，减耗有利于长期值班。",
+      "reason": "30%联络速度接近常规同效率干员，额外心情消耗只小幅影响续航。",
       "conditions": "",
       "provisional": false
     },
@@ -3243,9 +3263,9 @@
       "skills": [
         "hire_spd_cost[230]"
       ],
-      "score": 81,
+      "score": 87,
       "usage": "公开招募",
-      "reason": "联络速度与心情续航共同评价；额外消耗会缩短有效工作时长，减耗有利于长期值班。",
+      "reason": "45%联络速度属于高效主力，额外心情消耗只小幅影响续航。",
       "conditions": "",
       "provisional": false
     },
@@ -3293,9 +3313,9 @@
       "skills": [
         "manu_formula_spd&cost[000]"
       ],
-      "score": 54,
+      "score": 58,
       "usage": "赤金",
-      "reason": "生产力可用，但额外心情消耗降低持续工作表现，同档无代价技能更优。",
+      "reason": "25%赤金生产力适合正常轮班，额外0.25心情消耗只小幅影响续航。",
       "conditions": "",
       "provisional": false
     },
@@ -3483,10 +3503,10 @@
       "skills": [
         "meet_spd&cost[100]"
       ],
-      "score": 53,
+      "score": 90,
       "usage": "线索搜集",
-      "reason": "个人线索速度高，但心情消耗很大，持续值班与轮休代价明显。",
-      "conditions": "",
+      "reason": "35%线索搜集速度可与另一名干员叠加，属于高效主力；按8小时换班使用，额外心情消耗只影响续航。",
+      "conditions": "安排正常轮休，避免心情耗尽后继续工作。",
       "provisional": false
     },
     {
@@ -3513,9 +3533,9 @@
       "skills": [
         "meet_spd_condChar[000]"
       ],
-      "score": 55,
+      "score": 20,
       "usage": "独处线索",
-      "reason": "单人工作额外提高速度，节省人手但未必胜过双人总搜集；按独处需求评价。",
+      "reason": "额外35%要求只有自身工作；与常驻15%合计50%，另一位可用涣散成员保留星级与精英加成。",
       "conditions": "",
       "provisional": false
     },
@@ -3543,9 +3563,9 @@
       "skills": [
         "workshop_formula_device[080]"
       ],
-      "score": 85,
+      "score": 77,
       "usage": "定向材料",
-      "reason": "指定材料的高副产品率，适合该材料需求集中时使用；覆盖范围小于通用加工技能。",
+      "reason": "90%副产品加成仅限手性屈光体、重相位对映体两种配方；集中加工实用，日常覆盖较窄。",
       "conditions": "仅限技能描述指定材料。",
       "provisional": false
     },
@@ -3720,9 +3740,9 @@
       "skills": [
         "workshop_formula_device[050]"
       ],
-      "score": 85,
+      "score": 80,
       "usage": "定向材料",
-      "reason": "指定材料的高副产品率，适合该材料需求集中时使用；覆盖范围小于通用加工技能。",
+      "reason": "源岩类配方副产品加成90%，适合集中加工源岩；覆盖范围小于全部精英材料80%的选择。",
       "conditions": "仅限技能描述指定材料。",
       "provisional": false
     },
@@ -3740,10 +3760,10 @@
       "skills": [
         "meet_spd&condChar_mustget[000]"
       ],
-      "score": 80,
+      "score": 35,
       "usage": "定向线索",
-      "reason": "满足连续消耗门槛后可定向补线索，解决指定线索短缺；周期长、需要独处。",
-      "conditions": "不能在8小时短班中默认触发；需连续消耗超过16心情。",
+      "reason": "达到连续心情消耗门槛后可保证下一条为莱茵线索；另一成员需不工作，涣散搭档仍可提供星级与精英加成。",
+      "conditions": "仅自身工作，连续消耗超过16点心情后，下一次线索必定为莱茵。",
       "provisional": false
     },
     {
@@ -3907,10 +3927,10 @@
       "skills": [
         "meet_spd&cost_condChar[002]"
       ],
-      "score": 50,
+      "score": 40,
       "usage": "独处线索",
-      "reason": "要求单人在会客室工作且消耗较高，需和双人正常值班比较，不能只看个人速度。",
-      "conditions": "只按独处场景评价；线索必得效果需满足额外连续工作条件。",
+      "reason": "50%独处加速可配涣散搭档，保留其星级与精英加成；按完整一班、额外心情消耗和整站速度评价。",
+      "conditions": "仅自身处于工作状态时生效。",
       "provisional": false
     },
     {
@@ -4007,9 +4027,9 @@
       "skills": [
         "workshop_formula_device[111]"
       ],
-      "score": 90,
+      "score": 78,
       "usage": "定向材料",
-      "reason": "指定材料的高副产品率，适合该材料需求集中时使用；覆盖范围小于通用加工技能。",
+      "reason": "100%副产品加成仅限炽合金块这一配方；集中需求时高效，日常评级计入其余材料无加成的限制。",
       "conditions": "仅限技能描述指定材料。",
       "provisional": false
     },
@@ -4464,10 +4484,10 @@
       "skills": [
         "trade_ord_closure[000]"
       ],
-      "score": 70,
+      "score": 96,
       "usage": "特别订单",
-      "reason": "锁定可露希尔特别订单，需要按订单价值与耗时评价，不能只看10%订单速度。",
-      "conditions": "特别订单收益分布需同版本实测，暂定评价。",
+      "reason": "固定获取消耗2赤金、交付1200龙门币的特别订单，额外收益随队友和无人机的订单加速一起放大，是高优先级贸易站核心。",
+      "conditions": "精二解锁；搭配高订单效率干员，保持赤金供应并及时交付。特别订单不属于违约订单，与但书的违约收益分开评价。",
       "provisional": true
     },
     {
@@ -4484,9 +4504,9 @@
       "skills": [
         "meet_spd&cost[110]"
       ],
-      "score": 48,
+      "score": 60,
       "usage": "线索搜集",
-      "reason": "20%搜集速度附带额外消耗，比无代价20%技能更难持续。",
+      "reason": "20%搜集速度可与队友叠加，接近常规20%干员；额外心情消耗只小幅影响轮休便利。",
       "conditions": "",
       "provisional": false
     },
@@ -4494,9 +4514,9 @@
       "skills": [
         "meet_spd&cost_char[000]"
       ],
-      "score": 40,
+      "score": 46,
       "usage": "线索搜集",
-      "reason": "有其他队友时额外加速，也增加心情消耗，与自身基础速度合并评价。",
+      "reason": "有队友时额外提供15%搜集速度，心情消耗只小幅影响续航；与自身基础20%合并评价。",
       "conditions": "",
       "provisional": false
     },
@@ -6445,9 +6465,9 @@
         "workshop_formula_lolxh[000]",
         "workshop_proc_cost[000]"
       ],
-      "score": 72,
+      "score": 60,
       "usage": "高心情配方",
-      "reason": "原始8心情配方得到50%副产品率和显著减耗，批量处理更方便；低消耗配方不享有同等收益。",
+      "reason": "原始8心情配方得到50%副产品加成，减耗便于批量处理；日常材料收益与覆盖均有限，便利性不抵消低副产品率。",
       "conditions": "只影响符合描述的配方，和副产品技能一起生效时合并评价。",
       "provisional": false
     },
@@ -6456,9 +6476,9 @@
         "workshop_formula_rub[000]",
         "workshop_proc_probability[013]"
       ],
-      "score": 90,
+      "score": 82,
       "usage": "低级精英材料",
-      "reason": "原始2心情精英配方的副产品加成合计90%，其他配方只有50%。",
+      "reason": "原始2心情精英配方副产品加成90%，适合集中加工低级材料；其他配方仅50%，按日常覆盖保留折减。",
       "conditions": "加成作用于基础副产品概率；不是直接获得相同比例的材料。",
       "provisional": false,
       "scenarios": [
@@ -6536,10 +6556,10 @@
         "workshop_formula_cost3[101]",
         "workshop_formula_device[060]"
       ],
-      "score": 82,
+      "score": 74,
       "usage": "酮凝集材料",
-      "reason": "酮凝集副产品率80%兼有部分精英配方减耗，需按配方确认减耗。",
-      "conditions": "只影响符合描述的配方，和副产品技能一起生效时合并评价。；仅限技能描述指定材料。",
+      "reason": "酮凝集类副产品加成80%，部分精英配方减耗只增加批量便利，日常评级仍计入材料覆盖限制。",
+      "conditions": "副产品加成仅限酮凝集类；原始消耗2心情的精英配方减1心情。",
       "provisional": false
     },
     {
@@ -6558,10 +6578,10 @@
         "workshop_formula_cost3[110]",
         "workshop_formula_device[000]"
       ],
-      "score": 87,
+      "score": 82,
       "usage": "装置材料",
-      "reason": "装置90%副产品率与精英材料减耗同人兼有，按具体配方使用。",
-      "conditions": "只影响符合描述的配方，和副产品技能一起生效时合并评价。；仅限技能描述指定材料。",
+      "reason": "装置类副产品加成90%，精英材料减耗便于分批加工；其他材料没有副产品加成，日常评分保留覆盖折减。",
+      "conditions": "副产品加成仅限装置类；原始消耗4心情的精英配方减1心情。",
       "provisional": false
     },
     {
@@ -6664,10 +6684,10 @@
         "meet_spd&condChar_mustget[100]",
         "meet_spd&cost_condChar[011]"
       ],
-      "score": 82,
+      "score": 45,
       "usage": "罗德岛定向线索",
-      "reason": "独处速度与连续工作必得一并评价，适合特定线索短缺；普通短班未必触发。",
-      "conditions": "不能在8小时短班中默认触发；需连续消耗超过16心情。；只按独处场景评价；线索必得效果需满足额外连续工作条件。",
+      "reason": "独处35%可配涣散搭档保留星级与精英加成；达到连续心情消耗门槛后可保证下一条为罗德岛线索，适合定向需求。",
+      "conditions": "仅自身工作，连续消耗超过16点心情后，下一次线索必定为罗德岛；能否触发取决于实际消耗速度。",
       "provisional": false
     },
     {
@@ -6686,10 +6706,10 @@
         "workshop_formula_cost3[110]",
         "workshop_formula_device[030]"
       ],
-      "score": 87,
+      "score": 82,
       "usage": "聚酸酯材料",
-      "reason": "聚酸酯90%副产品率兼有精英配方减耗，按对应配方评价。",
-      "conditions": "只影响符合描述的配方，和副产品技能一起生效时合并评价。；仅限技能描述指定材料。",
+      "reason": "聚酸酯类副产品加成90%，精英材料减耗便于分批加工；其他材料没有副产品加成，日常评分保留覆盖折减。",
+      "conditions": "副产品加成仅限聚酸酯类；原始消耗4心情的精英配方减1心情。",
       "provisional": false
     },
     {
@@ -6785,10 +6805,10 @@
         "workshop_formula_cost5[000]",
         "workshop_formula_device[070]"
       ],
-      "score": 84,
+      "score": 76,
       "usage": "晶体材料",
-      "reason": "晶体80%副产品率配合心情减耗，适合连续加工晶体。",
-      "conditions": "只影响符合描述的配方，和副产品技能一起生效时合并评价。；仅限技能描述指定材料。",
+      "reason": "晶体类副产品加成80%兼有减耗，适合集中加工晶体；减耗便利不抵消配方覆盖限制。",
+      "conditions": "副产品加成与减耗仅限晶体类配方。",
       "provisional": false
     },
     {
@@ -6847,10 +6867,10 @@
         "workshop_formula_cost5[100]",
         "workshop_formula_device[021]"
       ],
-      "score": 89,
+      "score": 78,
       "usage": "异铁组材料",
-      "reason": "异铁组90%副产品率兼有对应低消耗配方减耗，材料与心情利用均优秀。",
-      "conditions": "只影响符合描述的配方，和副产品技能一起生效时合并评价。；仅限技能描述指定材料。",
+      "reason": "异铁组这一配方副产品加成90%兼有减耗，适合集中需求；单配方覆盖较窄，日常评分低于整个材料系列。",
+      "conditions": "副产品加成仅限异铁组；减耗按技能规定的原始心情消耗条件生效。",
       "provisional": false
     },
     {
@@ -6913,10 +6933,10 @@
         "workshop_formula_cost3[111]",
         "workshop_formula_device[020]"
       ],
-      "score": 87,
+      "score": 82,
       "usage": "异铁材料",
-      "reason": "异铁90%副产品率兼有精英材料减耗，按具体配方确认适用。",
-      "conditions": "只影响符合描述的配方，和副产品技能一起生效时合并评价。；仅限技能描述指定材料。",
+      "reason": "异铁类副产品加成90%兼有精英配方减耗；减耗便利只小幅加分，其他材料没有副产品加成。",
+      "conditions": "副产品加成仅限异铁类；原始消耗4心情的精英配方减1心情。",
       "provisional": false
     },
     {
@@ -7045,9 +7065,9 @@
         "meet_spd[010]",
         "meet_spd_condChar[000]"
       ],
-      "score": 78,
-      "usage": "独处线索",
-      "reason": "独处时基础15%与额外35%合计50%，无额外心情代价；双人时只保留15%。",
+      "score": 48,
+      "usage": "线索搜集",
+      "reason": "双人工作保留基础15%；独处合计50%时可配涣散搭档保留其星级与精英加成，整站速度可以超过两名普通20%成员。",
       "conditions": "线索收取、交流及线索类型需求会影响实际价值。",
       "provisional": false
     },
@@ -7133,10 +7153,10 @@
         "meet_spd&condChar_mustget[000]",
         "meet_spd&cost_condChar[011]"
       ],
-      "score": 82,
+      "score": 45,
       "usage": "莱茵定向线索",
-      "reason": "独处速度与连续工作必得莱茵线索合并，短班不能默认触发。",
-      "conditions": "不能在8小时短班中默认触发；需连续消耗超过16心情。；只按独处场景评价；线索必得效果需满足额外连续工作条件。",
+      "reason": "独处35%可配涣散搭档保留星级与精英加成；达到连续心情消耗门槛后可保证下一条为莱茵线索，适合定向需求。",
+      "conditions": "仅自身工作，连续消耗超过16点心情后，下一次线索必定为莱茵；能否触发取决于实际消耗速度。",
       "provisional": false
     },
     {
@@ -7254,10 +7274,10 @@
         "meet_spd&cost_condChar[002]",
         "meet_spd_notOwned[004]"
       ],
-      "score": 78,
-      "usage": "独处线索补缺",
-      "reason": "缺失线索倾向配合独处50%速度，但心情消耗高；需和双人常规班次比较。",
-      "conditions": "只按独处场景评价；线索必得效果需满足额外连续工作条件。；隐藏概率未公开，暂定评价。",
+      "score": 68,
+      "usage": "线索补缺",
+      "reason": "独处50%加速可配涣散搭档保留其星级与精英加成，整站速度接近或超过普通双人；补缺倾向的额外收益仍待量化。",
+      "conditions": "独处加速仅在自身工作时生效；补缺倾向的隐藏概率未公开。",
       "provisional": true
     },
     {
@@ -7298,10 +7318,10 @@
         "workshop_formula_cost[010]",
         "workshop_formula_probability[160]"
       ],
-      "score": 93,
+      "score": 95,
       "usage": "精英材料",
-      "reason": "100%副产品率突出，但每配方额外消耗2心情，需频繁恢复或分批加工。",
-      "conditions": "加成作用于基础副产品概率；不是直接获得相同比例的材料。",
+      "reason": "全部精英材料配方均获100%副产品加成，覆盖广、材料收益高；额外2心情需要恢复或分批加工，主要影响操作便利。",
+      "conditions": "副产品加成作用于基础概率；每次精英材料加工额外消耗2心情。",
       "provisional": false
     },
     {
@@ -7309,10 +7329,10 @@
         "workshop_formula_cost4[000]",
         "workshop_formula_device[050]"
       ],
-      "score": 91,
+      "score": 84,
       "usage": "源岩材料",
-      "reason": "源岩90%副产品率配合精英材料恒定2心情，高阶源岩连续加工优秀。",
-      "conditions": "仅限技能描述指定材料。",
+      "reason": "源岩类副产品加成90%，精英材料恒定2心情便于高阶批量加工；日常评级仍计入副产品只覆盖源岩的限制。",
+      "conditions": "90%副产品加成仅限源岩类；其他精英材料仅享恒定2心情。",
       "provisional": false
     },
     {
@@ -7320,10 +7340,10 @@
         "workshop_formula_cost3[112]",
         "workshop_formula_device[111]"
       ],
-      "score": 96,
+      "score": 80,
       "usage": "炽合金块",
-      "reason": "指定炽合金块副产品加成100%，兼有部分精英材料减耗，限于对应配方。",
-      "conditions": "只影响符合描述的配方，和副产品技能一起生效时合并评价。；仅限技能描述指定材料。",
+      "reason": "100%副产品加成仅限炽合金块，集中加工时高效；4心情精英配方减耗只改善批量便利，不能抵消单配方覆盖限制。",
+      "conditions": "副产品加成仅限炽合金块；原始消耗4心情的精英配方减1心情。",
       "provisional": false
     },
     {
@@ -7459,9 +7479,9 @@
         "meet_spd&cost[110]",
         "meet_spd&cost_char[000]"
       ],
-      "score": 57,
+      "score": 90,
       "usage": "双人线索",
-      "reason": "有队友时合计35%线索速度，同时合计额外2心情消耗，长班续航代价较大。",
+      "reason": "有队友时合计35%线索搜集速度，可叠加队友自身加速；按8小时换班评价，与同效率的见行者同档。",
       "conditions": "",
       "provisional": false
     }
@@ -7957,247 +7977,25 @@
       "id": "redcloud",
       "title": "红云仓库组",
       "room": "manufacture",
-      "usage": "通用生产",
-      "variants": [
-        {
-          "members": [
-            {
-              "id": "char_190_clour",
-              "room": "manufacture",
-              "elite": 1,
-              "level": 1,
-              "station": "main"
-            },
-            {
-              "id": "char_336_folivo",
-              "room": "manufacture",
-              "elite": 2,
-              "level": 1,
-              "station": "main"
-            },
-            {
-              "id": "char_452_bstalk",
-              "room": "manufacture",
-              "elite": 1,
-              "level": 1,
-              "station": "main"
-            }
-          ],
-          "score": 84,
-          "reason": "红云把全站增加的仓库容量转成生产力，队友的普通生产力和净容量一起保留。",
-          "conditions": "三级制造站；不与泡泡同时使用。",
-          "requirements": {
-            "manufactureLevel": 3
-          },
-          "provisional": true
-        },
-        {
-          "members": [
-            {
-              "id": "char_190_clour",
-              "room": "manufacture",
-              "elite": 1,
-              "level": 1,
-              "station": "main"
-            },
-            {
-              "id": "char_336_folivo",
-              "room": "manufacture",
-              "elite": 2,
-              "level": 1,
-              "station": "main"
-            },
-            {
-              "id": "char_2013_cerber",
-              "room": "manufacture",
-              "elite": 2,
-              "level": 1,
-              "station": "main"
-            }
-          ],
-          "score": 87,
-          "reason": "红云把全站增加的仓库容量转成生产力，队友的普通生产力和净容量一起保留。",
-          "conditions": "三级制造站；不与泡泡同时使用。",
-          "requirements": {
-            "manufactureLevel": 3
-          },
-          "provisional": true
-        },
-        {
-          "members": [
-            {
-              "id": "char_190_clour",
-              "room": "manufacture",
-              "elite": 1,
-              "level": 1,
-              "station": "main"
-            },
-            {
-              "id": "char_336_folivo",
-              "room": "manufacture",
-              "elite": 2,
-              "level": 1,
-              "station": "main"
-            },
-            {
-              "id": "char_4171_wulfen",
-              "room": "manufacture",
-              "elite": 2,
-              "level": 1,
-              "station": "main"
-            }
-          ],
-          "score": 82,
-          "reason": "红云把全站增加的仓库容量转成生产力，队友的普通生产力和净容量一起保留。",
-          "conditions": "三级制造站；不与泡泡同时使用。",
-          "requirements": {
-            "manufactureLevel": 3
-          },
-          "provisional": true
-        },
-        {
-          "members": [
-            {
-              "id": "char_190_clour",
-              "room": "manufacture",
-              "elite": 1,
-              "level": 1,
-              "station": "main"
-            },
-            {
-              "id": "char_1047_halo2",
-              "room": "manufacture",
-              "elite": 2,
-              "level": 1,
-              "station": "main"
-            },
-            {
-              "id": "char_108_silent",
-              "room": "manufacture",
-              "elite": 2,
-              "level": 1,
-              "station": "main"
-            }
-          ],
-          "score": 90,
-          "reason": "红云把全站增加的仓库容量转成生产力，队友的普通生产力和净容量一起保留。",
-          "conditions": "三级制造站；不与泡泡同时使用。",
-          "requirements": {
-            "manufactureLevel": 3
-          },
-          "provisional": true
-        }
-      ]
+      "usage": "仓库联动",
+      "core": ["char_190_clour"],
+      "partnerSlots": 2,
+      "variants": []
     },
     {
       "id": "bubble",
       "title": "泡泡大仓库组",
       "room": "manufacture",
-      "usage": "通用生产",
-      "variants": [
-        {
-          "members": [
-            {
-              "id": "char_381_bubble",
-              "room": "manufacture",
-              "elite": 1,
-              "level": 1,
-              "station": "main"
-            },
-            {
-              "id": "char_163_hpsts",
-              "room": "manufacture",
-              "elite": 2,
-              "level": 1,
-              "station": "main"
-            },
-            {
-              "id": "char_369_bena",
-              "room": "manufacture",
-              "elite": 0,
-              "level": 1,
-              "station": "main"
-            }
-          ],
-          "score": 85,
-          "reason": "火神精二增加19格仓库跨过16格阈值，泡泡按高倍率转换，第三人补仓库及生产力。",
-          "conditions": "三级制造站，火神精二是关键；火神精零16格不能享受同样倍率。",
-          "requirements": {
-            "manufactureLevel": 3
-          },
-          "provisional": true
-        },
-        {
-          "members": [
-            {
-              "id": "char_381_bubble",
-              "room": "manufacture",
-              "elite": 1,
-              "level": 1,
-              "station": "main"
-            },
-            {
-              "id": "char_163_hpsts",
-              "room": "manufacture",
-              "elite": 2,
-              "level": 1,
-              "station": "main"
-            },
-            {
-              "id": "char_378_asbest",
-              "room": "manufacture",
-              "elite": 2,
-              "level": 1,
-              "station": "main"
-            }
-          ],
-          "score": 88,
-          "reason": "火神精二增加19格仓库跨过16格阈值，泡泡按高倍率转换，第三人补仓库及生产力。",
-          "conditions": "三级制造站，火神精二是关键；火神精零16格不能享受同样倍率。",
-          "requirements": {
-            "manufactureLevel": 3
-          },
-          "provisional": true
-        },
-        {
-          "members": [
-            {
-              "id": "char_381_bubble",
-              "room": "manufacture",
-              "elite": 1,
-              "level": 1,
-              "station": "main"
-            },
-            {
-              "id": "char_163_hpsts",
-              "room": "manufacture",
-              "elite": 2,
-              "level": 1,
-              "station": "main"
-            },
-            {
-              "id": "char_4171_wulfen",
-              "room": "manufacture",
-              "elite": 2,
-              "level": 1,
-              "station": "main"
-            }
-          ],
-          "score": 90,
-          "reason": "火神精二增加19格仓库跨过16格阈值，泡泡按高倍率转换，第三人补仓库及生产力。",
-          "conditions": "三级制造站，火神精二是关键；火神精零16格不能享受同样倍率。",
-          "requirements": {
-            "manufactureLevel": 3
-          },
-          "provisional": true
-        }
-      ]
+      "usage": "仓库联动",
+      "core": ["char_381_bubble"],
+      "partnerSlots": 2,
+      "variants": []
     },
     {
       "id": "winter",
-      "title": "冬时与仓库转换",
+      "title": "冬时与温蒂清流",
       "room": "manufacture",
-      "usage": "通用生产",
+      "usage": "赤金",
       "variants": [
         {
           "members": [
@@ -8209,9 +8007,9 @@
               "station": "main"
             },
             {
-              "id": "char_190_clour",
+              "id": "char_400_weedy",
               "room": "manufacture",
-              "elite": 1,
+              "elite": 2,
               "level": 1,
               "station": "main"
             },
@@ -8223,10 +8021,13 @@
               "station": "main"
             }
           ],
-          "score": 83,
-          "reason": "冬时清除普通生产力但增加仓库，红云或泡泡按仓库转化；清流的设施数量型生产力可保留。",
-          "conditions": "两贸易站、三级制造站；必须核对生产力覆盖规则。",
+          "score": 91,
+          "reason": "温蒂按发电站、清流按贸易站、精一冬时按同站人数提供加成，三类数量型生产力可共存。两发电站时合计100%赤金生产力，冬时另提供15格仓库。",
+          "conditions": "两发电站、两贸易站、三级制造站，生产赤金；仓库转换类生产力会被归零，不能用红云或泡泡替代温蒂。",
+          "production": 100,
+          "capacity": 15,
           "requirements": {
+            "powerCountExact": 2,
             "tradingCount": 2,
             "manufactureLevel": 3
           },
@@ -8242,9 +8043,9 @@
               "station": "main"
             },
             {
-              "id": "char_381_bubble",
+              "id": "char_400_weedy",
               "room": "manufacture",
-              "elite": 1,
+              "elite": 2,
               "level": 1,
               "station": "main"
             },
@@ -8256,10 +8057,13 @@
               "station": "main"
             }
           ],
-          "score": 75,
-          "reason": "冬时清除普通生产力但增加仓库，红云或泡泡按仓库转化；清流的设施数量型生产力可保留。",
-          "conditions": "两贸易站、三级制造站；必须核对生产力覆盖规则。",
+          "score": 94,
+          "reason": "三发电站下温蒂提供45%、清流在两贸易站提供40%、精一冬时提供30%，合计115%赤金生产力；冬时仓库仍是每人5格，共15格。",
+          "conditions": "三发电站、两贸易站、三级制造站，生产赤金；不叠加普通或仓库转换类生产力。",
+          "production": 115,
+          "capacity": 15,
           "requirements": {
+            "powerCountExact": 3,
             "tradingCount": 2,
             "manufactureLevel": 3
           },
@@ -8275,9 +8079,9 @@
               "station": "main"
             },
             {
-              "id": "char_190_clour",
+              "id": "char_400_weedy",
               "room": "manufacture",
-              "elite": 1,
+              "elite": 2,
               "level": 1,
               "station": "main"
             },
@@ -8289,13 +8093,76 @@
               "station": "main"
             }
           ],
-          "score": 76,
-          "reason": "初始冬时每人只加5格仓库，低于强化10格；红云转化仓库并保留清流数量型赤金生产力。",
-          "conditions": "两贸易站、三级制造站、赤金配方。",
+          "score": 78,
+          "reason": "初始冬时只增加仓库，没有精一的同站人数生产力。温蒂与清流在两发电站、两贸易站下提供70%赤金生产力，冬时补15格仓库。",
+          "conditions": "两发电站、两贸易站、三级制造站，生产赤金；冬时精一可再增加30%生产力。",
+          "production": 70,
+          "capacity": 15,
           "requirements": {
+            "powerCountExact": 2,
             "tradingCount": 2,
             "manufactureLevel": 3
           },
+          "provisional": true
+        },
+        {
+          "members": [
+            { "id": "char_4208_wintim", "room": "manufacture", "elite": 0, "level": 1, "station": "main" },
+            { "id": "char_400_weedy", "room": "manufacture", "elite": 2, "level": 1, "station": "main" },
+            { "id": "char_385_finlpp", "room": "manufacture", "elite": 1, "level": 1, "station": "main" }
+          ],
+          "score": 86, "production": 85, "capacity": 15,
+          "reason": "初始冬时只增加15格仓库；三发电站下温蒂45%与清流40%合计85%赤金生产力。",
+          "conditions": "三发电站、两贸易站、三级制造站，生产赤金。",
+          "requirements": { "powerCountExact": 3, "tradingCount": 2, "manufactureLevel": 3 },
+          "provisional": true
+        },
+        {
+          "members": [
+            { "id": "char_4208_wintim", "room": "manufacture", "elite": 1, "level": 1, "station": "main" },
+            { "id": "char_400_weedy", "room": "manufacture", "elite": 0, "level": 1, "station": "main" },
+            { "id": "char_385_finlpp", "room": "manufacture", "elite": 1, "level": 1, "station": "main" }
+          ],
+          "score": 88, "production": 90, "capacity": 15,
+          "reason": "初始温蒂20%、清流40%、精一冬时30%，合计90%赤金生产力，无需温蒂精二。",
+          "conditions": "两发电站、两贸易站、三级制造站，生产赤金。",
+          "requirements": { "powerCountExact": 2, "tradingCount": 2, "manufactureLevel": 3 },
+          "provisional": true
+        },
+        {
+          "members": [
+            { "id": "char_4208_wintim", "room": "manufacture", "elite": 1, "level": 1, "station": "main" },
+            { "id": "char_400_weedy", "room": "manufacture", "elite": 0, "level": 1, "station": "main" },
+            { "id": "char_385_finlpp", "room": "manufacture", "elite": 1, "level": 1, "station": "main" }
+          ],
+          "score": 91, "production": 100, "capacity": 15,
+          "reason": "初始温蒂30%、清流40%、精一冬时30%，合计100%赤金生产力。",
+          "conditions": "三发电站、两贸易站、三级制造站，生产赤金。",
+          "requirements": { "powerCountExact": 3, "tradingCount": 2, "manufactureLevel": 3 },
+          "provisional": true
+        },
+        {
+          "members": [
+            { "id": "char_4208_wintim", "room": "manufacture", "elite": 0, "level": 1, "station": "main" },
+            { "id": "char_400_weedy", "room": "manufacture", "elite": 0, "level": 1, "station": "main" },
+            { "id": "char_385_finlpp", "room": "manufacture", "elite": 1, "level": 1, "station": "main" }
+          ],
+          "score": 70, "production": 60, "capacity": 15,
+          "reason": "初始温蒂20%与清流40%合计60%赤金生产力；初始冬时仅提供仓库。",
+          "conditions": "两发电站、两贸易站、三级制造站，生产赤金。",
+          "requirements": { "powerCountExact": 2, "tradingCount": 2, "manufactureLevel": 3 },
+          "provisional": true
+        },
+        {
+          "members": [
+            { "id": "char_4208_wintim", "room": "manufacture", "elite": 0, "level": 1, "station": "main" },
+            { "id": "char_400_weedy", "room": "manufacture", "elite": 0, "level": 1, "station": "main" },
+            { "id": "char_385_finlpp", "room": "manufacture", "elite": 1, "level": 1, "station": "main" }
+          ],
+          "score": 78, "production": 70, "capacity": 15,
+          "reason": "初始温蒂30%与清流40%合计70%赤金生产力；初始冬时仅提供仓库。",
+          "conditions": "三发电站、两贸易站、三级制造站，生产赤金。",
+          "requirements": { "powerCountExact": 3, "tradingCount": 2, "manufactureLevel": 3 },
           "provisional": true
         }
       ]
@@ -8331,10 +8198,11 @@
             }
           ],
           "score": 91,
+          "production": 100,
           "reason": "温蒂与队友保留设施数量型生产力，清流按贸易站提供赤金加成；避免放入普通生产力队友。",
           "conditions": "243：三发电站、两贸易站，制造赤金。",
           "requirements": {
-            "powerCount": 3,
+            "powerCountExact": 3,
             "tradingCount": 2,
             "manufactureLevel": 3
           },
@@ -8365,10 +8233,11 @@
             }
           ],
           "score": 83,
+          "production": 80,
           "reason": "温蒂与队友保留设施数量型生产力，清流按贸易站提供赤金加成；避免放入普通生产力队友。",
           "conditions": "252：两发电站、两贸易站，制造赤金。",
           "requirements": {
-            "powerCount": 2,
+            "powerCountExact": 2,
             "tradingCount": 2,
             "manufactureLevel": 3
           },
@@ -8399,10 +8268,11 @@
             }
           ],
           "score": 91,
+          "production": 100,
           "reason": "温蒂与队友保留设施数量型生产力，清流按贸易站提供赤金加成；避免放入普通生产力队友。",
           "conditions": "243：三发电站、两贸易站，制造赤金。",
           "requirements": {
-            "powerCount": 3,
+            "powerCountExact": 3,
             "tradingCount": 2,
             "manufactureLevel": 3
           },
@@ -8435,11 +8305,167 @@
           "score": 83,
           "reason": "温蒂与队友保留设施数量型生产力，清流按贸易站提供赤金加成；避免放入普通生产力队友。",
           "conditions": "252：两发电站、两贸易站，制造赤金。",
+          "production": 80,
           "requirements": {
-            "powerCount": 2,
+            "powerCountExact": 2,
             "tradingCount": 2,
             "manufactureLevel": 3
           },
+          "provisional": true
+        },
+        {
+          "members": [
+            { "id": "char_400_weedy", "room": "manufacture", "elite": 0, "level": 1, "station": "main" },
+            { "id": "char_385_finlpp", "room": "manufacture", "elite": 1, "level": 1, "station": "main" },
+            { "id": "char_433_windft", "room": "manufacture", "elite": 2, "level": 1, "station": "main" }
+          ],
+          "score": 86, "production": 85,
+          "reason": "初始温蒂30%、清流40%、掠风15%，合计85%赤金生产力。",
+          "conditions": "三发电站、两贸易站、三级制造站，生产赤金。",
+          "requirements": { "powerCountExact": 3, "tradingCount": 2, "manufactureLevel": 3 },
+          "provisional": true
+        },
+        {
+          "members": [
+            { "id": "char_400_weedy", "room": "manufacture", "elite": 0, "level": 1, "station": "main" },
+            { "id": "char_385_finlpp", "room": "manufacture", "elite": 1, "level": 1, "station": "main" },
+            { "id": "char_433_windft", "room": "manufacture", "elite": 2, "level": 1, "station": "main" }
+          ],
+          "score": 78, "production": 70,
+          "reason": "初始温蒂20%、清流40%、掠风10%，合计70%赤金生产力。",
+          "conditions": "两发电站、两贸易站、三级制造站，生产赤金。",
+          "requirements": { "powerCountExact": 2, "tradingCount": 2, "manufactureLevel": 3 },
+          "provisional": true
+        },
+        {
+          "members": [
+            { "id": "char_400_weedy", "room": "manufacture", "elite": 0, "level": 1, "station": "main" },
+            { "id": "char_385_finlpp", "room": "manufacture", "elite": 1, "level": 1, "station": "main" },
+            { "id": "char_472_pasngr", "room": "manufacture", "elite": 2, "level": 1, "station": "main" }
+          ],
+          "score": 86, "production": 85,
+          "reason": "初始温蒂30%、清流40%、异客15%，合计85%赤金生产力。",
+          "conditions": "三发电站、两贸易站、三级制造站，生产赤金。",
+          "requirements": { "powerCountExact": 3, "tradingCount": 2, "manufactureLevel": 3 },
+          "provisional": true
+        },
+        {
+          "members": [
+            { "id": "char_400_weedy", "room": "manufacture", "elite": 0, "level": 1, "station": "main" },
+            { "id": "char_385_finlpp", "room": "manufacture", "elite": 1, "level": 1, "station": "main" },
+            { "id": "char_472_pasngr", "room": "manufacture", "elite": 2, "level": 1, "station": "main" }
+          ],
+          "score": 78, "production": 70,
+          "reason": "初始温蒂20%、清流40%、异客10%，合计70%赤金生产力。",
+          "conditions": "两发电站、两贸易站、三级制造站，生产赤金。",
+          "requirements": { "powerCountExact": 2, "tradingCount": 2, "manufactureLevel": 3 },
+          "provisional": true
+        }
+      ]
+    },
+    {
+      "id": "weedy-eunectes",
+      "title": "温蒂清流与森蚺制造",
+      "room": "manufacture",
+      "usage": "赤金",
+      "variants": [
+        {
+          "members": [
+            { "id": "char_400_weedy", "room": "manufacture", "elite": 2, "level": 1, "station": "main" },
+            { "id": "char_385_finlpp", "room": "manufacture", "elite": 1, "level": 1, "station": "main" },
+            { "id": "char_416_zumama", "room": "manufacture", "elite": 2, "level": 1, "station": "main" }
+          ],
+          "score": 94,
+          "reason": "温蒂45%、清流40%、森蚺30%的设施数量型加成共存，合计115%赤金生产力；森蚺在制造站，无需占用中枢或安排Lancet-2。",
+          "production": 115,
+          "conditions": "三发电站、两贸易站、三级制造站，生产赤金。",
+          "requirements": { "powerCountExact": 3, "tradingCount": 2, "manufactureLevel": 3 },
+          "provisional": true
+        },
+        {
+          "members": [
+            { "id": "char_400_weedy", "room": "manufacture", "elite": 2, "level": 1, "station": "main" },
+            { "id": "char_385_finlpp", "room": "manufacture", "elite": 1, "level": 1, "station": "main" },
+            { "id": "char_416_zumama", "room": "manufacture", "elite": 2, "level": 1, "station": "main" }
+          ],
+          "score": 88,
+          "reason": "两发电站下温蒂30%、清流40%、森蚺20%，合计90%赤金生产力；森蚺只在制造站提供加成。",
+          "production": 90,
+          "conditions": "两发电站、两贸易站、三级制造站，生产赤金。",
+          "requirements": { "powerCountExact": 2, "tradingCount": 2, "manufactureLevel": 3 },
+          "provisional": true
+        },
+        {
+          "members": [
+            { "id": "char_400_weedy", "room": "manufacture", "elite": 0, "level": 1, "station": "main" },
+            { "id": "char_385_finlpp", "room": "manufacture", "elite": 1, "level": 1, "station": "main" },
+            { "id": "char_416_zumama", "room": "manufacture", "elite": 0, "level": 1, "station": "main" }
+          ],
+          "score": 78,
+          "reason": "初始温蒂每发电站10%、初始森蚺每发电站5%，两发电站加清流40%，合计70%赤金生产力。",
+          "conditions": "两发电站、两贸易站、三级制造站，生产赤金；两名六星均无需精二即可过渡。",
+          "production": 70,
+          "requirements": { "powerCountExact": 2, "tradingCount": 2, "manufactureLevel": 3 },
+          "provisional": true
+        },
+        {
+          "members": [
+            { "id": "char_400_weedy", "room": "manufacture", "elite": 0, "level": 1, "station": "main" },
+            { "id": "char_385_finlpp", "room": "manufacture", "elite": 1, "level": 1, "station": "main" },
+            { "id": "char_416_zumama", "room": "manufacture", "elite": 0, "level": 1, "station": "main" }
+          ],
+          "score": 86, "production": 85,
+          "reason": "初始温蒂30%、清流40%、初始森蚺15%，合计85%赤金生产力；森蚺在制造站。",
+          "conditions": "三发电站、两贸易站、三级制造站，生产赤金。",
+          "requirements": { "powerCountExact": 3, "tradingCount": 2, "manufactureLevel": 3 },
+          "provisional": true
+        },
+        {
+          "members": [
+            { "id": "char_400_weedy", "room": "manufacture", "elite": 2, "level": 1, "station": "main" },
+            { "id": "char_385_finlpp", "room": "manufacture", "elite": 1, "level": 1, "station": "main" },
+            { "id": "char_416_zumama", "room": "manufacture", "elite": 0, "level": 1, "station": "main" }
+          ],
+          "score": 91, "production": 100,
+          "reason": "精二温蒂45%、清流40%、初始森蚺15%，合计100%赤金生产力；森蚺无需精二即可补位。",
+          "conditions": "三发电站、两贸易站、三级制造站，生产赤金。",
+          "requirements": { "powerCountExact": 3, "tradingCount": 2, "manufactureLevel": 3 },
+          "provisional": true
+        },
+        {
+          "members": [
+            { "id": "char_400_weedy", "room": "manufacture", "elite": 2, "level": 1, "station": "main" },
+            { "id": "char_385_finlpp", "room": "manufacture", "elite": 1, "level": 1, "station": "main" },
+            { "id": "char_416_zumama", "room": "manufacture", "elite": 0, "level": 1, "station": "main" }
+          ],
+          "score": 83, "production": 80,
+          "reason": "精二温蒂30%、清流40%、初始森蚺10%，合计80%赤金生产力。",
+          "conditions": "两发电站、两贸易站、三级制造站，生产赤金。",
+          "requirements": { "powerCountExact": 2, "tradingCount": 2, "manufactureLevel": 3 },
+          "provisional": true
+        },
+        {
+          "members": [
+            { "id": "char_400_weedy", "room": "manufacture", "elite": 0, "level": 1, "station": "main" },
+            { "id": "char_385_finlpp", "room": "manufacture", "elite": 1, "level": 1, "station": "main" },
+            { "id": "char_416_zumama", "room": "manufacture", "elite": 2, "level": 1, "station": "main" }
+          ],
+          "score": 91, "production": 100,
+          "reason": "初始温蒂30%、清流40%、精二森蚺30%，合计100%赤金生产力。",
+          "conditions": "三发电站、两贸易站、三级制造站，生产赤金。",
+          "requirements": { "powerCountExact": 3, "tradingCount": 2, "manufactureLevel": 3 },
+          "provisional": true
+        },
+        {
+          "members": [
+            { "id": "char_400_weedy", "room": "manufacture", "elite": 0, "level": 1, "station": "main" },
+            { "id": "char_385_finlpp", "room": "manufacture", "elite": 1, "level": 1, "station": "main" },
+            { "id": "char_416_zumama", "room": "manufacture", "elite": 2, "level": 1, "station": "main" }
+          ],
+          "score": 83, "production": 80,
+          "reason": "初始温蒂20%、清流40%、精二森蚺20%，合计80%赤金生产力。",
+          "conditions": "两发电站、两贸易站、三级制造站，生产赤金。",
+          "requirements": { "powerCountExact": 2, "tradingCount": 2, "manufactureLevel": 3 },
           "provisional": true
         }
       ]
@@ -8656,22 +8682,23 @@
               "station": "main"
             },
             {
-              "id": "char_4155_talr",
+              "id": "char_240_wyvern",
               "room": "manufacture",
-              "elite": 2,
+              "elite": 0,
               "level": 1,
               "station": "main"
             },
             {
-              "id": "char_4211_snhunt",
+              "id": "char_235_jesica",
               "room": "manufacture",
-              "elite": 2,
+              "elite": 0,
               "level": 1,
               "station": "main"
             }
           ],
-          "score": 90,
-          "reason": "水月基础生产力与标准化计数一起生效，搭配已具备标准化的高效成员。",
+          "score": 85,
+          "production": 90,
+          "reason": "香草、杰西卡各提供25%，水月自身25%并按三项标准化技能获得15%，合计90%生产力；普通25%技能不自动属于标准化类。",
           "conditions": "三级制造站；按队友实际技能类别计数。",
           "requirements": {
             "manufactureLevel": 3
@@ -8683,27 +8710,28 @@
             {
               "id": "char_437_mizuki",
               "room": "manufacture",
-              "elite": 2,
+              "elite": 0,
               "level": 1,
               "station": "main"
             },
             {
-              "id": "char_4155_talr",
+              "id": "char_240_wyvern",
               "room": "manufacture",
-              "elite": 2,
+              "elite": 0,
               "level": 1,
               "station": "main"
             },
             {
-              "id": "char_281_popka",
+              "id": "char_235_jesica",
               "room": "manufacture",
               "elite": 0,
               "level": 1,
               "station": "main"
             }
           ],
-          "score": 85,
-          "reason": "水月基础生产力与标准化计数一起生效，搭配已具备标准化的高效成员。",
+          "score": 65,
+          "production": 60,
+          "reason": "初始水月没有自身25%与标准化标签，只按香草、杰西卡的两项标准化技能获得10%，合计60%生产力。",
           "conditions": "三级制造站；按队友实际技能类别计数。",
           "requirements": {
             "manufactureLevel": 3
@@ -11205,11 +11233,19 @@
               "elite": 2,
               "level": 1,
               "station": "main"
+            },
+            {
+              "id": "char_196_sunbr",
+              "room": "trading",
+              "elite": 0,
+              "level": 1,
+              "station": "main"
             }
           ],
           "score": 85,
-          "reason": "与另一乌萨斯学生成员同站时，怒潮凛冬经验生产力由30%增至40%，队友产出一起评价。",
-          "conditions": "",
+          "production": 75,
+          "reason": "怒潮凛冬与烈夏同站提供40%经验生产力；古米在贸易站时烈夏再提供35%，两人合计75%。",
+          "conditions": "古米必须在贸易站工作，烈夏的35%加成才生效。",
           "requirements": {},
           "provisional": true
         },
@@ -13326,8 +13362,8 @@
       ]
     },
     {
-      "id": "meeting-reserve-cantabile",
-      "title": "罗德岛隐秘队与晓歌",
+      "id": "meeting-reserve-orchid",
+      "title": "罗德岛隐秘队与焰狐龙梓兰",
       "room": "meeting",
       "usage": "线索搜集",
       "variants": [
@@ -13341,13 +13377,6 @@
               "station": "main"
             },
             {
-              "id": "char_497_ctable",
-              "room": "meeting",
-              "elite": 2,
-              "level": 1,
-              "station": "main"
-            },
-            {
               "id": "char_1048_orchd2",
               "room": "control",
               "elite": 0,
@@ -13355,9 +13384,9 @@
               "station": "main"
             }
           ],
-          "score": 82,
-          "reason": "同室或跨设施指定搭档触发额外线索效果，按两名成员及配套位置整体评价。",
-          "conditions": "额外10%来自焰狐龙梓兰中枢。",
+          "score": 70,
+          "reason": "焰狐龙梓兰为罗德岛隐秘队提供额外10%搜集速度；隐秘队自身带有补缺倾向，按一个会客室岗位和一个中枢岗位评价。",
+          "conditions": "焰狐龙梓兰进驻中枢时额外提供10%搜集速度；另一会客室岗位可自由安排。同类补缺倾向的叠加和概率尚未查证。",
           "requirements": {},
           "provisional": true
         }
@@ -13395,8 +13424,8 @@
       ]
     },
     {
-      "id": "meeting-faithmixer-cantabile",
-      "title": "信仰搅拌机与晓歌",
+      "id": "meeting-faithmixer-fiammetta",
+      "title": "信仰搅拌机与菲亚梅塔",
       "room": "meeting",
       "usage": "线索搜集",
       "variants": [
@@ -13410,13 +13439,6 @@
               "station": "main"
             },
             {
-              "id": "char_497_ctable",
-              "room": "meeting",
-              "elite": 2,
-              "level": 1,
-              "station": "main"
-            },
-            {
               "id": "char_300_phenxi",
               "room": "dormitory",
               "elite": 0,
@@ -13424,9 +13446,9 @@
               "station": "main"
             }
           ],
-          "score": 82,
-          "reason": "同室或跨设施指定搭档触发额外线索效果，按两名成员及配套位置整体评价。",
-          "conditions": "菲亚梅塔处于宿舍，兼顾她的心情支援。",
+          "score": 88,
+          "reason": "信仰搅拌机精二的20%搜集速度与菲亚梅塔宿舍支援10%相加；六星精二的进驻加成进一步提高实际速度。",
+          "conditions": "菲亚梅塔处于宿舍即可提供额外10%搜集速度；信仰搅拌机技能合计30%，加上六星精二正常进驻26%，合计56%。另一会客室岗位可自由安排。",
           "requirements": {},
           "provisional": true
         }
@@ -15452,6 +15474,59 @@
     "char_164_nightm": "c80a2c41da5fd8f2b6950deb1c8d429093d7218927fa45b90e1d4318be0683a5",
     "char_220_grani": "c6f1fc61a8b25a08046651ac5d2282d05b56f1fb48dcceff62fec0147810a66f",
     "char_263_skadi": "94a429053f4c9fb8de0c765d9f773b98a19f96633d60406dd45682177aee3191"
+  },
+  "meetingStageScores": {
+    "char_4220_kormr": [65],
+    "char_4091_ulika": [10],
+    "char_009_12fce": [50],
+    "char_109_fmout": [null, 73, 82],
+    "char_235_jesica": [null, 55, 67],
+    "char_133_mm": [53, 70, 82],
+    "char_118_yuki": [53, 65, 77],
+    "char_4100_caper": [34, 88, 92],
+    "char_198_blackd": [null, 55, 67],
+    "char_337_utage": [null, 65, 77],
+    "char_445_wscoot": [44, 70, 82],
+    "char_236_rope": [53, 65, 77],
+    "char_275_breeze": [38, 53, 70],
+    "char_4199_makiri": [38, 53, 78],
+    "char_401_elysm": [44, 52, 65],
+    "char_4237_jcinta": [null, null, 79],
+    "char_497_ctable": [58, 66, 78],
+    "char_4017_puzzle": [38, 53, 78],
+    "char_106_franka": [38, 53, 70],
+    "char_4142_laios": [55, 67, 79],
+    "char_155_tiger": [38, 53, 70],
+    "char_294_ayer": [38, 53, 79],
+    "char_274_astesi": [38, 53, 85],
+    "char_4131_odda": [25, 35, 79],
+    "char_405_absin": [44, 52, 65],
+    "char_4031_liesel": [25, 35, 68],
+    "char_297_hamoni": [null, null, 87],
+    "char_4013_kjera": [38, 53, 76],
+    "char_4114_harold": [38, 53, 65],
+    "char_144_red": [null, null, 85],
+    "char_158_milu": [38, 53, 79],
+    "char_195_glassb": [null, null, 70],
+    "char_492_quercu": [44, 52, 65],
+    "char_4172_xingzh": [null, null, 79],
+    "char_4036_forcer": [38, 53, 90],
+    "char_4016_kazema": [48, 60, 88],
+    "char_4026_vulpis": [40, 56, 80],
+    "char_427_vigil": [65, 77, 85],
+    "char_4087_ines": [null, null, 86],
+    "char_213_mostma": [40, 56, 72],
+    "char_4027_heyak": [26, 36, 80],
+    "char_291_aglina": [40, 56, 72],
+    "char_1015_aglna2": [58, 66, 90],
+    "char_202_demkni": [40, 56, 72],
+    "char_4194_rmixer": [50, 62, 80],
+    "char_264_f12yin": [null, null, 58],
+    "char_010_chen": [null, null, 85],
+    "char_1050_chen3": [58, 66, 78],
+    "char_4231_clemnt": [55, 67, 91],
+    "char_4214_cairn": [null, null, 88],
+    "char_347_jaksel": [null, 65, 77]
   },
   "rarities": {
     "char_285_medic2": 1,

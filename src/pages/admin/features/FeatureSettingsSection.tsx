@@ -22,7 +22,7 @@ const GROUPS: Array<{ label: string; features: SiteFeatureKey[] }> = [
   { label: copy.features.admin_groups.pages, features: ['v2', 'v1', 'faq', 'support', 'pricing', 'changelog', 'thanks', 'service_status'] },
   { label: copy.features.admin_groups.scheduling, features: ['schedule_generation', 'one_shift_per_day', 'scenario_comparison', 'metered_billing'] },
   { label: copy.features.admin_groups.assistants, features: ['ai_credits', 'ai_schedule_explanation', 'schedule_explanation_avatar', 'ai_goal_comparison', 'ai_cultivation_advisor', 'workspace_page_help', 'ai_change_summary'] },
-  { label: copy.features.admin_groups.tools, features: ['tools', 'manual_schedule', 'schedule_comparison', 'cultivation_plan', 'cultivation_projects', 'training_ratio', 'thanks_recruitment', 'material_demand', 'depot_value'] },
+  { label: copy.features.admin_groups.tools, features: ['tools', 'manual_schedule', 'schedule_comparison', 'cultivation_plan', 'cultivation_projects', 'training_ratio', 'thanks_recruitment', 'material_demand', 'depot_value', 'building_rating_radar', 'base_value_dashboard'] },
   { label: copy.features.admin_groups.exports, features: ['maa_export', 'full_result_export'] },
   { label: copy.features.admin_groups.community, features: ['invitations', 'inventory', 'onboarding_tasks', 'announcements', 'notifications', 'website_events', 'qqbot'] },
 ]

@@ -39,6 +39,33 @@ describe('FeatureSettingsSection', () => {
     expect(screen.getAllByText(/上级功能关闭/).length).toBeGreaterThan(0)
   })
 
+  it('starts the rating radar closed for legacy settings and persists an explicit choice', async () => {
+    const user = userEvent.setup()
+    let settings = { ...DEFAULT_SITE_FEATURE_SETTINGS, revision: 5 }
+    const { building_rating_radar: _radar, ...legacyFeatures } = settings.features
+    adminApiJson.mockResolvedValueOnce({ settings: { ...settings, features: legacyFeatures } })
+    adminApiJson.mockImplementation(async (_path, options) => {
+      if (options?.method === 'PUT') settings = { ...settings, features: options.json.features, revision: settings.revision + 1 }
+      return { settings }
+    })
+    render(<FeatureSettingsSection />)
+    await user.click(await screen.findByRole('tab', { name: '公开工具' }))
+    const radar = screen.getByRole('checkbox', { name: /基建评级雷达图/ })
+    expect(radar).not.toBeChecked()
+    await user.click(radar)
+    await user.click(screen.getByRole('button', { name: '保存功能开关' }))
+    await screen.findByText('功能开关已保存并立即生效。')
+    expect(settings.features.building_rating_radar).toBe(true)
+    await user.click(screen.getByRole('button', { name: '重新加载' }))
+    expect(await screen.findByRole('checkbox', { name: /基建评级雷达图/ })).toBeChecked()
+    await user.click(screen.getByRole('checkbox', { name: /基建评级雷达图/ }))
+    await user.click(screen.getByRole('button', { name: '保存功能开关' }))
+    await waitFor(() => expect(settings.features.building_rating_radar).toBe(false))
+    expect(adminApiJson).toHaveBeenLastCalledWith('/api/admin/feature-settings', expect.objectContaining({
+      json: { expected_revision: 6, features: expect.objectContaining({ building_rating_radar: false }) },
+    }))
+  })
+
   it('saves the assistant and paused-avatar switches independently', async () => {
     const user = userEvent.setup()
     render(<FeatureSettingsSection />)

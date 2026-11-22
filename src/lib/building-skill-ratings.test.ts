@@ -2,9 +2,10 @@ import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import catalog from '../data/building-skills.json'
 import published from '../data/building-skill-ratings.json'
+import warehousePartners from '../data/building-rating-warehouse-partners.json'
 import { canonicalJson } from './crypto'
 import { CONFIG_PRESETS } from './config'
-import { buildingRatingCombos, buildingRatingRoster, buildingRatingTrainingCost, ratingMemberStatus, ratingVariantStatus, singleBuildingRatings, type RatingMember } from './building-skill-ratings'
+import { buildingMeetingBonus, buildingRatingCombos, buildingRatingRoster, buildingRatingTrainingCost, ratingMemberStatus, ratingVariantStatus, singleBuildingRatings, type RatingMember } from './building-skill-ratings'
 import type { LicenseOperator } from './types'
 
 const characters: Record<string, typeof catalog.operators.char_285_medic2> = catalog.operators
@@ -77,12 +78,155 @@ describe('published building skill ratings', () => {
     expect(pair.variants.map((variant) => variant.score)).toEqual([78, 68])
   })
 
+  it('compares meeting shifts with actual promotion bonuses and the passive contribution of exhausted partners', () => {
+    const ordinary = singleBuildingRatings.find((entry) => entry.name === '远山' && entry.room === 'meeting')!.stage.assessment.score!
+    const forcer = singleBuildingRatings.find((entry) => entry.name === '见行者' && entry.room === 'meeting')!.stage.assessment.score!
+    const clem = singleBuildingRatings.find((entry) => entry.name === '克莱门莎' && entry.room === 'meeting')!.stage.assessment.score!
+    expect(forcer).toBeGreaterThan(ordinary)
+    expect(clem).toBeGreaterThan(forcer)
+    const solitary = new Set(Object.entries(catalog.skills).filter(([, skill]) => skill.description.includes('只有自身处于工作状态')).map(([id]) => id))
+    const affected = singleBuildingRatings.filter((entry) => entry.room === 'meeting' && entry.stage.skills.some((id) => solitary.has(id)))
+    expect(affected.map((entry) => entry.name).sort()).toEqual(['予愿安洁莉娜', '和弦', '复奏', '奥达', '霍尔海雅', '风丸'].sort())
+    for (const entry of affected.filter((item) => ['霍尔海雅', '奥达', '复奏'].includes(item.name))) expect(entry.stage.assessment.score!, entry.name).toBeLessThan(ordinary)
+    for (const entry of affected.filter((item) => ['风丸', '和弦', '予愿安洁莉娜'].includes(item.name))) expect(entry.stage.assessment.score!, entry.name).toBeGreaterThan(ordinary)
+    for (const [penalized, baseline] of [['manu_prod_spd&limit&cost[110]', 'manu_prod_spd[020]'], ['manu_formula_spd&limit&cost[100]', 'manu_formula_spd[020]'], ['hire_spd_cost[200]', 'hire_spd[011]']]) {
+      const score = published.reviews.find((review) => review.skills.includes(penalized))!.score!
+      const reference = published.reviews.find((review) => review.skills.includes(baseline))!.score!
+      expect(reference - score, penalized).toBeGreaterThanOrEqual(0)
+      expect(reference - score, penalized).toBeLessThanOrEqual(3)
+    }
+  })
+
+  it('keeps only real meeting dependencies and preserves the free second work position', () => {
+    expect(buildingRatingCombos.some((combo) => /meeting-(faithmixer|reserve)-cantabile/.test(combo.id))).toBe(false)
+    for (const [id, names] of [['meeting-faithmixer-fiammetta', ['信仰搅拌机', '菲亚梅塔']], ['meeting-reserve-orchid', ['罗德岛隐秘队', '焰狐龙梓兰']]] as const) {
+      const combo = buildingRatingCombos.find((item) => item.id === id)!
+      expect(combo.variants[0].members.map((member) => characters[member.id].name)).toEqual(names)
+      expect(combo.variants[0].members.filter((member) => member.room === 'meeting')).toHaveLength(1)
+    }
+  })
+
+  it('includes meeting progression even when the skill does not change, with stage-specific reviewed scores', () => {
+    const entries = singleBuildingRatings.filter((entry) => entry.room === 'meeting')
+    for (const entry of entries) for (const stage of entry.stages) {
+      expect(stage.assessment.score).toBe(published.meetingStageScores[entry.operatorId as keyof typeof published.meetingStageScores][stage.elite])
+    }
+    const lowStar = entries.find((entry) => entry.name === '12F')!
+    const shirayuki = entries.find((entry) => entry.name === '白雪')!
+    expect(lowStar.stages.map((stage) => stage.elite)).toEqual([0])
+    expect(shirayuki.stages.map((stage) => stage.elite)).toEqual([0, 1, 2])
+    expect(shirayuki.stages.map((stage) => stage.skills)).toEqual([lowStar.stage.skills, lowStar.stage.skills, lowStar.stage.skills])
+    expect(shirayuki.stages[0].assessment.score).toBeGreaterThan(lowStar.stage.assessment.score!)
+    expect(shirayuki.stage.assessment.score).toBeGreaterThan(shirayuki.stages[0].assessment.score!)
+    expect(buildingMeetingBonus({ id: 'char_009_12fce', elite: 0 })).toEqual({ rarity: 0, elite: 0, work: 5 })
+    expect(buildingMeetingBonus({ id: 'char_4194_rmixer', elite: 2 })).toEqual({ rarity: 5, elite: 16, work: 5 })
+  })
+
+  it('values workshop coverage above reduced mood costs and one-recipe peak bonuses', () => {
+    const processing = singleBuildingRatings.filter((entry) => entry.room === 'processing')
+    const nian = processing.find((entry) => entry.name === '年')!.stage.assessment.score!
+    const general = processing.find((entry) => entry.name === '苏苏洛')!.stage.assessment.score!
+    expect(nian).toBeGreaterThanOrEqual(95)
+    expect(nian).toBeGreaterThan(general)
+    const targeted = new Set(Object.keys(catalog.skills).filter((id) => id.startsWith('workshop_formula_device[')))
+    const restricted = processing.filter((entry) => entry.stage.skills.some((id) => targeted.has(id)))
+    expect(restricted.map((entry) => entry.name)).toContain('号角')
+    for (const entry of restricted) expect(entry.stage.assessment.score!, entry.name).toBeLessThan(general)
+    for (const name of ['休谟斯', '罗小黑']) expect(processing.find((entry) => entry.name === name)!.stage.assessment.score!, name).toBeLessThan(general)
+    const horn = processing.find((entry) => entry.name === '号角')!
+    expect(horn.stage.assessment.reason).toContain('仅限炽合金块')
+    expect(horn.stage.skills).toEqual(expect.arrayContaining(['workshop_formula_cost3[112]', 'workshop_formula_device[111]']))
+  })
+
+  it('keeps automation away from warehouse conversion and includes both manufacturing partners', () => {
+    const converters = ['char_190_clour', 'char_381_bubble']
+    const automation = new Set(['manu_prod_spd&manu[000]', 'manu_prod_spd&manu[100]', 'manu_prod_spd&power[000]', 'manu_prod_spd&power[010]', 'manu_prod_spd&power[020]'])
+    for (const combo of buildingRatingCombos) for (const variant of combo.variants) {
+      const automated = variant.members.filter((member) => member.room === 'manufacture').some((member) => {
+        const active = new Map<number, string>()
+        for (const skill of characters[member.id].skills) if (skill.elite <= member.elite) active.set(skill.slot, skill.id)
+        return [...active.values()].some((id) => automation.has(id))
+      })
+      if (automated) expect(variant.members.some((member) => converters.includes(member.id)), combo.id).toBe(false)
+    }
+    for (const id of ['char_416_zumama', 'char_4208_wintim']) {
+      expect(buildingRatingCombos.some((combo) => combo.variants.some((variant) =>
+        ['char_400_weedy', 'char_385_finlpp', id].every((operatorId) => variant.members.some((member) => member.id === operatorId && member.room === 'manufacture'))))).toBe(true)
+    }
+  })
+
+  it('counts actual Standardization skills and includes Gummy whenever Leto contributes production', () => {
+    const standard = buildingRatingCombos.find((combo) => combo.id === 'standard')!
+    expect(standard.variants.map((variant) => variant.production)).toEqual([90, 60])
+    for (const variant of standard.variants) for (const member of variant.members.filter((member) => member.id !== 'char_437_mizuki')) {
+      const active = new Map<number, string>()
+      for (const skill of characters[member.id].skills) if (skill.elite <= member.elite) active.set(skill.slot, skill.id)
+      expect([...active.values()].some((id) => catalog.skills[id as keyof typeof catalog.skills].name.startsWith('标准化'))).toBe(true)
+    }
+    const leto = buildingRatingCombos.find((combo) => combo.id === 'headbringer')!.variants[0]
+    expect(leto.production).toBe(75)
+    expect(leto.members).toContainEqual(expect.objectContaining({ id: 'char_196_sunbr', room: 'trading' }))
+    const roster = buildingRatingRoster(leto.members.filter((member) => member.id !== 'char_196_sunbr').map((member) => owned(member)))
+    expect(ratingVariantStatus(leto, roster, config).state).toBe('missing')
+  })
+
+  it('covers every automation unlock pairing in two- and three-power layouts', () => {
+    for (const [comboId, partnerId, expected] of [
+      ['winter', 'char_4208_wintim', [[0, 0, 2, 60], [0, 0, 3, 70], [0, 1, 2, 90], [0, 1, 3, 100], [2, 0, 2, 70], [2, 0, 3, 85], [2, 1, 2, 100], [2, 1, 3, 115]]],
+      ['weedy-eunectes', 'char_416_zumama', [[0, 0, 2, 70], [0, 0, 3, 85], [0, 2, 2, 80], [0, 2, 3, 100], [2, 0, 2, 80], [2, 0, 3, 100], [2, 2, 2, 90], [2, 2, 3, 115]]],
+    ] as [string, string, number[][]][]) {
+      const combo = buildingRatingCombos.find((combo) => combo.id === comboId)!
+      const actual = combo.variants.map((variant) => [variant.members.find((member) => member.id === 'char_400_weedy')!.elite, variant.members.find((member) => member.id === partnerId)!.elite, variant.requirements.powerCountExact, variant.production])
+      expect(actual, comboId).toHaveLength(expected.length)
+      expect(actual, comboId).toEqual(expect.arrayContaining(expected))
+    }
+  })
+
   it('keeps the four required tailor variants together and preserves Peper in control as an independent use', () => {
     expect(shamare.variants.slice(0, 4).map((variant) => variant.members.map((member) => characters[member.id].name))).toEqual([
       ['巫恋', '龙舌兰', '柏喙'], ['巫恋', '龙舌兰', '卡夫卡'], ['巫恋', '龙舌兰', '折光'], ['巫恋', '龙舌兰', '明椒'],
     ])
     expect(singleBuildingRatings.some((entry) => entry.name === '明椒' && entry.room === 'control')).toBe(true)
     expect(singleBuildingRatings.some((entry) => entry.name === '巫恋' && entry.room === 'trading')).toBe(false)
+  })
+})
+
+describe('warehouse partner combinations', () => {
+  const variant = (comboId: string, recipe: 'gold' | 'exp', members: [string, number][]) => buildingRatingCombos.find((combo) => combo.id === comboId)!.variants.find((item) => item.recipe === recipe && item.members.filter((member) => member.room === 'manufacture').length === members.length + 1 && members.every(([id, elite]) => item.members.some((member) => member.id === id && member.elite === elite)))!
+
+  it.each([
+    ['redcloud', 'gold', [['char_500_noirc', 0], ['char_150_snakek', 0]], 76, 28],
+    ['redcloud', 'exp', [['char_336_folivo', 2], ['char_452_bstalk', 1]], 92.25, 28],
+    ['redcloud', 'gold', [['char_336_folivo', 2], ['char_452_bstalk', 1]], 68.25, 16],
+    ['redcloud', 'gold', [['char_4171_wulfen', 2]], 52, 16],
+    ['redcloud', 'gold', [['char_1047_halo2', 2], ['char_128_plosis', 2]], 86, 18],
+    ['redcloud', 'gold', [['char_1047_halo2', 2], ['char_4048_doroth', 2]], 96, 18],
+    ['redcloud', 'exp', [['char_4198_christ', 2], ['char_1042_phatm2', 2]], 101, 18],
+    ['bubble', 'gold', [['char_163_hpsts', 2], ['char_369_bena', 0]], 93, 46],
+    ['bubble', 'gold', [['char_163_hpsts', 0], ['char_369_bena', 0]], 52, 43],
+    ['bubble', 'gold', [['char_378_asbest', 2]], 39, 14],
+  ] as [string, 'gold' | 'exp', [string, number][], number, number][])('evaluates %s %s with %j using net capacity, per-member thresholds and active recipe', (comboId, recipe, members, production, capacity) => {
+    expect(variant(comboId, recipe, members)).toMatchObject({ production, capacity, requirements: { manufactureLevel: members.length + 1 } })
+  })
+
+  it('includes every compatible warehouse provider without repeating a member or losing their minimum unlock', () => {
+    const redcloud = buildingRatingCombos.find((combo) => combo.id === 'redcloud')!
+    const represented = new Set(redcloud.variants.flatMap((item) => item.members.map((member) => member.id)))
+    for (const partner of warehousePartners) expect(represented.has(partner.id), partner.id).toBe(true)
+    for (const [id, operator] of Object.entries(catalog.operators)) {
+      if (['char_381_bubble', 'char_4208_wintim'].includes(id)) continue
+      if (operator.skills.some((skill) => /仓库(?:容量)?(?:上限)?\+/.test(catalog.skills[skill.id as keyof typeof catalog.skills].description))) expect(represented.has(id), operator.name).toBe(true)
+    }
+  })
+
+  it('requires real external support and keeps live mood and dormitory conditions unknown', () => {
+    for (const members of [[['char_4126_fuze', 2]], [['char_4062_totter', 1]], [['char_4138_narant', 2]]] as [string, number][][]) {
+      const item = variant('redcloud', 'gold', members)
+      expect(item).toBeDefined()
+      const match = ratingVariantStatus(item, buildingRatingRoster(item.members.map((member) => owned(member))), config)
+      if (members[0][0] === 'char_4126_fuze') expect(item.members.filter((member) => member.room === 'control')).toHaveLength(5)
+      else expect(match.state).toBe('unknown')
+    }
   })
 })
 
@@ -111,6 +255,16 @@ describe('rating profile matching', () => {
     expect(ratingVariantStatus(first, locked, config)).toMatchObject({ membersOwned: true, state: 'locked' })
     expect(ratingVariantStatus(first, roster, { ...config, trading_station_levels: [2, 2] }).state).toBe('blocked')
     expect(ratingVariantStatus(first, roster, null).state).toBe('unknown')
+  })
+
+  it('matches layout-specific scores to the actual power station count', () => {
+    const winter = buildingRatingCombos.find((combo) => combo.id === 'winter')!
+    const twoPower = winter.variants.find((variant) => variant.production === 100 && variant.requirements.powerCountExact === 2)!
+    const roster = buildingRatingRoster(twoPower.members.map((member) => owned(member)))
+    expect(ratingVariantStatus(twoPower, roster, config).state).toBe('blocked')
+    const twoPowerConfig = { ...CONFIG_PRESETS['252'], manufacturing_station_levels: [3, 3, 3, 2, 2] }
+    expect(ratingVariantStatus(twoPower, roster, twoPowerConfig).state).toBe('ready')
+    expect(ratingVariantStatus(winter.variants.find((variant) => variant.production === 115)!, roster, twoPowerConfig).state).toBe('blocked')
   })
 
   it('does not infer live dormitory, mood, or training-task conditions from account ownership', () => {

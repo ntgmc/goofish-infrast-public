@@ -2,6 +2,7 @@ import catalog from '../data/building-skills.json'
 import published from '../data/building-skill-ratings.json'
 import { getFacilityIds } from './facility-layout'
 import { calculateTrainingCost } from './training-ratio'
+import { warehouseBuildingVariants } from './building-rating-warehouse'
 import type { LicenseConfig, LicenseOperator } from './types'
 
 export const BUILDING_RATING_GRADES = ['SSS', 'S', 'A', 'B', 'C', 'D'] as const
@@ -9,8 +10,8 @@ export type BuildingRatingGrade = typeof BUILDING_RATING_GRADES[number]
 export type RatingScenario = { label: string; score: number; reason: string }
 export type SkillAssessment = { skills: string[]; score: number | null; usage: string; reason: string; conditions: string; provisional: boolean; scenarios?: RatingScenario[] }
 export type RatingMember = { id: string; room: string; elite: number; level: number; station: string }
-export type RatingVariant = { members: RatingMember[]; score: number; reason: string; conditions: string; provisional: boolean; requirements: Record<string, number | boolean | undefined> }
-export type RatingCombo = { id: string; title: string; room: string; usage: string; variants: RatingVariant[] }
+export type RatingVariant = { members: RatingMember[]; score: number; reason: string; conditions: string; provisional: boolean; requirements: Record<string, number | boolean | undefined>; recipe?: 'gold' | 'exp'; production?: number; capacity?: number }
+export type RatingCombo = { id: string; title: string; room: string; usage: string; variants: RatingVariant[]; core?: string[]; partnerSlots?: number }
 export type RatingStage = { elite: number; level: number; skills: string[]; assessment: SkillAssessment }
 export type SingleBuildingRating = { id: string; operatorId: string; name: string; room: string; stages: RatingStage[]; stage: RatingStage }
 type Skill = { name: string; room: string; icon: string; description: string }
@@ -18,11 +19,12 @@ type Character = { name: string; profession: string; skills: { id: string; slot:
 const characters: Record<string, Character> = catalog.operators
 const skills: Record<string, Skill> = catalog.skills
 const rarities: Record<string, number> = published.rarities
+const meetingStageScores: Record<string, (number | null)[]> = published.meetingStageScores
 const reviews: SkillAssessment[] = published.reviews
 const joints: SkillAssessment[] = published.joints
 export const buildingRatingEdition = { version: published.version, evaluatedAt: published.evaluatedAt, sources: published.sources }
 export const buildingRatingCoverage = { operators: Object.keys(characters).length, skills: Object.keys(skills).length }
-export const buildingRatingCombos: RatingCombo[] = published.combos
+export const buildingRatingCombos: RatingCombo[] = published.combos.map((combo) => 'partnerSlots' in combo ? { ...combo, variants: warehouseBuildingVariants(combo.id) } : combo)
 const reviewBySkill = new Map(reviews.flatMap((review) => review.skills.map((id) => [id, review] as const)))
 const signature = (ids: string[]) => [...ids].sort().join('|')
 const jointBySkills = new Map(joints.map((review) => [signature(review.skills), review]))
@@ -32,18 +34,25 @@ export function buildingRatingGrade(score: number): BuildingRatingGrade {
 }
 
 export function buildingRatingCharacter(id: string) {
-  return characters[id]
+  return { ...characters[id], rarity: rarities[id] }
 }
 
 export function buildingRatingSkill(id: string) {
   return skills[id]
 }
 
+export function buildingMeetingBonus(member: Pick<RatingMember, 'id' | 'elite'>) {
+  const rarity = rarities[member.id]
+  return { rarity: rarity <= 3 ? 0 : rarity === 4 ? 2 : rarity === 5 ? 4 : 5, elite: member.elite * 8, work: 5 }
+}
+
 export const singleBuildingRatings: SingleBuildingRating[] = Object.entries(characters).flatMap(([operatorId, operator]) => {
   const active = new Map<number, string>()
   const stages = new Map<string, RatingStage[]>()
   const dependent = new Set<string>()
-  const unlocks = [...new Map(operator.skills.map((unlock) => [`${unlock.elite}.${unlock.level}`, unlock])).values()]
+  const meetingProgression = operator.skills.some((skill) => skills[skill.id].room === 'meeting')
+    ? Array.from({ length: rarities[operatorId] <= 2 ? 1 : rarities[operatorId] === 3 ? 2 : 3 }, (_, elite) => ({ elite, level: 1 })) : []
+  const unlocks = [...new Map([...operator.skills, ...meetingProgression].map((unlock) => [`${unlock.elite}.${unlock.level}`, unlock])).values()]
     .sort((a, b) => a.elite - b.elite || a.level - b.level)
   for (const { elite, level } of unlocks) {
     for (const skill of operator.skills) if (skill.elite < elite || skill.elite === elite && skill.level <= level) active.set(skill.slot, skill.id)
@@ -59,17 +68,32 @@ export const singleBuildingRatings: SingleBuildingRating[] = Object.entries(char
       const assessment = ids.length === 1 ? reviewBySkill.get(ids[0]) : jointBySkills.get(signature(ids))
       if (!assessment || assessment.score === null) throw new Error(`Missing building skill assessment: ${operatorId}/${signature(ids)}`)
       const history = stages.get(room) ?? []
-      if (signature(history[history.length - 1]?.skills ?? []) !== signature(ids)) history.push({ elite, level, skills: ids, assessment })
+      if (signature(history[history.length - 1]?.skills ?? []) !== signature(ids) || room === 'meeting' && history[history.length - 1]?.elite !== elite) {
+        history.push({ elite, level, skills: ids, assessment })
+      }
       stages.set(room, history)
     }
   }
-  return [...stages].filter(([room]) => !dependent.has(room)).map(([room, history]) => ({ id: `${operatorId}:${room}`, operatorId, name: operator.name, room, stages: history, stage: history[history.length - 1] }))
+  return [...stages].filter(([room]) => !dependent.has(room)).map(([room, history]) => {
+    const progression = room === 'meeting' ? history.map((stage) => meetingStage(operatorId, stage)) : history
+    return { id: `${operatorId}:${room}`, operatorId, name: operator.name, room, stages: progression, stage: progression[progression.length - 1] }
+  })
 })
+
+function meetingStage(operatorId: string, stage: RatingStage): RatingStage {
+  const score = meetingStageScores[operatorId]?.[stage.elite]
+  if (score === null || score === undefined) throw new Error(`Missing meeting stage assessment: ${operatorId}/${stage.elite}`)
+  return { ...stage, assessment: { ...stage.assessment, score, provisional: stage.assessment.provisional || stage.skills.some((id) => /更容易|概率|倾向/.test(skills[id].description)) } }
+}
 
 export function comboBuildingRatingRange(combo: RatingCombo) {
   const scores = combo.variants.map((variant) => variant.score)
   const low = Math.min(...scores), high = Math.max(...scores)
   return { low, high, lowGrade: buildingRatingGrade(low), highGrade: buildingRatingGrade(high) }
+}
+
+export function comboBuildingRatingCore(combo: RatingCombo) {
+  return combo.variants[0].members.filter((member) => combo.core ? combo.core.includes(member.id) : combo.variants.every((variant) => variant.members.some((candidate) => candidate.id === member.id && candidate.room === member.room && candidate.station === member.station)))
 }
 
 export function relatedBuildingCombos(operatorId: string) {
@@ -122,7 +146,7 @@ export function ratingVariantStatus(variant: RatingVariant, roster: RatingRoster
     const room = key === 'tradingLevel' ? 'trading' : 'manufacture'
     const needed = [...groups.values()].filter((group) => group.room === room).map((group) => Math.max(group.count, Number(value))).sort((a, b) => b - a)
     const orderedLevels = levels ? [...levels].sort((a, b) => b - a) : null
-    const sufficient = orderedLevels && needed.length ? needed.every((level, index) => (orderedLevels[index] ?? 0) >= level) : actual !== null && actual >= Number(value)
+    const sufficient = orderedLevels && needed.length ? needed.every((level, index) => (orderedLevels[index] ?? 0) >= level) : actual !== null && (key === 'powerCountExact' ? actual === Number(value) : actual >= Number(value))
     conditions.push({ key, required: value, state: actual === null ? 'unknown' : sufficient ? 'ready' : 'blocked' })
   }
   const state: 'missing' | 'locked' | 'blocked' | 'unknown' | 'ready' = memberStates.includes('missing') ? 'missing' : memberStates.includes('locked') ? 'locked'
@@ -134,7 +158,8 @@ export function ratingVariantStatus(variant: RatingVariant, roster: RatingRoster
 function ratingFacilityValue(key: string, config: LicenseConfig): number | null {
   switch (key) {
     case 'tradingCount': return config.trading_stations_count
-    case 'powerCount': return getFacilityIds(config).filter((id) => id.startsWith('power_')).length
+    case 'powerCount':
+    case 'powerCountExact': return getFacilityIds(config).filter((id) => id.startsWith('power_')).length
     case 'tradingLevel': return config.trading_station_levels?.length ? Math.max(...config.trading_station_levels) : null
     case 'manufactureLevel': return config.manufacturing_station_levels?.length ? Math.max(...config.manufacturing_station_levels) : null
     case 'goldLines': return config.product_requirements.manufacturing_stations['Pure Gold'] ?? 0

@@ -26,6 +26,7 @@ import V1Route from './components/V1Route'
 import { completeDeploymentRefresh } from './lib/deployment-refresh'
 import { TaskDraftProvider } from './lib/task-drafts'
 import { authModeForPath, authPath, USER_SESSION_EXPIRED_EVENT } from './lib/auth-navigation'
+import { v2Section } from './pages/v2/navigation'
 
 
 const LandingPage = lazy(() => import('./pages/LandingPage'))
@@ -48,6 +49,7 @@ const PricingPage = lazy(() => import('./pages/PricingPage'))
 const ThanksPage = lazy(() => import('./pages/ThanksPage'))
 const StatusPage = lazy(() => import('./pages/StatusPage'))
 const V2Page = lazy(() => import('./pages/v2/V2Page'))
+const ValueClock = lazy(() => import('./pages/v2/pages/ValueClock'))
 const AuthPage = lazy(() => import('./pages/v2/AuthPage'))
 
 export default function App() {
@@ -98,7 +100,9 @@ function AppContent() {
 
   const v2Page = <FeatureRoute feature="v2" renderPending={(status, retry) => <V2LoadingScreen
     error={status === 'error' ? copy.features.load_failed_body : null} onRetry={retry} retryLabel={copy.features.retry} />}>
-    <PublicContentProvider><Suspense fallback={<V2LoadingScreen />}><V2Page /></Suspense></PublicContentProvider></FeatureRoute>
+    {v2Section(new URLSearchParams(location.search), location.hash, location.pathname) === 'value-clock'
+      ? <FeatureRoute feature="base_value_dashboard"><Suspense fallback={<V2LoadingScreen />}><ValueClock /></Suspense></FeatureRoute>
+      : <PublicContentProvider><Suspense fallback={<V2LoadingScreen />}><V2Page /></Suspense></PublicContentProvider>}</FeatureRoute>
 
   return (
     <div className="min-h-screen bg-surface-0 text-ink-primary">

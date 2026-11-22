@@ -82,6 +82,24 @@ describe('App public content routing', () => {
     await waitFor(() => expect(apiJson.mock.calls.some(([url]) => url === '/api/site/public-content')).toBe(true))
   })
 
+  it('loads the unlisted value clock directly without mounting the workspace or requesting personal data', async () => {
+    const original = apiJson.getMockImplementation()!
+    apiJson.mockImplementation((url: string) => {
+      if (url === '/api/site/features') return Promise.resolve({ ...DEFAULT_SITE_FEATURE_SETTINGS, features: { ...DEFAULT_SITE_FEATURE_SETTINGS.features, base_value_dashboard: true } })
+      if (url.startsWith('/api/site/value-clock')) return Promise.resolve({
+        schema_version: 1, view: 'production', series_id: 'production-v1', metric_version: 'production-sanity-v1', revision: 0,
+        tracking_started_at: null, server_now: '2026-11-22T00:00:00Z', as_of: '2026-11-22T00:00:00Z', valid_until: null,
+        day_started_at: '2026-11-21T16:00:00Z', day_ends_at: '2026-11-22T16:00:00Z', totals: null, today_totals: null, rates_per_second: null, active_accounts: 0, status: 'not_started',
+      })
+      return original(url)
+    })
+    render(<MemoryRouter initialEntries={['/v2?section=value-clock']}><App /></MemoryRouter>)
+    expect(await screen.findByRole('heading', { name: copy.valueClock.title })).toBeVisible()
+    expect(await screen.findByText(copy.valueClock.notStarted)).toBeVisible()
+    expect(screen.queryByText('V2 test workspace')).not.toBeInTheDocument()
+    expect(apiJson.mock.calls.some(([url]) => url === '/api/site/public-content' || url.startsWith('/api/auth/') || url.startsWith('/api/user/'))).toBe(false)
+  })
+
   it('uses the V2 loading screen and workspace from the first homepage render', async () => {
     let resolveFeatures!: (value: typeof DEFAULT_SITE_FEATURE_SETTINGS) => void
     apiJson.mockImplementation(() => new Promise((resolve) => { resolveFeatures = resolve }))

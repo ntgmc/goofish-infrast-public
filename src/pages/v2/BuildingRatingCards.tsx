@@ -7,10 +7,11 @@ import { motionTokens } from '../../components/MotionPrimitives'
 import SharedCardDialog from '../../components/ui/shared-card-dialog'
 import { DialogDescription, DialogTitle } from '../../components/ui/dialog'
 import { useAppReducedMotion } from '../../lib/motion-preference'
-import { buildingRatingCharacter, comboBuildingRatingRange, ratingMemberStatus, ratingVariantStatus, type RatingCombo, type RatingRoster, type RatingVariant, type SingleBuildingRating } from '../../lib/building-skill-ratings'
+import { buildingRatingCharacter, comboBuildingRatingCore, comboBuildingRatingRange, ratingMemberStatus, ratingVariantStatus, type RatingCombo, type RatingRoster, type RatingVariant, type SingleBuildingRating } from '../../lib/building-skill-ratings'
 import type { LicenseConfig } from '../../lib/types'
 import { Avatar } from './ScheduleBoard'
 import { RatingBadge, RatingStageDetails, RatingVariantDetails } from './BuildingRatingDetails'
+import BuildingRatingVariantPicker from './BuildingRatingVariantPicker'
 
 const text = copy.buildingRatings
 export type BuildingRatingEntry = SingleBuildingRating | RatingCombo
@@ -22,7 +23,7 @@ function RatingIdentity({ entry, detail = false, variant }: { entry: BuildingRat
   const range = variant ? { high: variant.score, low: undefined } : combo ? comboBuildingRatingRange(entry) : { high: entry.stage.assessment.score!, low: undefined }
   const primary = variant ?? (combo ? entry.variants.reduce((best, candidate) => candidate.score > best.score ? candidate : best) : null)
   const members = primary ? primary.members.filter((member) => member.room === entry.room) : []
-  const portraits = combo ? (members.length ? members : primary!.members).slice(0, 4) : [{ id: entry.operatorId }]
+  const portraits = combo ? (entry.partnerSlots && !detail ? comboBuildingRatingCore(entry) : members.length ? members : primary!.members).slice(0, 4) : [{ id: entry.operatorId }]
   const provisional = variant ? variant.provisional : combo ? entry.variants.some((candidate) => candidate.provisional) : entry.stage.assessment.provisional
   const Name = detail ? motion.h2 : motion.strong
   const title = <Name layoutId={reduced ? undefined : `rating-name-${entry.id}`} transition={motionTokens.morph}>{name}</Name>
@@ -103,7 +104,7 @@ const BuildingRatingCard = memo(function BuildingRatingCard({ entry, roster, act
     <button type="button" className="v2-rating-card-trigger" aria-haspopup="dialog" aria-label={text.openDetails(combo ? entry.title : entry.name)} />
     <RatingIdentity entry={entry} />
     <div className="v2-rating-card-meta">
-      {combo ? entry.variants.length > 1 && <span>{text.variants(entry.variants.length)}</span> : <span>{copy.domain.building_skills.unlock(entry.stage.elite, entry.stage.level)}</span>}
+      {combo ? entry.partnerSlots ? <span>{text.flexiblePartners(entry.partnerSlots)}</span> : entry.variants.length > 1 && <span>{text.variants(entry.variants.length)}</span> : <span>{copy.domain.building_skills.stage(entry.stage.elite, entry.stage.level, buildingRatingCharacter(entry.operatorId).rarity <= 2)}</span>}
       {roster && <span className="v2-rating-state" data-state={state ?? (owned ? 'ready' : 'missing')}>{combo ? owned ? text.membersOwned : text.membersMissing : text.memberStates[state!]}</span>}
     </div>
   </motion.article></LayoutGroup>
@@ -116,13 +117,11 @@ export function BuildingRatingDialog({ entry, initialVariant, source, roster, co
   const combo = 'variants' in entry
   return <SharedCardDialog layoutId={`rating-card-${entry.id}`} source={source} onClose={onClose} closeLabel={copy.v2.close} className="v2-rating-dialog">
     <header className="v2-rating-dialog-heading"><RatingIdentity entry={entry} detail variant={combo ? entry.variants[variantIndex] : undefined} />
-      <DialogDescription className="v2-rating-dialog-description">{ROOM_LABELS[entry.room] ?? entry.room}{combo ? entry.variants.length > 1 && ` · ${text.variants(entry.variants.length)}` : ` · ${text.minimum} · ${copy.domain.building_skills.unlock(entry.stage.elite, entry.stage.level)}`}</DialogDescription>
+      <DialogDescription className="v2-rating-dialog-description">{ROOM_LABELS[entry.room] ?? entry.room}{combo ? entry.partnerSlots ? ` · ${text.corePartners}` : entry.variants.length > 1 && ` · ${text.variants(entry.variants.length)}` : ` · ${text.minimum} · ${copy.domain.building_skills.stage(entry.stage.elite, entry.stage.level, buildingRatingCharacter(entry.operatorId).rarity <= 2)}`}</DialogDescription>
     </header>
     {combo ? <div className="v2-rating-dialog-body">
-      {entry.variants.length > 1 && <label className="v2-field v2-rating-variant-picker"><span>{text.chooseVariant}</span><select className="v2-input" value={variantIndex} onChange={(event) => setVariantIndex(Number(event.target.value))}>
-        {entry.variants.map((variant, index) => <option key={index} value={index}>{text.variantOption(index, variant.score, variant.members.filter((member) => member.room === entry.room).map((member) => buildingRatingCharacter(member.id).name).join(' / '))}</option>)}
-      </select></label>}
-      <RatingVariantDetails variant={entry.variants[variantIndex]} index={entry.variants.length > 1 ? variantIndex : undefined} roster={roster} config={config} />
+      <BuildingRatingVariantPicker combo={entry} index={variantIndex} onChange={setVariantIndex} roster={roster} />
+      <RatingVariantDetails variant={entry.variants[variantIndex]} room={entry.room} index={!entry.partnerSlots && entry.variants.length > 1 ? variantIndex : undefined} roster={roster} config={config} />
     </div> : <RatingStageDetails stages={entry.stages} member={{ id: entry.operatorId, room: entry.room, elite: entry.stage.elite, level: entry.stage.level, station: 'main' }} profileId={profileId} />}
   </SharedCardDialog>
 }

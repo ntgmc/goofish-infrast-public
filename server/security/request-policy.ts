@@ -804,6 +804,7 @@ const ROUTE_POLICIES = new Map<string, RoutePolicy>([
   ['/api/site/public-content-image', route({ GET: none() }, ['id'])],
   ['/api/changelog', route({ GET: none() }, ['page', 'release'])],
   ['/api/status', route({ GET: none() })],
+  ['/api/site/value-clock', route({ GET: none() }, ['view'])],
   ['/api/user/data/export', route({ GET: none() })],
   ['/api/user/data/delete-request', route({ POST: json('auth', requestSchemas.accountDelete) })],
   ['/api/user/data/cancel', route({ POST: json('auth', requestSchemas.deletionToken) })],

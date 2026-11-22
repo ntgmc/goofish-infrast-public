@@ -32,12 +32,12 @@ export default memo(function BuildingSkills({ operator }: { operator: RoomOperat
   </>
 })
 
-export function BuildingSkillList({ skills, operatorName, owned = true }: { skills: ReturnType<typeof operatorBuildingSkills>; operatorName?: string; owned?: boolean }) {
+export function BuildingSkillList({ skills, operatorName, owned = true, levelBased = skills.some((skill) => skill.level > 1) }: { skills: ReturnType<typeof operatorBuildingSkills>; operatorName?: string; owned?: boolean; levelBased?: boolean }) {
   const [params] = useSearchParams()
   const label = copy.domain.building_skills
   return <div className="v2-skill-list">{skills.map((skill) => <div className={`v2-skill v2-skill-${owned ? skill.state : 'locked'}`} key={skill.id}>
     <img src={`/building-skills/${skill.icon}.png`} alt="" width={32} height={32} loading="lazy" decoding="async" />
-    <div><strong>{skill.name}</strong><p className="v2-muted">{ROOM_LABELS[skill.room] ?? label.training} · {label.unlock(skill.elite, skill.level)}
+    <div><strong>{skill.name}</strong><p className="v2-muted">{ROOM_LABELS[skill.room] ?? label.training} · {label.stage(skill.elite, skill.level, levelBased)}
        · {owned ? skill.state === 'unknown' ? copy.buildingRatings.memberStates.unknown : label[skill.state as 'active' | 'locked' | 'upgraded'] : copy.v2.notOwnedLabel}</p>
       <p>{skill.description}</p></div>
   </div>)}{operatorName && <Link className="v2-text-button" to={`${v2Path('building-ratings', params.get('profile_id'))}&q=${encodeURIComponent(operatorName)}`}>{copy.buildingRatings.detailsLink}</Link>}</div>
