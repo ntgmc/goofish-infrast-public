@@ -23,12 +23,14 @@ export default function CancelAccountDeletionPage() {
 
   return (
     <AuthLayout title={copy.auth.pages_CancelAccountDeletionPage_004} description={copy.auth.pages_CancelAccountDeletionPage_005}>
+      <div className="grid gap-4">
         {error && <p className="v2-feedback v2-feedback-error" role="alert">{error}</p>}
         {status && <p className="v2-feedback" role="status" aria-live="polite">{status}</p>}
-        <button type="button" disabled={!token || loading || Boolean(status)} onClick={() => void cancel()} className="v2-button v2-button-primary v2-auth-submit">
+        <button type="button" disabled={!token || loading || Boolean(status)} onClick={() => void cancel()} className="v2-button v2-button-primary w-full">
           {loading ? copy.auth.pages_CancelAccountDeletionPage_006 : copy.auth.pages_CancelAccountDeletionPage_007}
         </button>
-        <Link to="/login" className="v2-auth-link">{copy.auth.pages_CancelAccountDeletionPage_008}</Link>
+        <Link to="/login" className="v2-button v2-button-secondary w-full">{copy.auth.pages_CancelAccountDeletionPage_008}</Link>
+      </div>
     </AuthLayout>
   )
 }
