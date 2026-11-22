@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { VALUE_CLOCK_METRICS as metrics, type ValueClockVector } from '../../src/lib/value-clock'
+import type { ValueClockVector } from '../../src/lib/value-clock'
 import type { WorkspaceResultHistoryExportItem } from '../../src/lib/types'
 import { freezeValueClockProduction, ValueClockError } from '../value-clock-production'
 import type { QueryClient } from './postgres'
@@ -43,9 +43,22 @@ export async function syncValueClockHistory(client: QueryClient): Promise<void> 
         started_at: new Date(row.at).toISOString(), ends_at: Number.isFinite(end) ? new Date(end).toISOString() : null, ...frozen.daily })
     }
     await client.query('delete from value_clock_intervals where identity = $1', [identity])
-    if (intervals.length) await client.query(`insert into value_clock_intervals(id, identity, profile_id, result_id, started_at, ends_at, ${metrics.join(', ')})
-      select id, identity, profile_id, result_id, started_at, ends_at, ${metrics.join(', ')} from jsonb_to_recordset($1::jsonb)
-      as r(id text, identity text, profile_id text, result_id text, started_at timestamptz, ends_at timestamptz, ${metrics.map((key) => `${key} numeric`).join(', ')})`, [JSON.stringify(intervals)])
+    if (intervals.length) await client.query(`insert into value_clock_intervals(
+        id, identity, profile_id, result_id, started_at, ends_at,
+        sanity, lmd_received, lmd_spent, lmd_net, experience_points, orundum,
+        gold_produced, gold_consumed, shards_produced, shards_consumed
+      )
+      select id, identity, profile_id, result_id, started_at, ends_at,
+        sanity, lmd_received, lmd_spent, lmd_net, experience_points, orundum,
+        gold_produced, gold_consumed, shards_produced, shards_consumed
+      from jsonb_to_recordset($1::jsonb)
+      as r(
+        id text, identity text, profile_id text, result_id text,
+        started_at timestamptz, ends_at timestamptz,
+        sanity numeric, lmd_received numeric, lmd_spent numeric, lmd_net numeric,
+        experience_points numeric, orundum numeric, gold_produced numeric,
+        gold_consumed numeric, shards_produced numeric, shards_consumed numeric
+      )`, [JSON.stringify(intervals)])
   }
   await client.query(`update value_clock_series set revision = revision + 1,
     started_at = (select min(started_at) from value_clock_intervals) where id = 'production-v1'`)
