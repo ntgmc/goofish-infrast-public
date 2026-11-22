@@ -4,6 +4,7 @@ import { useTaskDraft } from '../lib/task-drafts'
 import { copy } from '../copy/index'
 import { apiJson } from '../lib/api-client'
 import { useSklandSnapshot } from '../hooks/useSklandSnapshot'
+import { recordSklandSnapshotError } from '../lib/skland-snapshot-client'
 import { defaultCultivationQuery, type CultivationData, type CultivationOptions, type CultivationQuery } from '../lib/cultivation-contract'
 import { recommendCultivationTargets } from '../lib/cultivation-planner'
 import { useToolSession } from '../pages/tool/useToolSession'
@@ -68,7 +69,7 @@ export function useCultivation(session: ReturnType<typeof useToolSession>) {
     setPhase(refresh ? 'syncing' : 'calculating')
     setError(null)
     try {
-      if (refresh) await snapshot.refresh()
+      if (refresh && !await snapshot.refresh()) return
       if (controller.signal.aborted) return
       setPhase('calculating')
       const result = await apiJson<CultivationData>('/api/cultivation-plan', { method: 'POST', json: { profile_id: profileId, recommendation }, signal: controller.signal, timeoutMs: 90000, fallbackMessage: label.failed })
@@ -78,7 +79,10 @@ export function useCultivation(session: ReturnType<typeof useToolSession>) {
         setAppliedOptions((value) => ({ ...value, recommendation }))
       }
     } catch (caught) {
-      if (generation.current === run && !controller.signal.aborted) setError(caught instanceof Error ? caught.message : label.failed)
+      if (generation.current === run && !controller.signal.aborted) {
+        recordSklandSnapshotError(session.user!.id, profiles.find((profile) => profile.id === profileId)!, caught)
+        setError(caught instanceof Error ? caught.message : label.failed)
+      }
     } finally { if (generation.current === run) setPhase(null) }
   }
 
@@ -122,6 +126,6 @@ export function useCultivation(session: ReturnType<typeof useToolSession>) {
     if (data && JSON.stringify(next.recommendation) !== JSON.stringify(data.recommendation?.query ?? defaultCultivationQuery)) void load(next.recommendation, true, false)
   }
 
-  return { profiles, profileId, setChosenProfile, data, busy: busy || snapshot.busy, phase: phase ?? (snapshot.busy ? 'syncing' : null), error: error || snapshot.error || null, options, setOptions, appliedOptions,
+  return { profiles, profileId, setChosenProfile, data, busy: busy || snapshot.busy, phase: phase ?? (snapshot.busy ? 'syncing' : null), error: snapshot.error || error || null, options, setOptions, appliedOptions,
     limit, setLimit, recommendations, load, exclude, changed, apply }
 }

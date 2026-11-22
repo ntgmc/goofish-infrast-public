@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import { copy } from '../../../copy'
-import { RefreshIcon, ConfigIcon } from '../../../components/icons'
-import SklandIcon from '../../../components/SklandIcon'
-import SklandBindingDialog from '../../../components/SklandBindingDialog'
+import { ConfigIcon } from '../../../components/icons'
+import SklandDataActions from '../../../components/SklandDataActions'
 import { Tabs } from '../../../components/ui/tabs'
 import { useSklandSnapshot } from '../../../hooks/useSklandSnapshot'
 import { sklandResourceState } from '../../../lib/skland-snapshot'
@@ -54,7 +53,6 @@ export default function Skland({ session, onOpenProfile, onProfiles, onConfig }:
   const canRefresh = snapshot.available && !snapshot.busy && !(data?.retryAt && Date.parse(data.retryAt) > now)
   const game = data && ['fresh', 'stale'].includes(sklandResourceState(data.game.fetchedAt)) ? data.game.data : null
   const profiles = session.profiles.filter((entry) => entry.status === 'active' && !entry.archived_at)
-  const rebind = !profile?.skland_binding || profile.skland_binding.credential_status === 'invalid'
   return <div className="space-y-5">
     <section className="v2-panel p-5 sm:p-6">
       <div className="skland-account-controls flex flex-wrap items-end justify-between gap-4">
@@ -65,14 +63,13 @@ export default function Skland({ session, onOpenProfile, onProfiles, onConfig }:
           }}>{!profile && <option value="" disabled>{text.manageAccounts}</option>}{profiles.map((entry) => <option key={entry.id} value={entry.id}>{entry.display_name}</option>)}</select>
         </label> : <button type="button" className="v2-button v2-button-secondary" onClick={onProfiles}>{text.manageAccounts}</button>}
         <div className="v2-actions">
-          {profile && rebind ? <button type="button" className="v2-button v2-button-primary" onClick={() => setBinding(true)}><SklandIcon />{text.bind}</button>
-            : profile && <button type="button" className="v2-button v2-button-secondary" aria-busy={snapshot.busy} disabled={!canRefresh}
-              onClick={() => void refresh()}><RefreshIcon size={16} aria-hidden="true" />{snapshot.busy ? text.refreshing : text.refresh}</button>}
+          <SklandDataActions session={session} profile={profile} open={binding} onOpenChange={setBinding}
+            onRefresh={() => void refresh()} refreshing={snapshot.busy} refreshDisabled={!canRefresh} />
           {session.license && <button type="button" className="v2-button v2-button-secondary" onClick={onConfig}><ConfigIcon size={16} aria-hidden="true" />{text.configure}</button>}
-          <PageHelp page="skland" profileId={profile?.id} credentialInvalid={profile?.skland_binding?.credential_status === 'invalid'} inventoryIssue={Boolean(data?.inventory.error || !data?.inventory.items)} onAuthorize={profile ? () => setBinding(true) : undefined} onRefreshInventory={canRefresh ? () => void refresh() : undefined} />
+          <PageHelp page="skland" profileId={profile?.id} credentialInvalid={snapshot.needsAuthorization} inventoryIssue={Boolean(data?.inventory.error || !data?.inventory.items)} onAuthorize={profile ? () => setBinding(true) : undefined} onRefreshInventory={canRefresh ? () => void refresh() : undefined} />
         </div>
       </div>
-      {rebind && <p className="mt-4 text-sm text-ink-secondary">{text.bindFirst}</p>}
+      {profile && !profile.skland_binding && <p className="mt-4 text-sm text-ink-secondary">{text.bindFirst}</p>}
       {snapshot.error && <Notice error>{snapshot.error}</Notice>}
       <DataRefresh pending={snapshot.busy} revision={data} error={Boolean(snapshot.error)}
         label={copy.v2.dataActivity.syncing} description={data ? copy.v2.dataActivity.current : undefined} skeleton={data ? undefined : 'cards'} />
@@ -101,8 +98,6 @@ export default function Skland({ session, onOpenProfile, onProfiles, onConfig }:
         <DataTime value={data.game.fetchedAt} />
       </Tabs.Content>
     </Tabs.Root>}
-    <SklandBindingDialog key={profile?.id} open={binding} profile={profile} context={profile?.kind === 'depot_value' ? 'depot' : 'workspace'} autoStart
-      onOpenChange={setBinding} onPayload={session.applyAuthPayload} onCompleted={() => { setBinding(false); snapshot.reload() }} />
   </div>
 }
 

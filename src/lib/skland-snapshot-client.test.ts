@@ -48,7 +48,7 @@ describe('cross-page Skland data', () => {
     expect(readSklandSnapshotState(key).data?.version).toBe('2')
   })
 
-  it('keeps successful data after network failures and removes it after authorization failures', async () => {
+  it('keeps successful data after network failures and scopes authorization failures to the requesting profile', async () => {
     await loadSklandSnapshot('user', profile)
     mocks.api.mockRejectedValueOnce(new Error('offline'))
     await expect(loadSklandSnapshot('user', profile, { force: true })).rejects.toThrow('offline')
@@ -56,7 +56,9 @@ describe('cross-page Skland data', () => {
     await vi.waitFor(() => expect(readSklandSnapshotState(key).busy).toBe(false))
     mocks.api.mockRejectedValueOnce(new ApiError('cleared', 400, { code: 'skland_credential_invalid' }, '/api/user/skland/snapshot/refresh'))
     await expect(loadSklandSnapshot('user', profile, { force: true })).rejects.toThrow('cleared')
-    expect(readSklandSnapshotState(key).data).toBeNull()
+    expect(readSklandSnapshotState(key).accessErrors.profile.code).toBe('skland_credential_invalid')
+    expect(readSklandSnapshotState(key).accessErrors.other).toBeUndefined()
+    expect(readSklandSnapshotState(key).data?.inventory.lmd).toBe(100)
   })
 
   it('cannot restore cleared or logged-out data from late responses', async () => {

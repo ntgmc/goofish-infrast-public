@@ -364,7 +364,7 @@ export default async (req: Request): Promise<Response> => {
 
       const accountToken = await getHypergryphTokenByScanCode(scanCode)
       const cred = await getCredByHypergryphToken(accountToken)
-      return await createPendingSklandBindingFromCred(auth.user, profile, cred, undefined, { req, sessionTokenHash: auth.tokenHash })
+      return await createPendingSklandBindingFromCred(auth.user, profile, cred, undefined, { req, sessionTokenHash: auth.tokenHash }, body.purpose === 'reauthorize' ? 'reauthorize' : undefined)
     }
 
     if (pathname.endsWith('/credential/preview')) {
@@ -375,7 +375,7 @@ export default async (req: Request): Promise<Response> => {
       const source = normalizeCredentialSource(body.source)
       const cred = extractSklandCredential(body.credential_text)
       if (!cred) return jsonResponse({ error: '缺少森空岛凭据。' }, 400)
-      return await createPendingSklandBindingFromCred(auth.user, profile, cred, source, { req, sessionTokenHash: auth.tokenHash })
+      return await createPendingSklandBindingFromCred(auth.user, profile, cred, source, { req, sessionTokenHash: auth.tokenHash }, body.purpose === 'reauthorize' ? 'reauthorize' : undefined)
     }
 
     if (pathname.endsWith('/account/select')) {
@@ -869,7 +869,30 @@ async function confirmProfileSklandBinding(input: {
 
   const now = new Date().toISOString()
   let operationResponse: SklandConfirmationOperationResponse
-  if (isDepotValueProfile(input.profile)) {
+  if (pending.purpose === 'reauthorize') {
+    const accounts = await listSklandArknightsBindingsByCred(decryptSklandCredential(pending.encrypted_cred))
+    if (!accounts.some((account) => account.uid === pending.uid)) {
+      throw new SklandHttpError('skland_credential_invalid', '当前账号不在森空岛授权列表中，请重新授权。', 400, 'rebind')
+    }
+    operationResponse = await withTransaction(async (client) => {
+      const operationId = await beginSklandConfirmationOperation(client, {
+        userId: input.user.id, idempotencyKey: input.idempotencyKey, requestHash, operationType: 'bind_skland_profile', now,
+      })
+      const locked = await client.query<{ record_json: UserGameAccountRecord }>(
+        'select record_json from user_game_accounts where id = $1 and user_id = $2 for update',
+        [input.profile.id, input.user.id],
+      )
+      const current = locked.rows[0]?.record_json
+      if (!current) throw new SklandHttpError('profile_not_found', '账号档案不存在。', 404)
+      assertCurrentConfirmation(current.skland_pending_binding, input.confirmationId)
+      if (current.archived_at || current.status !== 'active') throw new SklandHttpError('profile_unavailable', '当前档案不可用。', 409)
+      if (current.skland_binding?.uid !== pending.uid) throw new SklandHttpError('skland_account_mismatch', '森空岛账号与当前绑定账号不一致，请重新授权。', 409, 'rebind')
+      await saveProfileInTransaction(client, buildAuthorizedSklandProfile(current, current.skland_pending_binding, now))
+      const response = { profile_id: current.id }
+      await completeSklandConfirmationOperation(client, operationId, response, now)
+      return response
+    })
+  } else if (isDepotValueProfile(input.profile)) {
     const imported = await importSklandOperatorsByCred(decryptSklandCredential(pending.encrypted_cred), { uid: pending.uid, includeInventory: true })
     operationResponse = await withTransaction(async (client) => {
       const operationId = await beginSklandConfirmationOperation(client, {
@@ -893,7 +916,7 @@ async function confirmProfileSklandBinding(input: {
       if (current.status !== 'active') {
         throw new SklandHttpError('profile_unavailable', '账号档案状态不可用。', 409)
       }
-      const nextProfile = buildDepotValueSklandProfile(current, currentPending, now)
+      const nextProfile = buildAuthorizedSklandProfile(current, currentPending, now)
       await saveProfileInTransaction(client, nextProfile)
       await seedSklandSnapshot(client, nextProfile, imported.snapshot)
       const response = { profile_id: current.id }
@@ -1447,7 +1470,7 @@ function buildFreePreviewClaim(
   }
 }
 
-function buildDepotValueSklandProfile(
+function buildAuthorizedSklandProfile(
   profile: UserGameAccountRecord,
   pending: SklandPendingConfirmationRecord,
   now: string,
@@ -1460,7 +1483,7 @@ function buildDepotValueSklandProfile(
       nickname: pending.nickname,
       channel_name: pending.channel_name,
       bound_at: existingBinding?.bound_at ?? now,
-      last_imported_at: null,
+      last_imported_at: existingBinding?.last_imported_at ?? null,
       encrypted_cred: pending.encrypted_cred,
       credential_status: 'available',
       credential_invalid_at: null,
@@ -1478,9 +1501,29 @@ async function createPendingSklandBindingFromCred(
   cred: string,
   source?: CredentialSource,
   requestContext?: SklandRequestContext,
+  purpose?: 'reauthorize',
 ): Promise<Response> {
   const accounts = await listSklandArknightsBindingsByCred(cred)
   const existingUid = profile.skland_binding?.uid
+  if (purpose === 'reauthorize') {
+    if (!existingUid) throw new SklandHttpError('skland_not_bound', '请先绑定森空岛。', 400, 'bind_first')
+    const account = accounts.find((entry) => entry.uid === existingUid)
+    if (!account) {
+      const other = accounts.find((entry) => entry.is_default) ?? accounts[0]
+      return handleAccountMismatch(user, profile, { ...other, operator_count: 0 }, requestContext)
+    }
+    const now = new Date()
+    const pending: SklandPendingConfirmationRecord = {
+      stage: 'confirmation', purpose, confirmation_id: randomUUID(),
+      uid: account.uid, nickname: account.nickname, channel_name: account.channel_name, operator_count: 0,
+      encrypted_cred: encryptSklandCredential(cred), created_at: now.toISOString(),
+      expires_at: new Date(now.getTime() + PENDING_BINDING_TTL_MS).toISOString(),
+    }
+    await updateSklandProfile(profile, (current) => ({ ...current, skland_pending_binding: pending, updated_at: pending.created_at }))
+    return jsonResponse({ status: 'confirm_required', confirmation_id: pending.confirmation_id,
+      skland_preview: { uid: account.uid, nickname: account.nickname, channel_name: account.channel_name, operator_count: 0 },
+      warning: '请核对当前账号，确认后恢复森空岛授权。' })
+  }
   if (existingUid) {
     const matchingAccount = accounts.find((account) => account.uid === existingUid)
     if (matchingAccount) {

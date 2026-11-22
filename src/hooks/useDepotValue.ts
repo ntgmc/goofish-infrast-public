@@ -4,7 +4,7 @@ import { type SklandPayload } from '../components/SklandBindingDialog'
 import { getCurrentSiteUrl } from '../lib/site-url'
 import { apiJson } from '../lib/api-client'
 import { useSklandSnapshot } from './useSklandSnapshot'
-import { syncSklandSnapshotSession } from '../lib/skland-snapshot-client'
+import { recordSklandSnapshotError, syncSklandSnapshotSession } from '../lib/skland-snapshot-client'
 import { MAX_DEPOT_ITEM_COUNT, MAX_DEPOT_ITEM_TYPES } from '../lib/depot-value-constraints'
 import type { AuthMeResponse, DepotValueItem, DepotValueProfileResponse, DepotValueRequest, DepotValueResponse, UserGameAccount } from '../lib/types'
 import { copy, CURRENT_LOCALE } from '../copy/index'
@@ -99,11 +99,14 @@ export function useDepotValue(session: ReturnType<typeof useToolSession>) {
       })
       if (!controller.signal.aborted) setResult(data)
     } catch (caught) {
-      if (!controller.signal.aborted) setError((caught as Error).message)
+      if (!controller.signal.aborted) {
+        if (payload.source === 'skland' && auth?.user && selectedSklandProfile) recordSklandSnapshotError(auth.user.id, selectedSklandProfile, caught)
+        setError((caught as Error).message)
+      }
     } finally {
       if (!controller.signal.aborted) setLoading(null)
     }
-  }, [])
+  }, [auth?.user?.id, selectedSklandProfile])
 
   useEffect(() => {
     const version = snapshot.data?.version
@@ -180,13 +183,10 @@ export function useDepotValue(session: ReturnType<typeof useToolSession>) {
     const profileId = selectedSklandProfile?.id
     if (profileId) {
       setSelectedProfileId(profileId)
-      if (selectedSklandProfile?.skland_binding?.credential_status === 'invalid') {
-        await openSklandBinding()
-        return
-      }
+      if (snapshot.needsAuthorization) return
       const next = await snapshot.refresh()
-      if (selectedAccount.current !== selectionKey) return
-      if (next) analyzedVersion.current = `${profileId}:${next.version}`
+      if (!next || selectedAccount.current !== selectionKey) return
+      analyzedVersion.current = `${profileId}:${next.version}`
       await analyze({ source: 'skland', profile_id: profileId, sample_consent: sampleConsent })
       return
     }
@@ -229,7 +229,7 @@ export function useDepotValue(session: ReturnType<typeof useToolSession>) {
 
   return { canvasRef, depotText, setDepotText, auth, authLoading, authError, depotProfile,
     selectedProfileId, setSelectedProfileId, result, setResult, loading: loading ?? (snapshot.busy ? 'skland' as const : null), profilePreparing, sklandDialogOpen, setSklandDialogOpen,
-    sampleConsent, setSampleConsent, error: error || snapshot.error || null, setError, sklandProfiles, selectedSklandProfile, openSklandBinding,
+    sampleConsent, setSampleConsent, error: snapshot.error || error || null, setError, sklandProfiles, selectedSklandProfile, openSklandBinding,
     readClipboard, analyzeUpload, analyzeSkland, handleSklandPayload, handleSklandCompleted, downloadShareImage }
 }
 

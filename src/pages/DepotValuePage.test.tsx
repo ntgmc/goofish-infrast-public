@@ -27,6 +27,7 @@ vi.mock('../components/SklandBindingDialog', () => ({
 
 beforeEach(() => {
   mocks.apiJson.mockReset()
+  mocks.refresh.mockResolvedValue({ version: 'refreshed' })
   mocks.snapshot.mockReturnValue({ data: null, busy: false, error: '', refresh: mocks.refresh })
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null)
   HTMLElement.prototype.scrollIntoView = vi.fn()

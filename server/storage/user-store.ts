@@ -123,6 +123,7 @@ export interface SklandPendingAccountSelectionRecord extends SklandPendingBindin
 
 export interface SklandPendingConfirmationRecord extends SklandPendingBindingBase {
   stage?: 'confirmation'
+  purpose?: 'reauthorize'
   uid: string
   nickname: string
   channel_name: string

@@ -506,9 +506,10 @@ export const requestSchemas = {
   }),
   sklandProfile: strict({ profile_id: shortString(128) }),
   sklandSnapshotRefresh: strict({ profile_id: shortString(128), force: z.boolean().optional() }),
-  sklandScan: strict({ profile_id: shortString(128), scan_id: shortString(256) }),
+  sklandScan: strict({ profile_id: shortString(128), scan_id: shortString(256), purpose: z.literal('reauthorize').optional() }),
   sklandCredential: strict({
     profile_id: shortString(128),
+    purpose: z.literal('reauthorize').optional(),
     credential_text: z.string().min(1).max(16 * 1024),
     source: z.enum(['manual', 'bookmarklet']).optional(),
   }),

@@ -134,7 +134,7 @@ export default function WorkspaceSections({ section, session, workflow, generati
                 {section === 'benchmarks' && <SiteBenchmark />}
                 {section === 'updates' && <Updates />}
                 {section === 'plans' && workflow && <Plans workflow={workflow} />}
-                {section === 'generation' && workflow && <Generation workflow={workflow} progress={generationProgress} disabledReason={generationDisabledReason}
+                {section === 'generation' && workflow && <Generation session={session} workflow={workflow} progress={generationProgress} disabledReason={generationDisabledReason}
                   preparationStep={guided ? step : undefined} onOperators={onOperators} onNavigate={onNavigate} onConfig={onConfig} />}
                 {section === 'lab' && workflow && <Lab workflow={workflow} onConfig={onConfig} />}
               </>}

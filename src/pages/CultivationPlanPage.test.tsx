@@ -10,7 +10,7 @@ import { copy } from '../copy'
 const text = copy.tools.cultivation
 const mocks = vi.hoisted(() => ({ api: vi.fn(), session: vi.fn(), snapshot: vi.fn(), refresh: vi.fn() }))
 vi.mock('../hooks/useSklandSnapshot', () => ({ useSklandSnapshot: mocks.snapshot }))
-vi.mock('../lib/api-client', () => ({ apiJson: mocks.api }))
+vi.mock('../lib/api-client', async (original) => ({ ...await original<typeof import('../lib/api-client')>(), apiJson: mocks.api }))
 vi.mock('./tool/useToolSession', () => ({ useToolSession: mocks.session }))
 vi.mock('../components/ThemeSwitcher', () => ({ default: () => null }))
 
@@ -25,8 +25,9 @@ const sample = (): CultivationData => ({
 beforeEach(() => {
   localStorage.clear()
   vi.clearAllMocks()
+  mocks.refresh.mockResolvedValue({ version: 'refreshed' })
   mocks.snapshot.mockReturnValue({ data: null, busy: false, error: '', refresh: mocks.refresh })
-  mocks.session.mockReturnValue({ authLoading: false, authStatus: 'authenticated', activeProfile: { id: 'one' }, profiles: [{ id: 'one', display_name: '档案一', status: 'active', skland_binding: {} }, { id: 'two', display_name: '档案二', status: 'active', skland_binding: {} }] })
+  mocks.session.mockReturnValue({ user: { id: 'doctor' }, authLoading: false, authStatus: 'authenticated', activeProfile: { id: 'one' }, profiles: [{ id: 'one', display_name: '档案一', status: 'active', skland_binding: {} }, { id: 'two', display_name: '档案二', status: 'active', skland_binding: {} }] })
   mocks.api.mockResolvedValue(sample())
 })
 afterEach(cleanup)
@@ -36,7 +37,7 @@ const content = () => <MemoryRouter><Cultivation session={mocks.session()} /></M
 describe('homework training recommendations', () => {
   it('shows real sync and calculation waits and preserves results and drafts after a failed refresh', async () => {
     let finishSync!: () => void, finishCalculation!: (data: CultivationData) => void
-    mocks.refresh.mockReturnValue(new Promise<void>((resolve) => { finishSync = resolve }))
+    mocks.refresh.mockReturnValue(new Promise((resolve) => { finishSync = () => resolve({ version: 'refreshed' }) }))
     mocks.api.mockReturnValueOnce(new Promise<CultivationData>((resolve) => { finishCalculation = resolve }))
     render(content())
     fireEvent.click(screen.getByRole('button', { name: copy.skland.refresh }))

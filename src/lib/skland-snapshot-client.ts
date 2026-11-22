@@ -3,14 +3,15 @@ import { ApiError, apiJson } from './api-client'
 import { SKLAND_FRESH_MS, type SklandSnapshot } from './skland-snapshot'
 import type { AuthSuccessResponse, UserGameAccount } from './types'
 
-type State = { data: SklandSnapshot | null; busy: boolean; error: string; revision: number; checkedAt: number; blocked: boolean }
+type AccessError = { code: string; message: string }
+type State = { data: SklandSnapshot | null; busy: boolean; error: string; revision: number; checkedAt: number; blocked: boolean; accessErrors: Record<string, AccessError> }
 type Entry = { state: State; listeners: Set<() => void>; request: Promise<SklandSnapshot> | null; generation: number }
 const entries = new Map<string, Entry>()
 let user: string | null = null
 let profiles = new Map<string, string>()
 let channel: BroadcastChannel | null = null
 let subscribers = 0
-function broadcast(message: { key?: string; logout?: true }): void {
+function broadcast(message: { key?: string; logout?: true; authorization?: { userId: string; profileId: string } }): void {
   if (channel) channel.postMessage(message)
   else if (typeof BroadcastChannel !== 'undefined') {
     const notification = new BroadcastChannel('maatool:skland-snapshot')
@@ -23,7 +24,7 @@ export const sklandSnapshotKey = (userId: string, uid: string) => JSON.stringify
 function entry(key: string): Entry {
   let current = entries.get(key)
   if (!current) {
-    current = { state: { data: null, busy: false, error: '', revision: 0, checkedAt: 0, blocked: false }, listeners: new Set(), request: null, generation: 0 }
+    current = { state: { data: null, busy: false, error: '', revision: 0, checkedAt: 0, blocked: false, accessErrors: {} }, listeners: new Set(), request: null, generation: 0 }
     entries.set(key, current)
   }
   return current
@@ -64,6 +65,30 @@ export function invalidateSklandSnapshot(key: string, notify = false): void {
   if (notify) broadcast({ key })
 }
 
+export function notifySklandAuthorization(userId: string, profile: Pick<UserGameAccount, 'id' | 'skland_binding'>): void {
+  resetSklandProfileSnapshot(userId, profile)
+  broadcast({ authorization: { userId, profileId: profile.id } })
+}
+
+export function resetSklandProfileSnapshot(userId: string, profile: Pick<UserGameAccount, 'id' | 'skland_binding'>): void {
+  if (!profile.skland_binding) return
+  const key = sklandSnapshotKey(userId, profile.skland_binding.uid)
+  const current = entries.get(key)
+  if (current) {
+    const { [profile.id]: _removed, ...accessErrors } = current.state.accessErrors
+    update(current, { accessErrors })
+  }
+  invalidateSklandSnapshot(key, true)
+}
+
+export function recordSklandSnapshotError(userId: string, profile: Pick<UserGameAccount, 'id' | 'skland_binding'>, error: unknown): void {
+  if (!profile.skland_binding || !(error instanceof ApiError) || ![400, 401, 403, 404, 409].includes(error.status)) return
+  const current = entry(sklandSnapshotKey(userId, profile.skland_binding.uid))
+  const code = (error.data as { code?: string } | null)?.code ?? (error.status === 401 ? 'session_expired' : 'skland_access_denied')
+  if (![401, 403, 404].includes(error.status) && !['skland_credential_invalid', 'skland_not_bound', 'skland_binding_changed'].includes(code)) return
+  update(current, { accessErrors: { ...current.state.accessErrors, [profile.id]: { code, message: error.message } } })
+}
+
 export function clearSklandAccountSnapshot(uid: string): void {
   if (!user) return
   const key = sklandSnapshotKey(user, uid)
@@ -80,7 +105,7 @@ export function syncSklandSnapshotSession(payload: Pick<AuthSuccessResponse, 'us
     for (const current of entries.values()) {
       current.generation++
       current.request = null
-      update(current, { data: null, busy: false, error: '', checkedAt: 0, blocked: false, revision: current.state.revision + 1 })
+      update(current, { data: null, busy: false, error: '', checkedAt: 0, blocked: false, accessErrors: {}, revision: current.state.revision + 1 })
     }
     if (!payload) broadcast({ logout: true })
   }
@@ -88,7 +113,7 @@ export function syncSklandSnapshotSession(payload: Pick<AuthSuccessResponse, 'us
     const binding = profile.skland_binding
     const signature = JSON.stringify([binding?.uid, binding?.bound_at, binding?.credential_status, binding?.last_imported_at, profile.status, profile.archived_at])
     const old = profiles.get(profile.id)
-    if (old && old !== signature && binding?.uid) invalidateSklandSnapshot(sklandSnapshotKey(nextUser!, binding.uid), true)
+    if (old && old !== signature && binding?.uid) resetSklandProfileSnapshot(nextUser!, profile)
     profiles.set(profile.id, signature)
   }
 }
@@ -114,16 +139,17 @@ export function loadSklandSnapshot(userId: string, profile: Pick<UserGameAccount
     }
     if (current.generation === generation) {
       const changed = current.state.data?.version !== data.version
-      update(current, { data, checkedAt: Date.now(), blocked: false, error: data.inventory.error ?? data.game.error ?? '' })
+      const { [profile.id]: _removed, ...accessErrors } = current.state.accessErrors
+      update(current, { data, checkedAt: Date.now(), blocked: false, accessErrors, error: data.inventory.error ?? data.game.error ?? '' })
       if (changed) broadcast({ key })
     }
     return data
   })()
   const tracked = request.catch((error) => {
-    if (current.generation === generation) update(current, {
-      ...(error instanceof ApiError && [400, 401, 403, 404, 409].includes(error.status) ? { data: null, blocked: true } : {}),
-      error: error instanceof Error ? error.message : copy.skland.failed,
-    })
+    if (current.generation === generation) {
+      recordSklandSnapshotError(userId, profile, error)
+      if (!current.state.accessErrors[profile.id]) update(current, { error: error instanceof Error ? error.message : copy.skland.failed })
+    }
     throw error
   }).finally(() => {
     if (current.request === tracked) { current.request = null; update(current, { busy: false }) }

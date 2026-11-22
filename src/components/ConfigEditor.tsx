@@ -118,6 +118,9 @@ function bindAutoDrones(config: LicenseConfig): void {
 
 interface ConfigEditorProps {
   profileId?: string
+  sklandActions?: React.ReactNode
+  sklandAuthorizationMessage?: string
+  onSklandError?: (error: unknown) => void
   config: LicenseConfig
   canEdit: boolean
   readOnly?: boolean
@@ -139,7 +142,7 @@ interface ConfigEditorProps {
 }
 
 export default function ConfigEditor({
-  profileId, config, canEdit, readOnly = false, readOnlyMessage = copy.common.configGenerationReadOnly, canEditIntermediateInventory,
+  profileId, sklandActions, sklandAuthorizationMessage, onSklandError, config, canEdit, readOnly = false, readOnlyMessage = copy.common.configGenerationReadOnly, canEditIntermediateInventory,
   canSelectPreset = false, canEditFixedShiftHours = false, showOrundumPreference = false, changed = false, permission,
   validation, onUpdate, note, embedded = false, hideHeader = false,
   hidePresetActions = false, hideValidation = false, guideSklandImport = false,
@@ -153,7 +156,7 @@ export default function ConfigEditor({
     setImporting(false)
     setImportFeedback(null)
     return () => importRequest.current?.abort()
-  }, [profileId, readOnly])
+  }, [profileId, readOnly, sklandAuthorizationMessage])
   const roomsTabRef = useRef<HTMLButtonElement>(null)
   const roomsPanelRef = useRef<HTMLDivElement>(null)
   const orundumTabRef = useRef<HTMLButtonElement>(null)
@@ -238,7 +241,10 @@ export default function ConfigEditor({
       setImportFeedback({ kind: 'imported', previousDataTime: response.refresh_warning ? new Date(response.fetched_at).toLocaleString('zh-CN') : undefined })
       if (!guideSklandImport) showRooms()
     } catch (error) {
-      if (!controller.signal.aborted) setImportFeedback({ kind: 'error', message: error instanceof Error ? error.message : copy.common.facilityLayoutReadFailed })
+      if (!controller.signal.aborted) {
+        onSklandError?.(error)
+        setImportFeedback({ kind: 'error', message: error instanceof Error ? error.message : copy.common.facilityLayoutReadFailed })
+      }
     } finally {
       if (importRequest.current === controller) importRequest.current = null
       if (!controller.signal.aborted) setImporting(false)
@@ -295,7 +301,7 @@ export default function ConfigEditor({
   })
 
   const imported = importFeedback?.kind === 'imported' ? importFeedback : null
-  const importError = importFeedback?.kind === 'error' ? importFeedback.message : null
+  const importError = sklandAuthorizationMessage ?? (importFeedback?.kind === 'error' ? importFeedback.message : null)
   const previousDataTime = imported?.previousDataTime
   const ImportIcon = previousDataTime ? ServiceOverloadedIcon : imported ? SuccessIcon : ErrorIcon
   const importTitle = importError ? copy.skland.configReview.failed : previousDataTime ? copy.skland.configReview.previousTitle : copy.skland.configReview.success
@@ -327,11 +333,12 @@ export default function ConfigEditor({
         <Tabs.Trigger value="strategy">{text.strategy}</Tabs.Trigger>
       </Tabs.List>
       {profileId && <div className={guideSklandImport ? 'config-skland-import' : 'config-field mt-4'} data-imported={guideSklandImport && imported ? true : undefined}>
-        <button type="button" className="tool-secondary-action min-h-11 px-4 config-skland-trigger" disabled={readOnly || (!guideSklandImport && importing)}
+        {!sklandAuthorizationMessage && <button type="button" className="tool-secondary-action min-h-11 px-4 config-skland-trigger" disabled={readOnly || (!guideSklandImport && importing)}
           aria-busy={importing} aria-disabled={guideSklandImport && importing ? true : undefined} aria-describedby={guideSklandImport ? importMessageId : undefined}
-          onClick={() => void importSklandConfig()}><SklandIcon />{importing ? copy.skland.importingConfig : guideSklandImport && imported ? text.reimportConfig : copy.skland.importConfig}</button>
-        <p id={importMessageId} className={guideSklandImport && importFeedback ? 'sr-only' : 'config-help config-skland-help'}>{guideSklandImport ? copy.skland.configReview.importHelp : copy.skland.importConfigHelp}</p>
-        {guideSklandImport && <div className={importFeedback ? 'config-skland-feedback' : 'sr-only'} data-kind={importError ? 'error' : imported?.previousDataTime ? 'previous' : imported ? 'success' : undefined}>
+          onClick={() => void importSklandConfig()}><SklandIcon />{importing ? copy.skland.importingConfig : guideSklandImport && imported ? text.reimportConfig : copy.skland.importConfig}</button>}
+        {sklandActions && <div className="v2-actions">{sklandActions}</div>}
+        <p id={importMessageId} className={guideSklandImport && (importFeedback || sklandAuthorizationMessage) ? 'sr-only' : 'config-help config-skland-help'}>{guideSklandImport ? copy.skland.configReview.importHelp : copy.skland.importConfigHelp}</p>
+        {guideSklandImport && <div className={importFeedback || sklandAuthorizationMessage ? 'config-skland-feedback' : 'sr-only'} data-kind={importError ? 'error' : imported?.previousDataTime ? 'previous' : imported ? 'success' : undefined}>
           <div role="status" aria-atomic="true" className="config-skland-message">
             {(imported || importError) && <><ImportIcon size={18} aria-hidden="true" /><div>
               <strong>{importTitle}</strong>
