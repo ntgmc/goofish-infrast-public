@@ -1,6 +1,6 @@
 # 全站基建价值时钟 Handoff
 
-状态：价值时钟已实现，V2 保持隐藏入口，通过 `/v2?section=value-clock` 直达。后台“公开工具 → 基建价值大屏”（`base_value_dashboard`）默认关闭，依赖 `site`、`tools`、`v2`。其余三个大屏仍为待实现方案，不提供未实现页面的跳转。
+状态：价值时钟已实现并保持隐藏入口。优化增益时钟的实现代码和数据结构已保留，但页面入口与相关 API 当前关闭。后台“公开工具 → 基建价值大屏”（`base_value_dashboard`）默认关闭，依赖 `site`、`tools`、`v2`。工厂和观察窗口仍为待实现方案。
 
 本页回答：**本站保存的基建排班，随着时间累计预计能产出多少价值？**
 
@@ -22,7 +22,7 @@ Vite 本地开发默认使用独立的 905 账号预览：累计约 2882 万等�
 
 全屏由点击触发；浏览器不支持或拒绝时启用展示布局，保留退出按钮。Escape 退出后焦点回到触发按钮。支持暂停动态显示，暂停不改变服务器累计；减少动态效果时每秒最多更新一次，正常情况下每 250 毫秒最多更新一次。连续数字不设置 `aria-live`，状态变化才播报。
 
-路由为 `/v2?section=value-clock`，不添加 V2 导航、工具目录或历史详情跳转。后续三个 section 分别为 `optimization-gain-clock`、`production-factory`、`value-window`；全部完成并获准开放入口后再增加四页导航。
+路由为 `/v2?section=value-clock`，不添加 V2 导航、工具目录或历史详情跳转。增益页的实现 section 为 `optimization-gain-clock`，当前不在导航和区段识别表中；后续两个 section 为 `production-factory`、`value-window`。
 
 总开关控制页面和公开读取；关闭后保留账本及自动同步所需的变更记录，再开放时读取同一统计系列。
 
@@ -83,7 +83,7 @@ Vite 本地开发默认使用独立的 905 账号预览：累计约 2882 万等�
 
 实现位于 [来源校验](../server/value-clock-production.ts)、[历史同步](../server/storage/value-clock-sync.ts)、[数据库结构](../server/storage/value-clock-schema.ts) 和 [公开快照](../server/storage/value-clock-store.ts)。
 
-数据库迁移版本为 `2026-11-22.3`，遵循项目[数据库迁移流程](database-migration.md)，在迁移完成前将已有历史构造成数值区间与每日汇总，失败则不标记迁移成功。保留原结果及旧迁移账本。
+数据库迁移版本为 `2026-11-22.4`，遵循项目[数据库迁移流程](database-migration.md)，在迁移完成前将已有历史构造成数值区间与每日汇总，失败则不标记迁移成功。保留原结果及旧迁移账本。
 
 - `value_clock_series` 保存统计起点和修订版本。
 - `value_clock_pending` 保存结果及档案变动所影响的身份。数据库触发器同时覆盖 API、Worker 保存及合并路径。
@@ -95,7 +95,7 @@ Vite 本地开发默认使用独立的 905 账号预览：累计约 2882 万等�
 
 ## 5. 公开 API 与浏览器时间契约
 
-当前接口为 `GET /api/site/value-clock?view=production`，匿名可读，返回 `Cache-Control: no-store`。仅支持生产视图。服务端聚合数值，页面读取快照。
+公开接口为 `GET /api/site/value-clock?view=production`，匿名可读，返回 `Cache-Control: no-store`。`?view=gain` 当前返回 `404 feature_unavailable`；增益实现代码和账本结构保留。
 
 | 字段 | 约定 |
 | --- | --- |
@@ -116,7 +116,7 @@ Vite 本地开发默认使用独立的 905 账号预览：累计约 2882 万等�
 
 公开查询键为 `['public', 'value-clock', 'production', null, null]`。API 边界校验结构并传递查询 `signal`。向下修正直接校准并提示“统计已校准”，不取历史最大值掩盖修正。
 
-增益、指定观察起点以及个人贡献读取按其余三份 Handoff 后续实现，不在当前页面添加占位链接或操作。
+增益视图复用时间投影、读数频率和全屏规则，使用独立的 `['public', 'value-clock', 'gain', null, null]` 查询。指定观察起点和个人贡献读取按观察窗口方案后续实现。
 
 ## 6. 验收
 

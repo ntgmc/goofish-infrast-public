@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
-import { createValueClockPreview } from './value-clock-preview'
-import { projectValueClock, valueClockSnapshotSchema, zeroValueClockVector, type ValueClockSnapshot } from './value-clock'
+import { createGainClockPreview, createValueClockPreview } from './value-clock-preview'
+import { gainClockSnapshotSchema, projectValueClock, valueClockSnapshotSchema, zeroValueClockVector, type ValueClockSnapshot } from './value-clock'
 
 const snapshot: ValueClockSnapshot = {
   schema_version: 1, view: 'production', series_id: 'production-v1', metric_version: 'production-sanity-v1', revision: 1,
@@ -32,4 +32,18 @@ it('rejects incomplete or overlong ready snapshots at the request boundary', () 
   expect(valueClockSnapshotSchema.safeParse({ ...snapshot, totals: null }).success).toBe(false)
   expect(valueClockSnapshotSchema.safeParse({ ...snapshot, valid_until: '2026-11-22T00:03:00Z' }).success).toBe(false)
   expect(valueClockSnapshotSchema.safeParse({ ...snapshot, totals: { ...snapshot.totals, sanity: Infinity } }).success).toBe(false)
+})
+
+it('keeps negative and zero gains as data while missing evidence remains unknown', () => {
+  const gain = createGainClockPreview(0)
+  expect(gainClockSnapshotSchema.safeParse(gain).success).toBe(true)
+  const negative = { ...gain, totals: { ...gain.totals!, sanity: -12 }, rates_per_second: { ...gain.rates_per_second!, sanity: -1 } }
+  expect(gainClockSnapshotSchema.safeParse(negative).success).toBe(true)
+  expect(projectValueClock(negative, 1000).totals?.sanity).toBe(-13)
+  expect(gainClockSnapshotSchema.safeParse({ ...gain, totals: zeroValueClockVector() }).success).toBe(true)
+  const unknown = { ...gain, status: 'empty', active_accounts: 0, totals: null, today_totals: null, rates_per_second: null,
+    comparison: { ...gain.comparison, has_recorded_comparison: false, active_comparable_accounts: 0 } }
+  expect(gainClockSnapshotSchema.safeParse(unknown).success).toBe(true)
+  expect(gainClockSnapshotSchema.safeParse({ ...unknown, today_totals: zeroValueClockVector() }).success).toBe(false)
+  expect(gainClockSnapshotSchema.safeParse({ ...gain, active_accounts: 0 }).success).toBe(false)
 })

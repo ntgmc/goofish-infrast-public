@@ -12,7 +12,7 @@
 | 查找 V2 页面、购买配置和后台入口 | [V2 工作台与管理后台](v2-workspace.md) |
 | 修改界面文案和付费能力预览 | [文案目录](../src/copy/README.md)、[产品文案](product-copy.md) |
 | 维护前端请求与缓存 | [查询缓存](frontend-queries.md)、[列表交互性能](frontend-performance.md) |
-| 开发基建价值大屏（待实现方案） | [价值时钟与共享账本](value-clock-handoff.md)、[优化增益时钟](optimization-gain-clock-handoff.md) |
+| 维护基建价值与优化增益大屏（增益当前关闭） | [价值时钟与共享账本](value-clock-handoff.md)、[优化增益时钟](optimization-gain-clock-handoff.md) |
 | 开发资源流水线与观察窗口（待实现方案） | [全站基建工厂](production-factory-handoff.md)、[围观价值窗口](value-window-handoff.md) |
 
 ## 功能与数据

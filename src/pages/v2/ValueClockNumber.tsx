@@ -1,8 +1,8 @@
 import { useLayoutEffect, useRef, type CSSProperties } from 'react'
 
-export default function ValueClockNumber({ value, animated = true }: { value: number | undefined; animated?: boolean }) {
+export default function ValueClockNumber({ value, animated = true, signed = false }: { value: number | undefined; animated?: boolean; signed?: boolean }) {
   if (value === undefined) return <>—</>
-  const [integer, fraction] = value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split('.')
+  const [integer, fraction] = value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2, signDisplay: signed ? 'exceptZero' : 'auto' }).split('.')
   return <span className="value-clock-number"><span className="value-clock-number-integer">{animated ? Array.from(integer, (character, index) => /\d/.test(character)
     ? <Digit key={index} character={character} index={index} /> : <span key={index}>{character}</span>) : integer}</span><span className="value-clock-number-fraction">.{fraction}</span></span>
 }

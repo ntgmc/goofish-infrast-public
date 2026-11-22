@@ -83,21 +83,34 @@ describe('App public content routing', () => {
   })
 
   it('loads the unlisted value clock directly without mounting the workspace or requesting personal data', async () => {
+    const section = 'value-clock'
     const original = apiJson.getMockImplementation()!
     apiJson.mockImplementation((url: string) => {
       if (url === '/api/site/features') return Promise.resolve({ ...DEFAULT_SITE_FEATURE_SETTINGS, features: { ...DEFAULT_SITE_FEATURE_SETTINGS.features, base_value_dashboard: true } })
       if (url.startsWith('/api/site/value-clock')) return Promise.resolve({
-        schema_version: 1, view: 'production', series_id: 'production-v1', metric_version: 'production-sanity-v1', revision: 0,
+        schema_version: 1, view: section === 'value-clock' ? 'production' : 'gain', series_id: 'production-v1', metric_version: 'production-sanity-v1', revision: 0,
         tracking_started_at: null, server_now: '2026-11-22T00:00:00Z', as_of: '2026-11-22T00:00:00Z', valid_until: null,
-        day_started_at: '2026-11-21T16:00:00Z', day_ends_at: '2026-11-22T16:00:00Z', totals: null, today_totals: null, rates_per_second: null, active_accounts: 0, status: 'not_started',
+        day_started_at: '2026-11-21T16:00:00Z', day_ends_at: '2026-11-22T16:00:00Z', totals: null, today_totals: null, rates_per_second: null, active_accounts: 0, status: section === 'value-clock' ? 'not_started' : 'empty',
+        comparison: { baseline_kind: 'previous_plan', has_recorded_comparison: false, active_comparable_accounts: 0, active_production_accounts: 1, current_daily_sanity: 0, baseline_daily_sanity: 0, daily_gain_sanity: 0, gain_ratio: null },
       })
       return original(url)
     })
-    render(<MemoryRouter initialEntries={['/v2?section=value-clock']}><App /></MemoryRouter>)
+    render(<MemoryRouter initialEntries={[`/v2?section=${section}`]}><App /></MemoryRouter>)
     expect(await screen.findByRole('heading', { name: copy.valueClock.title })).toBeVisible()
-    expect(await screen.findByText(copy.valueClock.notStarted)).toBeVisible()
+    expect((await screen.findAllByText(copy.valueClock.notStarted))[0]).toBeVisible()
     expect(screen.queryByText('V2 test workspace')).not.toBeInTheDocument()
     expect(apiJson.mock.calls.some(([url]) => url === '/api/site/public-content' || url.startsWith('/api/auth/') || url.startsWith('/api/user/'))).toBe(false)
+  })
+
+  it('does not open the closed optimization gain clock route', async () => {
+    apiJson.mockImplementation(async (url: string) => {
+      if (url === '/api/site/features') return { ...DEFAULT_SITE_FEATURE_SETTINGS, features: { ...DEFAULT_SITE_FEATURE_SETTINGS.features, base_value_dashboard: true } }
+      if (url === '/api/site/public-content') return cloneDefaultPublicContentSettings()
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    render(<MemoryRouter initialEntries={['/v2?section=optimization-gain-clock']}><App /></MemoryRouter>)
+    expect(await screen.findByText('V2 test workspace')).toBeVisible()
+    expect(apiJson.mock.calls.some(([url]) => url.includes('value-clock'))).toBe(false)
   })
 
   it('uses the V2 loading screen and workspace from the first homepage render', async () => {

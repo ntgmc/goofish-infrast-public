@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { copy } from '../../../copy'
-import { useAppReducedMotion } from '../../../lib/motion-preference'
-import { projectValueClock, type ValueClockSnapshot } from '../../../lib/value-clock'
+import { useValueClockReadings } from '../../../lib/use-value-clock-readings'
 import { useValueClockQuery } from '../../../lib/value-clock-query'
 import ValueClockNumber from '../ValueClockNumber'
 import '../value-clock.css'
@@ -48,39 +47,9 @@ export default function ValueClock() {
 
 function ClockReadings({ fullscreen, preview }: { fullscreen: ReactNode; preview: boolean }) {
   const query = useValueClockQuery(preview)
-  const reduced = useAppReducedMotion()
   const [paused, setPaused] = useState(false)
-  const [calibrated, setCalibrated] = useState(false)
-  const previous = useRef<{ snapshot: ValueClockSnapshot; receivedAt: number } | null>(null)
-  const [reading, setReading] = useState<ReturnType<typeof projectValueClock> & { details: ReturnType<typeof projectValueClock> | null; stale: boolean }>({ totals: null, today: null, details: null, stale: false })
   const data = query.data
-  useEffect(() => {
-    if (!data) return
-    const old = previous.current
-    if (old && (old.snapshot.series_id !== data.snapshot.series_id || data.snapshot.revision !== old.snapshot.revision && (data.snapshot.totals?.sanity ?? 0) < (projectValueClock(old.snapshot, performance.now() - old.receivedAt).totals?.sanity ?? 0) - 0.005)) setCalibrated(true)
-    previous.current = data
-    const snapshot = data.snapshot
-    const moving = snapshot.status === 'ready' && Object.values(snapshot.rates_per_second ?? {}).some((rate) => rate !== 0)
-    let timer = 0, detailsAt = -Infinity
-    const tick = () => {
-      if (document.hidden) return
-      const now = performance.now()
-      const elapsed = now - data.receivedAt + Math.max(0, Date.parse(snapshot.server_now) - Date.parse(snapshot.as_of))
-      const values = projectValueClock(snapshot, elapsed)
-      const remaining = snapshot.valid_until ? Date.parse(snapshot.valid_until) - Date.parse(snapshot.as_of) - elapsed : null
-      const stale = remaining !== null && remaining <= 0
-      const refreshDetails = now - detailsAt >= 1000 || stale
-      if (refreshDetails) detailsAt = now
-      setReading((current) => paused ? current.stale === stale ? current : { ...current, stale }
-        : { ...values, details: refreshDetails ? values : current.details, stale })
-      if (remaining !== null && !stale) timer = window.setTimeout(tick, moving && !paused ? Math.min(reduced ? 1000 : 250, remaining) : remaining)
-    }
-    const stop = () => { clearTimeout(timer) }
-    const visibility = () => { stop(); tick() }
-    tick()
-    document.addEventListener('visibilitychange', visibility)
-    return () => { stop(); document.removeEventListener('visibilitychange', visibility) }
-  }, [data, reduced, paused])
+  const { reading, calibrated, reduced } = useValueClockReadings(data, paused)
   const snapshot = data?.snapshot
   const sanity = reading.totals?.sanity
   const displaySanity = reading.details?.totals?.sanity ?? sanity

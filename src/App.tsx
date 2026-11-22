@@ -98,9 +98,10 @@ function AppContent() {
     }).catch(() => undefined)
   }, [location.pathname])
 
+  const section = v2Section(new URLSearchParams(location.search), location.hash, location.pathname)
   const v2Page = <FeatureRoute feature="v2" renderPending={(status, retry) => <V2LoadingScreen
     error={status === 'error' ? copy.features.load_failed_body : null} onRetry={retry} retryLabel={copy.features.retry} />}>
-    {v2Section(new URLSearchParams(location.search), location.hash, location.pathname) === 'value-clock'
+    {section === 'value-clock'
       ? <FeatureRoute feature="base_value_dashboard"><Suspense fallback={<V2LoadingScreen />}><ValueClock /></Suspense></FeatureRoute>
       : <PublicContentProvider><Suspense fallback={<V2LoadingScreen />}><V2Page /></Suspense></PublicContentProvider>}</FeatureRoute>
 
