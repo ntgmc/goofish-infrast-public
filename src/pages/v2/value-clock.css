@@ -14,7 +14,7 @@
 .value-clock-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .75rem 1rem; }
 .value-clock-status { display: flex; flex-shrink: 0; max-width: 100%; align-items: center; gap: .6rem; margin: 0; color: var(--color-v2-secondary); font-size: .875rem; }
 .value-clock-status-mark { flex: 0 0 .4rem; height: .4rem; border-radius: 50%; background: var(--color-v2-muted); }
-.value-clock-status-mark[data-live] { background: var(--destructive); box-shadow: 0 0 0 .25rem color-mix(in srgb, var(--destructive) 10%, transparent); }
+.value-clock-status-mark[data-live] { background: var(--color-v2-accent); box-shadow: 0 0 0 .25rem color-mix(in srgb, var(--color-v2-accent) 10%, transparent); }
 .value-clock-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
 .value-clock-action { min-height: 44px; padding: .5rem .9rem; border: 1px solid var(--color-v2-line); border-radius: .35rem; background: transparent; color: inherit; font: inherit; font-size: .8125rem; cursor: pointer; white-space: nowrap; }
 .value-clock-action:hover { background: var(--color-v2-hover); }
@@ -23,12 +23,15 @@
 .value-clock-eyebrow { margin: 0 0 2.5rem; font-family: var(--font-display); font-size: clamp(1rem, 5.6cqi, 2rem); font-weight: 500; letter-spacing: -.025em; text-wrap: balance; }
 .value-clock-eyebrow span { display: inline-block; }
 .value-clock-total-label { margin: 0 0 .75rem; color: var(--color-v2-secondary); font-size: .875rem; }
-.value-clock-total { font-size: clamp(2rem, 8.8cqi, 7.5rem); font-weight: 600; line-height: 1.15; letter-spacing: -.065em; color: var(--destructive); }
+.value-clock-total { font-size: clamp(2rem, 8.8cqi, 7.5rem); font-weight: 600; line-height: 1.15; letter-spacing: -.065em; color: var(--color-v2-accent); }
+@supports (background-clip: text) {
+  .value-clock-total { background: linear-gradient(105deg, var(--color-v2-accent) 12%, color-mix(in oklch, var(--color-v2-accent) 35%, #bc934b) 50%, var(--color-v2-accent) 88%); background-clip: text; color: transparent; }
+}
 .value-clock-total-compact { display: none; }
 .value-clock-progress { display: none; width: 4rem; height: 2px; margin-top: 1rem; appearance: none; border: 0; background: var(--color-v2-line); }
 .value-clock-progress::-webkit-progress-bar { background: var(--color-v2-line); }
-.value-clock-progress::-webkit-progress-value { background: var(--destructive); }
-.value-clock-progress::-moz-progress-bar { background: var(--destructive); }
+.value-clock-progress::-webkit-progress-value { background: var(--color-v2-accent); }
+.value-clock-progress::-moz-progress-bar { background: var(--color-v2-accent); }
 .value-clock-unit { margin: .6rem 0 0; font-size: .875rem; color: var(--color-v2-secondary); }
 .value-clock-rate { display: flex; justify-content: center; align-items: baseline; flex-wrap: wrap; gap: .35rem .65rem; margin: 1.75rem 0 0; font-size: .875rem; color: var(--color-v2-secondary); }
 .value-clock-rate strong { color: var(--color-v2-ink); font-size: 1.5rem; font-weight: 500; }
@@ -63,4 +66,8 @@
   .value-clock-resources dd { flex-shrink: 0; max-width: 100%; margin: 0 0 0 auto; font-size: 1.25rem; }
   .value-clock-secondary { gap: 1rem; padding-block: 1.5rem; }
 }
-@media (forced-colors: active) { .value-clock-progress { accent-color: Highlight; appearance: auto; } }
+@media (prefers-contrast: more) { .value-clock-total { background: none; color: var(--color-v2-accent); } }
+@media (forced-colors: active) {
+  .value-clock-total { background: none; color: CanvasText; }
+  .value-clock-progress { accent-color: Highlight; appearance: auto; }
+}
