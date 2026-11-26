@@ -247,7 +247,10 @@ export function useAdminController(section: AdminSection = 'overview', search = 
       if (!loginUser.trim()) nextErrors.loginUser = '请输入账号'
       if (!loginPassword) nextErrors.loginPassword = '请输入密码'
       setLoginFieldErrors(nextErrors)
-      if (Object.keys(nextErrors).length > 0) return
+      if (Object.keys(nextErrors).length > 0) {
+        document.getElementById(nextErrors.loginUser ? 'admin-login-user' : 'admin-login-password')?.focus()
+        return
+      }
       setLoginLoading(true)
       setError(null)
       try {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AdminQueryScope } from '../../lib/private-query-scope'
-import { Navigate, useLocation } from 'react-router'
+import { Link, Navigate, useLocation } from 'react-router'
 import { adminPath, fallbackAdminPath, resolveAdminSection } from '../../lib/app-routes'
 import { PageTransition } from '../../components/MotionPrimitives'
 import SessionLoader, { SectionLoader } from '../../components/SessionLoader'
@@ -32,7 +32,9 @@ export default function AdminDashboardView() {
   const c = useAdminController(activeSection ?? 'overview', location.search)
   const visibleSections = (Object.keys(sectionLabels) as AdminSection[]).filter((section) => canAccessAdminSection(section, c.adminCapabilities))
   const [visitedSections, setVisitedSections] = useState<AdminSection[]>([])
+  const [passwordVisible, setPasswordVisible] = useState(false)
   useEffect(() => {
+    setPasswordVisible(false)
     if (!c.authenticated) setVisitedSections([])
     else if (activeSection && canAccessAdminSection(activeSection, c.adminCapabilities)) setVisitedSections((current) => current.includes(activeSection) ? current : [...current, activeSection])
   }, [activeSection, c.authenticated, c.adminCapabilities])
@@ -43,14 +45,18 @@ export default function AdminDashboardView() {
   if (!c.authenticated) return <DialogSurfaceProvider value="admin-dialog"><main className="admin-app admin-login" tabIndex={-1} data-route-focus>
     <div className="admin-login-frame"><div className="admin-login-heading"><p className="text-sm text-ink-muted">MAA 基建管理后台</p><h1>管理工作台</h1></div>
       <form onSubmit={c.handleLogin} noValidate className="tool-panel p-6"><div className="flex items-center justify-between gap-3"><h2 className="text-lg font-semibold">账号登录</h2><ThemeSwitcher iconOnly /></div>
-        <label className="mt-5 block"><span className="mb-2 block text-sm">账号</span><input id="admin-login-user" value={c.loginUser}
+        <label className="mt-5 block"><span className="mb-2 block text-sm">账号</span><input id="admin-login-user" name="username" required autoCapitalize="none" autoCorrect="off" spellCheck={false} value={c.loginUser}
           onChange={(e) => { c.setLoginUser(e.currentTarget.value); c.setLoginFieldErrors((current) => omitFieldError(current, 'loginUser')) }} className={inputClassName(Boolean(c.loginFieldErrors.loginUser))}
           autoComplete="username" aria-invalid={Boolean(c.loginFieldErrors.loginUser)} aria-describedby={c.loginFieldErrors.loginUser ? 'admin-login-user-error' : undefined} />
           {c.loginFieldErrors.loginUser && <p id="admin-login-user-error" className="mt-2 text-sm text-error" role="alert">{c.loginFieldErrors.loginUser}</p>}</label>
-        <label className="mt-4 block"><span className="mb-2 block text-sm">密码</span><input id="admin-login-password" type="password" value={c.loginPassword}
+        <label className="mt-4 block"><span className="mb-2 block text-sm">密码</span><input id="admin-login-password" name="password" required type={passwordVisible ? 'text' : 'password'} value={c.loginPassword}
           onChange={(e) => { c.setLoginPassword(e.currentTarget.value); c.setLoginFieldErrors((current) => omitFieldError(current, 'loginPassword')) }} className={inputClassName(Boolean(c.loginFieldErrors.loginPassword))}
           autoComplete="current-password" aria-invalid={Boolean(c.loginFieldErrors.loginPassword)} aria-describedby={c.loginFieldErrors.loginPassword ? 'admin-login-password-error' : undefined} />
           {c.loginFieldErrors.loginPassword && <p id="admin-login-password-error" className="mt-2 text-sm text-error" role="alert">{c.loginFieldErrors.loginPassword}</p>}</label>
+        <div className="admin-login-options">
+          <label><input type="checkbox" checked={passwordVisible} onChange={(event) => setPasswordVisible(event.currentTarget.checked)} className="h-4 w-4 accent-brand-500" />显示密码</label>
+          <Link to="/">返回网站</Link>
+        </div>
         {c.error && <div className="tool-alert tool-alert--error mt-4" role="alert">{c.error}</div>}
         <button type="submit" disabled={c.loading} className="tool-primary-action mt-5 w-full">{c.loading ? '正在登录…' : '进入后台'}</button>
       </form></div>

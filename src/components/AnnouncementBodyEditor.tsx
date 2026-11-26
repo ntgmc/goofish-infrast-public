@@ -22,14 +22,22 @@ export default function AnnouncementBodyEditor({ id, value, onChange }: Props) {
   return (
     <div className="mt-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className="text-sm font-medium text-ink-secondary">{copy.public.components_AnnouncementBodyEditor_001}</span>
+        <label htmlFor={mode === 'edit' ? `${id}-input` : undefined} className="text-sm font-medium text-ink-secondary">{copy.public.components_AnnouncementBodyEditor_001}</label>
         <LayoutGroup id={`${id}-announcement-tabs`}>
-        <div role="tablist" aria-label={copy.public.components_AnnouncementBodyEditor_002} className="tool-inset inline-flex p-1">
+        <div role="tablist" aria-label={copy.public.components_AnnouncementBodyEditor_002} className="tool-inset inline-flex p-1" onKeyDown={(event) => {
+          const next = event.key === 'Home' ? 'edit' : event.key === 'End' ? 'preview'
+            : event.key === 'ArrowLeft' || event.key === 'ArrowRight' ? mode === 'edit' ? 'preview' : 'edit' : null
+          if (!next) return
+          event.preventDefault()
+          setMode(next)
+          document.getElementById(`${id}-${next}-tab`)?.focus()
+        }}>
           <button
             id={`${id}-edit-tab`}
             type="button"
             role="tab"
             aria-selected={mode === 'edit'}
+            tabIndex={mode === 'edit' ? 0 : -1}
             aria-controls={editorId}
             onClick={() => setMode('edit')}
             className={`tool-secondary-action relative min-h-11 overflow-hidden border-transparent bg-transparent px-3 text-sm ${mode === 'edit' ? 'text-ink-primary' : 'text-ink-secondary hover:border-transparent hover:bg-surface-2 hover:text-ink-primary'}`}
@@ -41,6 +49,7 @@ export default function AnnouncementBodyEditor({ id, value, onChange }: Props) {
             type="button"
             role="tab"
             aria-selected={mode === 'preview'}
+            tabIndex={mode === 'preview' ? 0 : -1}
             aria-controls={previewId}
             onClick={() => setMode('preview')}
             className={`tool-secondary-action relative min-h-11 overflow-hidden border-transparent bg-transparent px-3 text-sm ${mode === 'preview' ? 'text-ink-primary' : 'text-ink-secondary hover:border-transparent hover:bg-surface-2 hover:text-ink-primary'}`}
