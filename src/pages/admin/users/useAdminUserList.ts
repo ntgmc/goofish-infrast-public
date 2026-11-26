@@ -43,13 +43,14 @@ export function useAdminUserList(options: Options, operationsSearch = '') {
   }, [operationsSearch])
 
   useEffect(() => {
+    if (userSearchInput.trim() === userSearch) return
     setSelectedUserIds([])
     const timeout = window.setTimeout(() => {
       setUserSearch(userSearchInput.trim())
       setUserPage(1)
     }, 300)
     return () => window.clearTimeout(timeout)
-  }, [userSearchInput])
+  }, [userSearchInput, userSearch])
 
   useEffect(() => { setSelectedUserIds([]) }, [userPage, userPageSize, userSearch, userFilters])
 
@@ -68,7 +69,7 @@ export function useAdminUserList(options: Options, operationsSearch = '') {
   })
   const appUsers = enabled ? query.data?.app_users ?? [] : []
   const userPagination = (enabled && query.data?.pagination) || { ...EMPTY_PAGINATION, page_size: userPageSize }
-  const usersLoading = enabled && query.isFetching
+  const usersLoading = enabled && (query.isFetching || userSearchInput.trim() !== userSearch)
   const usersLoaded = enabled && query.isFetched
   const selectedUsers = useMemo(() => appUsers.filter((user) => selectedUserIds.includes(user.id)), [appUsers, selectedUserIds])
 

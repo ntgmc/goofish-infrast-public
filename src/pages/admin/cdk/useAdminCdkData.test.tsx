@@ -45,6 +45,24 @@ describe('admin CDK queries', () => {
     expect(vi.mocked(adminApiJson).mock.calls[4][0]).toContain('search=account')
   })
 
+  it('marks pending searches busy and requests only the final search on the first page', async () => {
+    vi.mocked(adminApiJson).mockImplementation(respondWithPage)
+    const { result } = renderHook(() => useAdminCdkData(options))
+    await waitFor(() => expect(result.current.records).toHaveLength(1))
+    act(() => result.current.setCdkPage(2))
+    await waitFor(() => expect(result.current.cdkPagination.page).toBe(2))
+    const requests = vi.mocked(adminApiJson).mock.calls.length
+    act(() => result.current.setCdkSearchInput('first'))
+    expect(result.current.cdkLoading).toBe(true)
+    act(() => result.current.setCdkSearchInput(' final-order '))
+    expect(adminApiJson).toHaveBeenCalledTimes(requests)
+    await waitFor(() => expect(result.current.cdkLoading).toBe(false))
+    expect(adminApiJson).toHaveBeenCalledTimes(requests + 1)
+    const params = new URL(vi.mocked(adminApiJson).mock.lastCall![0], 'https://example.test').searchParams
+    expect(params.get('search')).toBe('final-order')
+    expect(params.get('page')).toBe('1')
+  })
+
   it('cancels obsolete pages and requests left behind by navigation', async () => {
     const requests: Array<{ signal: AbortSignal; finish: (value: unknown) => void }> = []
     vi.mocked(adminApiJson).mockImplementation((_url, init) => new Promise((resolve) => {

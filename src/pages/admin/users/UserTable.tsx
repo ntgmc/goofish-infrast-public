@@ -104,14 +104,14 @@ export function UserTable(props: Props) {
       <button type="button" className="tool-secondary-action text-sm" disabled={busy || !selected.length} onClick={() => props.onSelect([])}>取消选择</button>
     </div>
     <div className="admin-records-region" aria-busy={loading}>
-      {loading && <div className="border-b border-surface-3 px-4 py-2 text-sm text-ink-muted" role="status">正在加载…</div>}
+      {loading && users.length > 0 && <div className="border-b border-surface-3 px-4 py-2 text-sm text-ink-muted" role="status">正在更新用户列表…</div>}
       <table className="admin-records-table admin-users-table w-full text-left text-sm" aria-label="注册用户" role="table">
         <thead className="bg-surface-2 text-xs text-ink-muted" role="rowgroup"><tr role="row">
           <th scope="col" className="px-4 py-3"><label className="admin-record-check"><input className="h-4 w-4 accent-brand-500" type="checkbox" aria-label="选择当前页全部用户" disabled={busy} checked={allSelected} onChange={(event) => props.onSelect(event.currentTarget.checked ? users.map((user) => user.id) : [])} /></label></th>
           <th scope="col" className="px-4 py-3">邮箱／用户 ID</th><th scope="col" className="px-4 py-3">状态</th><th scope="col" className="px-4 py-3">权限</th><th scope="col" className="px-4 py-3">档案</th><th scope="col" className="px-4 py-3">时间</th><th scope="col" className="px-4 py-3">操作</th>
         </tr></thead>
         <tbody className="divide-y divide-surface-3" role="rowgroup">
-          {!users.length ? <tr><td colSpan={7} className="px-4 py-10 text-center text-ink-muted">没有匹配的用户，请调整筛选条件。</td></tr> : users.map((user) => <tr key={user.id} role="row" aria-selected={selected.includes(user.id)} className="hover:bg-surface-2/50">
+          {!users.length ? <tr><td colSpan={7} className="px-4 py-10 text-center text-ink-muted">{loading ? '正在查找用户…' : '没有匹配的用户，请调整筛选条件。'}</td></tr> : users.map((user) => <tr key={user.id} role="row" aria-selected={selected.includes(user.id)} className="hover:bg-surface-2/50">
             <td role="cell" className="admin-record-select px-4 py-4"><label className="admin-record-check"><input className="h-4 w-4 accent-brand-500" type="checkbox" aria-label={`选择用户 ${user.email}`} disabled={busy} checked={selected.includes(user.id)} onChange={(event) => props.onSelect(event.currentTarget.checked ? [...selected, user.id] : selected.filter((id) => id !== user.id))} /></label></td>
             <td role="cell" className="admin-record-identity px-4 py-4 font-medium text-ink-primary"><span>{user.email}</span><div className="mt-1 break-all font-mono text-xs text-ink-muted">{user.id}</div>
               {user.operations_progress && <div className="mt-2 text-xs text-ink-secondary">

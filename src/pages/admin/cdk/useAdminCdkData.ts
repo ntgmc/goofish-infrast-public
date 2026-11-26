@@ -50,9 +50,10 @@ export function useAdminCdkData({ adminUsername, authenticated, capabilities, se
   }, [adminUsername, queryClient])
 
   useEffect(() => {
+    if (cdkSearchInput.trim() === cdkSearch) return
     const timeout = window.setTimeout(() => { setCdkSearch(cdkSearchInput.trim()); setCdkPage(1) }, 300)
     return () => window.clearTimeout(timeout)
-  }, [cdkSearchInput])
+  }, [cdkSearchInput, cdkSearch])
   useEffect(() => {
     const error = cdkEnabled ? cdkQuery.error : riskEnabled ? riskQuery.error : null
     if (error) setError(error.message)
@@ -65,7 +66,7 @@ export function useAdminCdkData({ adminUsername, authenticated, capabilities, se
   }, [riskEnabled, riskQuery.data, riskPage])
 
   return { records, cdkSearchInput, setCdkSearchInput, cdkPage, setCdkPage, cdkPageSize, setCdkPageSize, cdkPagination,
-    cdkLoading: cdkEnabled && cdkQuery.isFetching, cdkLoaded: cdkEnabled && cdkQuery.isFetched,
+    cdkLoading: cdkEnabled && (cdkQuery.isFetching || cdkSearchInput.trim() !== cdkSearch), cdkLoaded: cdkEnabled && cdkQuery.isFetched,
     riskRecords, riskPage, setRiskPage, riskPageSize, setRiskPageSize, riskPagination, riskLoading: riskEnabled && riskQuery.isFetching,
     cdkFilters, cdkSearch, cdkTypeFilter, setCdkTypeFilter, statusFilter, setStatusFilter, permissionFilter, setPermissionFilter,
     riskFilter, setRiskFilter, generatedFilter, setGeneratedFilter, loadCdkPage: refreshCdkLists, loadRiskPage: refreshCdkLists }

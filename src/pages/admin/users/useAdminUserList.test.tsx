@@ -51,6 +51,24 @@ describe('admin user queries', () => {
     await waitFor(() => expect(adminApiJson).toHaveBeenCalledTimes(4))
   })
 
+  it('marks pending searches busy immediately and applies only the final input on the first page', async () => {
+    vi.mocked(adminApiJson).mockImplementation(async (url) => page(Number(new URL(url, 'https://example.test').searchParams.get('page'))))
+    const { result } = renderHook(() => useAdminUserList(options))
+    await waitFor(() => expect(result.current.appUsers).toHaveLength(1))
+    act(() => result.current.setUserPage(2))
+    await waitFor(() => expect(result.current.userPagination.page).toBe(2))
+    const requests = vi.mocked(adminApiJson).mock.calls.length
+    act(() => result.current.setUserSearchInput('first'))
+    expect(result.current.usersLoading).toBe(true)
+    act(() => result.current.setUserSearchInput(' final@example.test '))
+    expect(adminApiJson).toHaveBeenCalledTimes(requests)
+    await waitFor(() => expect(result.current.usersLoading).toBe(false))
+    expect(adminApiJson).toHaveBeenCalledTimes(requests + 1)
+    const params = new URL(vi.mocked(adminApiJson).mock.lastCall![0], 'https://example.test').searchParams
+    expect(params.get('search')).toBe('final@example.test')
+    expect(params.get('page')).toBe('1')
+  })
+
   it('does not expose cached users after changing administrator identity or losing list access', async () => {
     vi.mocked(adminApiJson).mockResolvedValueOnce(page(1)).mockImplementationOnce(() => new Promise(() => {}))
     const { result, rerender } = renderHook(({ adminUsername, enabled }) => useAdminUserList({ ...options, adminUsername, enabled }), {
