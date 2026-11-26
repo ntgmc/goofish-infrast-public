@@ -174,7 +174,6 @@ export function useAdminController(section: AdminSection = 'overview', search = 
     const failures = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected')
     if (failures.length > 0) {
       setError(`部分数据刷新失败：${failures.map((result) => errorMessage(result.reason)).join('；')}`)
-      setNotice((current) => current ? `${current}；操作已成功，但部分数据刷新失败，请手动重试。` : current)
     }
     if (!failures.length && families.length) setLastSuccessfulSyncAt(new Date().toISOString())
   }, [authenticated, adminUsername, queryClient, section])

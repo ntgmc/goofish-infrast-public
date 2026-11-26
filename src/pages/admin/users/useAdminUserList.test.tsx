@@ -69,6 +69,15 @@ describe('admin user queries', () => {
     expect(params.get('page')).toBe('1')
   })
 
+  it('clears a read failure when a new search succeeds', async () => {
+    vi.mocked(adminApiJson).mockRejectedValueOnce(new Error('List unavailable')).mockResolvedValue(page(1))
+    const { result } = renderHook(() => useAdminUserList(options))
+    await waitFor(() => expect(options.setError).toHaveBeenLastCalledWith('List unavailable'))
+    act(() => result.current.setUserSearchInput('recovered'))
+    await waitFor(() => expect(result.current.appUsers).toHaveLength(1))
+    await waitFor(() => expect(options.setError).toHaveBeenLastCalledWith(null))
+  })
+
   it('does not expose cached users after changing administrator identity or losing list access', async () => {
     vi.mocked(adminApiJson).mockResolvedValueOnce(page(1)).mockImplementationOnce(() => new Promise(() => {}))
     const { result, rerender } = renderHook(({ adminUsername, enabled }) => useAdminUserList({ ...options, adminUsername, enabled }), {

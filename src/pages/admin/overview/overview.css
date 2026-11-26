@@ -12,6 +12,7 @@
 .ops-controls, .ops-range-options, .ops-report-actions, .ops-snapshot, .ops-usage-heading, .ops-trend-controls, .ops-question-heading { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs); }
 .ops-controls, .ops-snapshot, .ops-usage-heading, .ops-trend-controls, .ops-question-heading { justify-content: space-between; }
 .ops-controls { gap: var(--space-sm); }
+.ops-todos-index { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 7rem), 1fr)); gap: var(--space-xs); }
 .ops-overview .ops-todo-link { min-width: 0; padding: var(--space-xs); white-space: normal; }
 .ops-todo-label { display: flex; align-items: start; justify-content: space-between; gap: var(--space-3xs); color: var(--color-ink-secondary); font-size: var(--text-sm); }
 .ops-todo-label > span { color: var(--color-brand-500); }

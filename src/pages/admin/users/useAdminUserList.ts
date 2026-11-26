@@ -74,8 +74,10 @@ export function useAdminUserList(options: Options, operationsSearch = '') {
   const selectedUsers = useMemo(() => appUsers.filter((user) => selectedUserIds.includes(user.id)), [appUsers, selectedUserIds])
 
   useEffect(() => {
-    if (enabled && query.error) setError(query.error.message)
-  }, [enabled, query.error, setError])
+    if (!enabled) return
+    if (query.error) setError(query.error.message)
+    else if (query.isSuccess) setError(null)
+  }, [enabled, query.error, query.isSuccess, setError])
 
   useEffect(() => {
     if (enabled && query.data?.pagination && query.data.pagination.page !== userPage) setUserPage(query.data.pagination.page)

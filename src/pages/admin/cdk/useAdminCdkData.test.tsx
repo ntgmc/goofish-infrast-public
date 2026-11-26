@@ -63,6 +63,15 @@ describe('admin CDK queries', () => {
     expect(params.get('page')).toBe('1')
   })
 
+  it('clears a read failure when a new search succeeds', async () => {
+    vi.mocked(adminApiJson).mockRejectedValueOnce(new Error('List unavailable')).mockImplementation(respondWithPage)
+    const { result } = renderHook(() => useAdminCdkData(options))
+    await waitFor(() => expect(options.setError).toHaveBeenLastCalledWith('List unavailable'))
+    act(() => result.current.setCdkSearchInput('recovered'))
+    await waitFor(() => expect(result.current.records).toHaveLength(1))
+    await waitFor(() => expect(options.setError).toHaveBeenLastCalledWith(null))
+  })
+
   it('cancels obsolete pages and requests left behind by navigation', async () => {
     const requests: Array<{ signal: AbortSignal; finish: (value: unknown) => void }> = []
     vi.mocked(adminApiJson).mockImplementation((_url, init) => new Promise((resolve) => {

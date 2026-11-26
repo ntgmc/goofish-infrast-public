@@ -55,9 +55,10 @@ export function useAdminCdkData({ adminUsername, authenticated, capabilities, se
     return () => window.clearTimeout(timeout)
   }, [cdkSearchInput, cdkSearch])
   useEffect(() => {
-    const error = cdkEnabled ? cdkQuery.error : riskEnabled ? riskQuery.error : null
-    if (error) setError(error.message)
-  }, [cdkEnabled, cdkQuery.error, riskEnabled, riskQuery.error, setError])
+    const query = cdkEnabled ? cdkQuery : riskEnabled ? riskQuery : null
+    if (query?.error) setError(query.error.message)
+    else if (query?.isSuccess) setError(null)
+  }, [cdkEnabled, cdkQuery.error, cdkQuery.isSuccess, riskEnabled, riskQuery.error, riskQuery.isSuccess, setError])
   useEffect(() => {
     if (cdkEnabled && cdkQuery.data?.pagination && cdkQuery.data.pagination.page !== cdkPage) setCdkPage(cdkQuery.data.pagination.page)
   }, [cdkEnabled, cdkQuery.data, cdkPage])

@@ -27,7 +27,7 @@ export default function OperationsTodosPanel({ adminUsername, active, capabiliti
       <button type="button" className="tool-secondary-action" disabled={loading || !enabled} onClick={() => void query.refetch({ cancelRefetch: false })}>{loading ? '正在刷新…' : '刷新待办'}</button></div>
     <p className="mt-2 text-sm text-ink-secondary">当前未处理事项，包含此前积压。</p>
     {error && <p role="alert" className="tool-alert tool-alert--error mt-4">{error}</p>}
-    <div className="mt-4 grid grid-cols-2 gap-3 xl:grid-cols-4">{items.filter((item) => capabilities.includes(item.capability)).map((item) => <Link key={item.key} to={item.path} className="ops-todo-link tool-inset">
+    <div className="ops-todos-index mt-4">{items.filter((item) => capabilities.includes(item.capability)).map((item) => <Link key={item.key} to={item.path} className="ops-todo-link tool-inset">
       <span className="ops-todo-label">{item.label}<span aria-hidden="true">→</span></span>
       <strong>{error || !data ? '—' : data[item.key] ?? '—'}</strong>
     </Link>)}</div>
