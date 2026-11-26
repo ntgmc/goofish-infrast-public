@@ -1,5 +1,5 @@
 export const optimizeCopy = {
-  quickUpgradeNotice: '快速计算仅展示已验证有收益的部分升级建议，收益和回本数值供参考，可能遗漏其他可用建议。',
+  quickUpgradeNotice: '快速计算会复核部分培养建议，可能遗漏其他有收益的选择。收益和回本数值供参考。',
   quickUpgradeEmpty: '本次快速复核未确认有收益的升级建议。可切换完整计算继续查找。',
   generation: {
     save_failed: '配置保存失败，排班尚未开始，当前输入已保留。请重试保存，成功后再生成排班。',
@@ -20,15 +20,15 @@ export const optimizeCopy = {
     description: '免费版可生成排班并保存图片，不支持 MAA 导出。需要自定义配置、增量重算、收益分析或 MAA 执行文件时，可查看高级版权益。',
     advanced: '高级版能力',
     conclusion: '需要自定义配置、重新优化或分析收益时，可以比较高级版方案。',
-    recompute_preview: '干员或库存变化后，可在概览页使用增量重算。维护卡有效期内不限次数生成并优先处理；免费版仍可重新生成完整排班。',
-    import_preview: '高级版可在干员数据页上传 MAA 干员识别文件，校验后用于排班。免费版通过森空岛导入。',
+    recompute_preview: '更新干员或库存后，在「排班总览」重新排班。维护卡有效期内不限次数，优先处理；免费版也可按规则重新生成。',
+    import_preview: '高级版可在「干员管理」上传 MAA 干员识别文件。免费版通过森空岛导入。',
     lab_unavailable: '场景对比当前暂停开放，可先了解方案权益，恢复后再使用。',
     readonly_action: '高级版可用',
     config_views: '配置查看方式',
     current_config: '当前免费配置',
     custom_config: '自定义基建 · 只读预览',
     config_title: '让排班适配你的基建布局',
-    config_description: '高级版可调整房间、产物数量、班次、宿舍和无人机策略。先查看当前配置中的这些选项，预览时已保存的方案会保留。切回免费配置后可继续排班。',
+    config_description: '高级版可调整房间、产物、班次、宿舍和无人机。可先查看配置选项；预览保留已保存的方案，切回免费配置后可继续排班。',
     readonly: '高级配置只读预览',
     manual_title: '手动调整干员与无人机安排',
     manual_description: '高级版可调整各班次的进驻干员与无人机加速目标，保存本地草稿、导入导出草稿备份，并导出排班图片。',
@@ -38,11 +38,11 @@ export const optimizeCopy = {
     recompute: '增量重算与优先处理',
     recompute_detail: '干员或库存变化后，重新优化排班。维护卡有效期内不限次数生成，任务会优先处理，繁忙时仍需等待。',
     exports: 'MAA JSON 与完整计算数据',
-    exports_benefit: 'MAA 排班模式可导出执行文件，用于自动化排班；完整计算 JSON 可用于分析、复盘和排障。',
-    exports_detail: '高级版可在 MAA 排班模式下导出执行文件，用于自动化排班；也可下载完整计算 JSON，用于分析、复盘和排障。免费版可保存排班图片，不支持这两项文件导出。',
+    exports_benefit: '导出 MAA 排班文件用于自动换班，或下载完整计算数据用于分析和排查问题。',
+    exports_detail: '高级版可导出 MAA 排班文件，也可下载完整计算 JSON。免费版可保存排班图片，不支持这两项文件导出。',
     analysis: '培养建议与回本分析',
     analysis_detail: '比较培养成本、预计每日收益提升和回本时间，再决定先培养谁。',
-    lab: '场景对比实验室',
+    lab: '比较基建配置',
     lab_detail: '比较当前方案和最多 3 个额外配置的预计收益，选择布局和策略。可用次数随购买方案而定。',
     open: '查看功能',
     lab_title: '比较不同配置的收益',
@@ -69,7 +69,7 @@ export const optimizeCopy = {
   // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_004: "练度优化建议",
   // src/components/UpgradeSuggestions.tsx
-  components_UpgradeSuggestions_005: "建议供培养规划参考，材料缺口和回本时间按森空岛养成库存估算。完成培养后请刷新干员数据，后续计算会使用最新练度。",
+  components_UpgradeSuggestions_005: "材料缺口和回本时间按森空岛库存估算。培养完成后，请更新干员数据并重新排班。",
   // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_006: "建议排序",
   // src/components/UpgradeSuggestions.tsx
@@ -248,7 +248,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/GenerateControlBar.tsx
   pages_tool_optimize_GenerateControlBar_012: "查看排班计算说明",
   // src/pages/tool/optimize/GenerateControlBar.tsx
-  pages_tool_optimize_GenerateControlBar_013: "按当前干员数据和基建配置计算。MAA JSON 可导入 MAA 执行排班，效率和生产明细可在数据页查看。",
+  pages_tool_optimize_GenerateControlBar_013: "按当前干员和基建配置生成排班，在“收益分析”查看产量。具备导出权益时，可下载 MAA 文件用于自动换班。",
   // src/pages/tool/optimize/GenerateControlBar.tsx
   pages_tool_optimize_GenerateControlBar_014: "本次计算使用的数据",
   // src/pages/tool/optimize/GenerateControlBar.tsx
@@ -438,7 +438,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/ResultSection.tsx
   pages_tool_optimize_ResultSection_001: "生成后即可查看排班结果",
   // src/pages/tool/optimize/ResultSection.tsx
-  pages_tool_optimize_ResultSection_002: "在总览中检查配置并点击生成，完成后可查看数据、排班详情、导入方式和培养建议。",
+  pages_tool_optimize_ResultSection_002: "确认干员和基建配置后，点击“生成排班”。完成后可查看安排、收益和使用指南；培养建议按当前权益提供。",
   // src/pages/tool/optimize/ResultSection.tsx
   pages_tool_optimize_ResultSection_003: "解锁这个账号",
   // src/pages/tool/optimize/ResultSection.tsx
@@ -510,7 +510,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/ScenarioLabSection.tsx
   pages_tool_optimize_ScenarioLabSection_018: "每档最多 3 个",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
-  pages_tool_optimize_ScenarioLabSection_019: "Pareto 前沿",
+  pages_tool_optimize_ScenarioLabSection_019: "推荐方案",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
   pages_tool_optimize_ScenarioLabSection_020: "失败 ",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
@@ -520,11 +520,11 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/ScenarioLabSection.tsx
   pages_tool_optimize_ScenarioLabSection_023: "产量与操作成本",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
-  pages_tool_optimize_ScenarioLabSection_024: "横轴表示实际换班次数。自动模式先快速选定换班间隔，再按布局复核；前沿只包含复核后的结果。",
+  pages_tool_optimize_ScenarioLabSection_024: "横轴是每日换班次数，纵轴是预计收益。推荐方案均已复核，可结合换班习惯选择。",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
   pages_tool_optimize_ScenarioLabSection_025: "全部场景",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
-  pages_tool_optimize_ScenarioLabSection_026: "默认优先显示已验证前沿；点击列头排序或选择场景。",
+  pages_tool_optimize_ScenarioLabSection_026: "优先显示已复核的推荐方案。点击列头排序，点击方案查看安排。",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
   pages_tool_optimize_ScenarioLabSection_027: "已选择场景",
   // src/pages/tool/optimize/ScenarioLabSection.tsx
@@ -670,17 +670,17 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/scenario-lab/ScenarioFactors.tsx
   pages_tool_optimize_scenario_lab_ScenarioFactors_032: "/碎",
   // src/pages/tool/optimize/scenario-lab/ScenarioParetoChart.tsx
-  pages_tool_optimize_scenario_lab_ScenarioParetoChart_001: "已验证前沿包含 ",
+  pages_tool_optimize_scenario_lab_ScenarioParetoChart_001: "已复核的推荐方案共 ",
   // src/pages/tool/optimize/scenario-lab/ScenarioParetoChart.tsx
-  pages_tool_optimize_scenario_lab_ScenarioParetoChart_002: " 个场景，操作成本从 ",
+  pages_tool_optimize_scenario_lab_ScenarioParetoChart_002: " 个，每日换班 ",
   // src/pages/tool/optimize/scenario-lab/ScenarioParetoChart.tsx
   pages_tool_optimize_scenario_lab_ScenarioParetoChart_003: " 次到 ",
   // src/pages/tool/optimize/scenario-lab/ScenarioParetoChart.tsx
-  pages_tool_optimize_scenario_lab_ScenarioParetoChart_004: " 次每日换班。",
+  pages_tool_optimize_scenario_lab_ScenarioParetoChart_004: " 次。",
   // src/pages/tool/optimize/scenario-lab/ScenarioParetoChart.tsx
-  pages_tool_optimize_scenario_lab_ScenarioParetoChart_005: "当前没有形成已验证 Pareto 前沿。",
+  pages_tool_optimize_scenario_lab_ScenarioParetoChart_005: "暂无已复核的推荐方案。",
   // src/pages/tool/optimize/scenario-lab/ScenarioParetoChart.tsx
-  pages_tool_optimize_scenario_lab_ScenarioParetoChart_006: "产量与每日换班次数 Pareto 图",
+  pages_tool_optimize_scenario_lab_ScenarioParetoChart_006: "每日收益与换班次数对比图",
   // src/pages/tool/optimize/scenario-lab/ScenarioParetoChart.tsx
   pages_tool_optimize_scenario_lab_ScenarioParetoChart_007: " 横轴越靠左操作越少，纵轴越靠上等效理智产量越高。",
   // src/pages/tool/optimize/scenario-lab/ScenarioParetoChart.tsx
@@ -694,7 +694,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/scenario-lab/ScenarioParetoChart.tsx
   pages_tool_optimize_scenario_lab_ScenarioParetoChart_012: " 次换班",
   // src/pages/tool/optimize/scenario-lab/ScenarioParetoChart.tsx
-  pages_tool_optimize_scenario_lab_ScenarioParetoChart_013: "，已验证前沿",
+  pages_tool_optimize_scenario_lab_ScenarioParetoChart_013: "，已复核的推荐方案",
   // src/pages/tool/optimize/scenario-lab/ScenarioParetoChart.tsx
   pages_tool_optimize_scenario_lab_ScenarioParetoChart_014: "图例",
   // src/pages/tool/optimize/scenario-lab/ScenarioParetoChart.tsx
@@ -702,7 +702,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/scenario-lab/ScenarioParetoChart.tsx
   pages_tool_optimize_scenario_lab_ScenarioParetoChart_016: "复核结果",
   // src/pages/tool/optimize/scenario-lab/ScenarioParetoChart.tsx
-  pages_tool_optimize_scenario_lab_ScenarioParetoChart_017: "已验证前沿",
+  pages_tool_optimize_scenario_lab_ScenarioParetoChart_017: "已复核推荐",
   // src/pages/tool/optimize/scenario-lab/ScenarioParetoChart.tsx
   pages_tool_optimize_scenario_lab_ScenarioParetoChart_018: "游戏内轮换",
   // src/pages/tool/optimize/scenario-lab/ScenarioParetoChart.tsx
@@ -764,7 +764,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/scenario-lab/ScenarioResultsTable.tsx
   pages_tool_optimize_scenario_lab_ScenarioResultsTable_027: "场景计算失败",
   // src/pages/tool/optimize/scenario-lab/ScenarioResultsTable.tsx
-  pages_tool_optimize_scenario_lab_ScenarioResultsTable_028: "前沿",
+  pages_tool_optimize_scenario_lab_ScenarioResultsTable_028: "推荐",
   // src/pages/tool/optimize/scenario-lab/ScenarioResultsTable.tsx
   pages_tool_optimize_scenario_lab_ScenarioResultsTable_029: "复核",
   // src/pages/tool/optimize/scenario-lab/ScenarioResultsTable.tsx
@@ -830,7 +830,7 @@ export const optimizeCopy = {
   // src/pages/tool/optimize/types.ts
   pages_tool_optimize_types_009: "实验室",
   // src/pages/tool/optimize/types.ts
-  pages_tool_optimize_types_010: "比较场景与 Pareto 前沿",
+  pages_tool_optimize_types_010: "比较不同配置的收益与换班次数",
   // src/pages/tool/optimize/useLicenseSync.ts
   pages_tool_optimize_useLicenseSync_001: "账号授权状态同步失败，请稍后重试",
   // src/pages/tool/optimize/useOptimizationJob.ts
@@ -897,7 +897,7 @@ export const optimizeCopy = {
   pages_tool_optimize_OptimizationTaskCenter_007: "关闭完成通知",
   pages_tool_optimize_OptimizationTaskCenter_008: "浏览器未授权通知，可在站点设置中重新开启。",
   pages_tool_optimize_OptimizationTaskCenter_009: "排队中",
-  pages_tool_optimize_OptimizationTaskCenter_010: "自动重试等待中",
+  pages_tool_optimize_OptimizationTaskCenter_010: "等待自动重试",
   pages_tool_optimize_OptimizationTaskCenter_011: "执行中",
   pages_tool_optimize_OptimizationTaskCenter_012: "正在取消",
   pages_tool_optimize_OptimizationTaskCenter_013: "已完成",
@@ -944,7 +944,7 @@ export const optimizeCopy = {
   pages_tool_optimize_tour_006: "调整配置",
   pages_tool_optimize_tour_007: "修改下一次计算使用的基建与排班参数；修改后需要回到总览重新计算。",
   pages_tool_optimize_tour_008: "查看结果",
-  pages_tool_optimize_tour_009: "查看当前或历史排班结果，并在权限允许时下载轻量 MAA JSON 或应用升级建议。",
+  pages_tool_optimize_tour_009: "查看当前或历史排班，按档案权益导出 MAA 文件、查看培养建议。",
   pages_tool_optimize_tour_010: "情景实验室",
   pages_tool_optimize_tour_011: "批量比较多组方案，从图表或表格中选好配置，再用于生成排班。",
   pages_tool_optimize_tour_012: "确认输入并编辑配置",
@@ -952,13 +952,13 @@ export const optimizeCopy = {
   pages_tool_optimize_tour_014: "开始排班",
   pages_tool_optimize_tour_015: "使用开始排班或重新计算按钮提交任务；禁用原因、优先券和计算进度会同步显示。",
   pages_tool_optimize_tour_016: "使用最近一次排班结果",
-  pages_tool_optimize_tour_017: "可直接查看排班结果、下载轻量 MAA JSON，或恢复当时配置继续调整。完整历史位于方案与历史页。",
+  pages_tool_optimize_tour_017: "查看结果、导出排班，或载入当时的配置继续调整。其他记录可在“历史方案”查看。",
   pages_tool_optimize_tour_018: "保存当前配置",
   pages_tool_optimize_tour_019: "为当前配置命名并保存；最多保存 3 套，保存不会立即开始新的计算。",
   pages_tool_optimize_tour_020: "管理已保存配置",
   pages_tool_optimize_tour_021: "已保存配置可载入到编辑器、重命名或删除；载入后会成为下一次计算的当前配置。",
   pages_tool_optimize_tour_022: "回看历史排班结果",
-  pages_tool_optimize_tour_023: "历史结果自动保留最新 5 条；每条可查看、下载轻量 MAA JSON，也可恢复当时的配置继续调整。",
+  pages_tool_optimize_tour_023: "在“历史方案”查看或导出已保存的排班，也可载入当时的配置继续调整。可保留数量以档案容量为准。",
   pages_tool_optimize_tour_024: "编辑排班配置",
   pages_tool_optimize_tour_025: "选择预设并调整具体参数，这些改动只影响下一次计算。",
   pages_tool_optimize_tour_026: "留意校验与同步",
@@ -966,7 +966,7 @@ export const optimizeCopy = {
   pages_tool_optimize_tour_028: "阅读排班结果",
   pages_tool_optimize_tour_029: "查看当前或选中的历史结果，包括房间安排、轮换与相关分析。",
   pages_tool_optimize_tour_030: "继续使用结果",
-  pages_tool_optimize_tour_031: "按当前档案权益下载 MAA JSON 或应用培养建议。完整计算数据位于数据页底部的“开发者与排障”区域。",
+  pages_tool_optimize_tour_031: "在“导出”中按档案权益下载 MAA 文件、图片或完整计算数据；在“培养建议”中比较培养投入和收益。",
   pages_tool_optimize_tour_032: "选择实验因素",
   pages_tool_optimize_tour_033: "设置要比较的班次、策略等因素，并先检查页面计算出的有效组合数量。",
   pages_tool_optimize_tour_034: "开始情景对比",

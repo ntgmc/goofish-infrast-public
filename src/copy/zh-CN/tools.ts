@@ -14,18 +14,18 @@ export const toolsCopy = {
   },
   cultivation: {
     title: '作业练度推荐',
-    description: '对照 PRTS 作业需求与当前练度，找到值得培养的干员。',
+    description: '对照 PRTS 作业要求和当前练度，选择培养目标。',
     back: '返回工具页',
     loading: '正在加载作业练度推荐',
     load: '读取森空岛练度',
     loadingData: '正在对比练度与作业需求…',
     failed: '读取推荐数据失败，请重试。',
-    noProfile: '请先创建档案并绑定森空岛，再读取练度对比。',
+    noProfile: '先添加游戏账号并绑定森空岛，再对照练度。',
     profile: '游戏档案', parameters: '推荐条件', unapplied: '待更新',
     views: { priorities: '培养推荐', comparison: '练度对照', special: '培养与自选' },
     preferences: { coverage: '作业需求优先', community: '一图流养成统计' },
     preference: '推荐依据',
-    preferenceHints: { coverage: '结合所选作业需求与精二、专三和模组养成情况，推荐值得培养的干员与练度目标。', community: '综合精二率、专三率和模组养成情况推荐干员，再参考各目标的养成比例选择练度，也适用于没有作业的玩法。' },
+    preferenceHints: { coverage: '按所选作业要求，推荐干员的精二、技能专精和模组目标。', community: '参考玩家的精二、专三和模组养成情况推荐目标，也适用于没有作业的玩法。' },
     recommendationFilters: '推荐范围', moreFilters: '选择活动、关卡与干员', scope: '推荐用途', scopes: { recent: '近期通用', permanent: '常驻需求', history: '历史参考' },
     timeWindow: '作业时间', allTime: '全部时间', coverage: '养成档位', coverages: { basic: '基础参考 · 60%', practical: '实用推荐 · 80%', high: '高覆盖 · 90%' },
     activity: '活动或章节', stage: '关卡', category: '内容类型', profession: '职业', rarity: '星级', all: '全部',
@@ -74,7 +74,7 @@ export const toolsCopy = {
     title: '感谢庆典特别招募推荐',
     description: '按四个特别招募队列查看当前档案的拥有情况与干员评分。每个队列会随机获得一名干员，队列评分越高，整体越值得选择。',
     back: '返回工具页', loading: '正在加载特别招募推荐', loadingData: '正在计算队列评分…', failed: '读取特别招募推荐失败，请重试。',
-    noProfile: '请先创建档案并绑定森空岛，再查看特别招募推荐。',
+    noProfile: '先添加游戏账号并绑定森空岛，再查看招募推荐。',
     profile: '游戏档案', refresh: '刷新练度', unavailable: '当前练度数据中没有完整的活动干员名单，请稍后重新导入。',
     recommended: '推荐选择', expectedScore: (score: number) => score.toFixed(1), ownership: (owned: number, unowned: number, total: number) => `已拥有 ${owned} · 未拥有 ${unowned}/${total}`,
     owned: '已拥有', notOwned: '未拥有', score: (score: number) => `评分 ${score.toFixed(1)}`, scoreHint: '干员评分结合精二、专三、模组养成情况和作业需求计算。已拥有干员按评分的 10% 计入队列评分。',
@@ -90,7 +90,7 @@ export const toolsCopy = {
     select: '选择已有排班表', placeholder: '请选择排班表或导入 JSON',
     active: '历史排班', archived: '已归档排班',
     import: '导入 JSON', loading: '正在读取排班表…',
-    importSettings: 'JSON 缺失信息的补充设置',
+    importSettings: '补充文件缺少的信息',
     importHint: '支持完整计算结果 JSON 和 MAA 排班 JSON，最大 5 MB，252 可直接导入。文件缺少班次时长或产物时，使用下方配置；调整后请重新导入。',
     start: '模拟并对比',
     progress: (side: string, stage: string) => `${side} · ${stage}`,
@@ -133,7 +133,7 @@ export const toolsCopy = {
     preview: "手动排班与效率测算预览",
     retryWorkspace: "重新加载档案",
     operators: "干员与练度依据",
-    operatorsHint: "使用所选档案已拥有的干员及当前练度，包括档案中的精英化调整。基建技能按精英阶段和等级解锁；修改练度请前往档案设置，重新进入工具后生效。",
+    operatorsHint: "使用所选档案的干员和练度，包括精英化调整。基建技能按精英阶段与等级解锁；更新数据请前往“干员管理”，再重新进入工具。",
     prepareSchedule: "导入或创建方案",
     blankSettings: "空白方案配置",
     configHint: "开始后仍可调整设施等级和产物。",
@@ -182,7 +182,7 @@ export const toolsCopy = {
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_010: "仓库价值分析器",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_011: "上传 MAA 仓库 JSON，估算库存的等效理智价值，并下载结果图分享到贴吧或 QQ 群。",
+  pages_DepotValuePage_011: "导入 MAA 仓库文件或森空岛库存，估算材料价值并保存分享图。",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_012: "返回首页",
   // src/pages/DepotValuePage.tsx
@@ -194,7 +194,7 @@ export const toolsCopy = {
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_016: "粘贴仓库 JSON",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_017: "从 MAA 选择“企鹅物流刷图规划”或“明日方舟工具箱”导出，复制内容后粘贴到输入框。\n                      粘贴 JSON 只用于本次分析，不会进入样本池。\n                    ",
+  pages_DepotValuePage_017: "在 MAA 中选择“企鹅物流刷图规划”或“明日方舟工具箱”格式导出，再粘贴到此处。粘贴的数据只用于本次分析，不计入排名样本。",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_018: "读取剪贴板",
   // src/pages/DepotValuePage.tsx
@@ -206,7 +206,7 @@ export const toolsCopy = {
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_022: "正在估算...",
   // src/pages/DepotValuePage.tsx
-  pages_DepotValuePage_023: "分析已粘贴的仓库数据",
+  pages_DepotValuePage_023: "分析仓库",
   // src/pages/DepotValuePage.tsx
   pages_DepotValuePage_024: "森空岛快捷导入",
   // src/pages/DepotValuePage.tsx

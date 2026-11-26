@@ -26,7 +26,7 @@ export const dashboardCopy = {
     deletion_detail: '补充说明（选填，最多 500 字）',
     deletion_survey_help: '你的反馈将用于改进服务，请勿填写密码或授权凭据。',
     deletion_survey_invalid: '请选择注销原因，补充说明最多 500 字。',
-    deletion_open_v2: '前往 V2 申请注销',
+    deletion_open_v2: '前往账号设置申请注销',
   },
   animation: {
     title: "动画效果",
@@ -130,7 +130,7 @@ export const dashboardCopy = {
   pages_tool_dashboard_InvitationsSection_052: " 次邀请奖励，名额重置时间：",
   pages_tool_dashboard_InvitationsSection_053: "今天你的奖励名额已用完。好友仍可正常获得奖励，但今天后续完成的邀请不会再为你发放奖励。",
   pages_tool_dashboard_InvitationsSection_054: "好友邀请记录",
-  pages_tool_dashboard_InvitationsSection_055: "还没有邀请记录。把邀请链接分享给好友后，这里会显示注册、森空岛绑定和奖励发放进度。",
+  pages_tool_dashboard_InvitationsSection_055: "暂无邀请记录。分享链接后，可查看好友注册、绑定和奖励进度。",
   pages_tool_dashboard_InvitationsSection_056: "受邀好友",
   pages_tool_dashboard_InvitationsSection_057: "注册时间",
   pages_tool_dashboard_InvitationsSection_058: "邀请完成时间",
@@ -214,7 +214,7 @@ export const dashboardCopy = {
   // src/pages/tool/dashboard/RedeemSection.tsx
   pages_tool_dashboard_RedeemSection_006: "免费个人排班",
   // src/pages/tool/dashboard/RedeemSection.tsx
-  pages_tool_dashboard_RedeemSection_007: "免费个人排班可查看完整游戏内轮换队列并保存图片，不支持 MAA JSON 下载；MAA 导出、完整原始数据与高级分析需要高级权限。",
+  pages_tool_dashboard_RedeemSection_007: "免费生成游戏内轮换排班并保存图片。MAA 导出、完整计算数据和高级分析需要高级版权益。",
   // src/pages/tool/dashboard/RedeemSection.tsx
   pages_tool_dashboard_RedeemSection_008: "档案名称",
   // src/pages/tool/dashboard/RedeemSection.tsx
@@ -293,7 +293,7 @@ export const dashboardCopy = {
   pages_tool_AccountDashboard_tour_002: "管理游戏账号",
   pages_tool_AccountDashboard_tour_003: "查看正式档案和免费档案，选择账号后即可准备干员与基建数据。",
   pages_tool_AccountDashboard_tour_004: "使用工具",
-  pages_tool_AccountDashboard_tour_005: "分析仓库价值并下载结果图片。手动排班模拟将在功能完善后开放。",
+  pages_tool_AccountDashboard_tour_005: "手动安排基建、规划干员培养，或分析仓库价值。",
   pages_tool_AccountDashboard_tour_006: "添加游戏账号",
   pages_tool_AccountDashboard_tour_007: "使用 CDK 创建正式档案；没有 CDK 时，也可以通过森空岛领取免费个人排班。",
   pages_tool_AccountDashboard_tour_008: "邀请奖励",

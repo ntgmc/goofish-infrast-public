@@ -50,7 +50,7 @@ describe('RouteMetadata', () => {
     await act(async () => router.navigate(`${pathname}#release-example`))
     expect(document.title).toBe('更新日志 | MaaTool')
     await act(async () => router.navigate(`${pathname}?section=unknown`))
-    expect(document.title).toBe(pathname === '/' ? 'MAA 基建排班优化器 | MaaTool' : '基建排班工具 | MaaTool · V2')
+    expect(document.title).toBe(pathname === '/' ? 'MAA 基建排班优化器 | MaaTool' : '基建排班工具 | MaaTool')
   })
 
   it('keeps public information pages indexable and excludes private routes', async () => {

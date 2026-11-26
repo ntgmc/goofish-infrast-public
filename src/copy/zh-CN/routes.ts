@@ -21,7 +21,7 @@ export const routesCopy = {
     'thanks-recruitment': '正在加载特别招募推荐',
   },
   v2: {
-    brand: 'MaaTool', brandDescription: '基建排班工具', testVersion: 'V2',
+    brand: 'MaaTool', brandDescription: '基建排班工具',
     resultDescription: '查看干员排班和预计产出，按需调整配置并生成新方案。',
     loading: '正在加载排班…', retry: '重新读取',
   },

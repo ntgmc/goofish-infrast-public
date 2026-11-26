@@ -105,6 +105,11 @@ export const publicContentCopy = {
   legacy_feedback_join_answer: '点击页面中的“加入 QQ 群”申请入群。反馈问题前，先遮盖截图中的个人信息；不要发送密码、完整 CDK、二维码、Cookie 或森空岛凭据。',
   faq_join_question: '如何反馈问题和查看进度？',
   faq_join_answer: '登录后点击“反馈”提交问题，可选择附带当前档案、结果或任务编号。在“我的反馈”查看回复、补充信息和处理进度。',
+  legacy_result_guide_faq: [
+    { id: 'use-json', question: '下载的 MAA JSON 怎么使用？完整计算 JSON 呢？', answer: '在结果页下载轻量 MAA JSON，再到 MAA 的自定义基建配置中选择文件。文件包含班次、房间、入驻干员、产品和自动执行动作。使用前请核对 MAA 版本、游戏内房间布局和当前干员状态，并保留原配置以便恢复。\n完整计算 JSON 是高级版提供的分析和排障数据，不能用作 MAA 排班文件。游戏内轮换模式不生成 MAA JSON。' },
+    { id: 'free-versus-lifetime', question: '免费档案和付费维护卡有什么区别？', answer: '免费档案通过森空岛确认 UID 后领取，同一个游戏 UID 全站只能领取一次。可以生成并查看完整游戏内轮换、保存排班图片；不支持 MAA JSON 下载，完整计算数据和高级分析需要高级权限。\n付费方案有 30 天尝鲜维护包、90 天版本维护卡、365 天年度维护卡和终身卡，均支持森空岛导入或 MAA 干员 JSON 初始化，并在有效期内提供完整高级能力。具体价格、期限和权益可查看“价格与权益”页。' },
+    { id: 'schedule-modes', question: 'MAA 排班和游戏内轮换有什么区别？', answer: '使用 MAA 自动换班时，选择 MAA 排班，具备导出权益后可下载自定义基建 JSON。在游戏内换班时，选择游戏内轮换，它会生成两班设施预设队列，供你使用队列轮换或快速切换。可以按自己的执行方式和换班频率选择。' },
+  ],
   legacy_v1_workspace_faq: [
     { id: 'requirements', question: '使用 MaaTool 需要准备什么？', answer: '查看仓库估值可以直接打开免费工具。生成排班需要先注册 MaaTool 账号，再通过森空岛确认游戏 UID、创建免费档案，或用 CDK 开通正式档案。进入工作台后，导入干员数据，核对基建配置，再开始排班。' },
     { id: 'account-concepts', question: 'MaaTool 账号、游戏账号档案和 CDK 分别是什么？', answer: 'MaaTool 账号用邮箱和密码登录本站。游戏账号档案对应一个《明日方舟》游戏 UID，保存该账号的数据、配置和排班结果。CDK 用于开通正式档案及对应权益，不能当作 MaaTool 登录密码或游戏密码使用。' },
@@ -199,7 +204,7 @@ export const publicContentCopy = {
   admin_qq_number: '群号',
   admin_qq_url: 'HTTPS 入群链接',
   admin_qq_link_label: '按钮文案',
-  admin_purchase_description: '设置通用闲鱼商品及购买说明。V2 购买入口先打开站内购买页。各套餐和补差价商品的链接、图片请在「价格与权益」中分别设置。',
+  admin_purchase_description: '设置通用闲鱼商品和购买说明。各套餐及补差价商品的链接、图片，请在「价格与权益」中分别设置。',
   admin_xianyu_url: '闲鱼购买链接',
   admin_purchase_instructions: '购买补充说明',
   admin_purchase_instructions_help: '显示在所有购买页的流程下方，可填写发货方式、联系说明等；留空则隐藏。',

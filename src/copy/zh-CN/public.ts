@@ -2,9 +2,9 @@ export const publicCopy = {
   // src/components/AnnouncementBanner.tsx
   components_AnnouncementBanner_001: "站内公告",
   // src/components/AnnouncementBanner.tsx
-  components_AnnouncementBanner_002: "查看详情",
+  components_AnnouncementBanner_002: "展开公告",
   // src/components/AnnouncementBanner.tsx
-  components_AnnouncementBanner_003: "收起详情",
+  components_AnnouncementBanner_003: "收起公告",
   // src/components/AnnouncementBodyEditor.tsx
   components_AnnouncementBodyEditor_001: "正文",
   // src/components/AnnouncementBodyEditor.tsx
@@ -254,7 +254,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_008: "下载的 MAA JSON 怎么使用？完整计算 JSON 呢？",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_009: "在结果页下载轻量 MAA JSON，再到 MAA 的自定义基建配置中选择文件。文件包含班次、房间、入驻干员、产品和自动执行动作。使用前请核对 MAA 版本、游戏内房间布局和当前干员状态，并保留原配置以便恢复。\n完整计算 JSON 是高级版提供的分析和排障数据，不能用作 MAA 排班文件。游戏内轮换模式不生成 MAA JSON。",
+  pages_PublicInfoPage_009: "点击“导出”下载 MAA JSON，再到 MAA 的“自定义基建配置”中选择文件。文件包含班次、设施、进驻干员、产物和执行动作。使用前核对 MAA 版本、游戏布局和干员状态，并备份原配置。\n完整计算 JSON 用于分析和排查问题，不能导入 MAA。游戏内轮换不生成 MAA 文件；两项 JSON 下载均需对应权益。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_010: "为什么结果与实际收益不同？",
   // src/pages/PublicInfoPage.tsx
@@ -445,7 +445,7 @@ export const publicCopy = {
     profile_states: { frozen: "已冻结", revoked: "已撤销" },
     archived: "已归档",
     choose_plan: "选择维护方案",
-    after_story: "按使用期限选择，共同享有高级排班能力。",
+    after_story: "四种期限均包含完整高级排班功能。",
     free_title: "免费开始",
     free_action: "免费开始使用",
     free_unavailable: "免费开始暂未开放",
@@ -466,7 +466,7 @@ export const publicCopy = {
   pricing_cards: {
     features: ["不限次数生成排班，优先处理", "导出排班，交给 MAA 自动换班", "自定义基建策略，分析培养收益", "手动排班，模拟心情与产量"],
     comparisons: (count: number | null) => count === null ? "方案对比不限次数" : `含 ${count} 次方案对比`,
-    comparisons_help: "想换基建布局或调整生产策略时，可先用方案对比查看每日产量与换班次数，再决定怎么排。每次使用同一份干员数据，比较当前方案与最多三套额外配置。",
+    comparisons_help: "用同一份干员数据，比较当前方案与最多三套额外配置的每日产量和换班次数，再决定如何调整。",
     archive_gift: (count: number) => `可同时封存 ${count} 份排班结果`,
     archive_comparison: "排班结果封存",
     archive_title: "保留值得回看的排班",
@@ -509,7 +509,7 @@ export const publicCopy = {
     account_scope: '维护同一个游戏账号（UID），绑定后不支持自行更换；限时权益从兑换成功时开始计时。',
     delivery_title: '人工发货',
     delivery_help: '正常时间一般在付款后 10 分钟内发送兑换码；如未及时收到，可在闲鱼留言催促。',
-    support_action: '兑换或使用遇到问题？联系售后',
+    support_action: '联系售后',
     scan: '扫码或保存商品图片',
     redeem_action: '已有兑换码，去兑换',
     upgrade_redeem: '已有兑换码，升级当前档案',
@@ -588,7 +588,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_085: "免费档案和付费维护卡有什么区别？",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_086: "免费档案通过森空岛确认 UID 后领取，同一个游戏 UID 全站只能领取一次。可以生成并查看完整游戏内轮换、保存排班图片；不支持 MAA JSON 下载，完整计算数据和高级分析需要高级权限。\n付费方案有 30 天尝鲜维护包、90 天版本维护卡、365 天年度维护卡和终身卡，均支持森空岛导入或 MAA 干员 JSON 初始化，并在有效期内提供完整高级能力。具体价格、期限和权益可查看“价格与权益”页。",
+  pages_PublicInfoPage_086: "免费档案可生成完整游戏内轮换排班并保存图片。通过森空岛绑定 UID 领取，每个 UID 全站限领一次；不支持 MAA 导出、完整计算数据和高级分析。\n维护卡有 30 天、90 天、365 天和终身方案，均可通过森空岛或 MAA 识别文件导入干员，在有效期内使用完整高级功能。价格、期限和权益见“价格与权益”。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_087: "森空岛授权后会立即保存账号吗？",
   // src/pages/PublicInfoPage.tsx
@@ -604,7 +604,7 @@ export const publicCopy = {
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_093: "MAA 排班和游戏内轮换有什么区别？",
   // src/pages/PublicInfoPage.tsx
-  pages_PublicInfoPage_094: "使用 MAA 自动换班时，选择 MAA 排班，具备导出权益后可下载自定义基建 JSON。在游戏内换班时，选择游戏内轮换，它会生成两班设施预设队列，供你使用队列轮换或快速切换。可以按自己的执行方式和换班频率选择。",
+  pages_PublicInfoPage_094: "用 MAA 自动换班，选择“MAA 排班”，具备导出权益后可下载文件。手动换班，选择“游戏内轮换”，对照两班安排设置游戏内预设队列，再用“队列轮换”或“快速切换”换班。按自己的换班方式和频率选择。",
   // src/pages/PublicInfoPage.tsx
   pages_PublicInfoPage_095: "绑定后可以自行更换游戏 UID 吗？",
   // src/pages/PublicInfoPage.tsx

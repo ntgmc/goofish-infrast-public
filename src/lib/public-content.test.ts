@@ -11,6 +11,31 @@ import {
 } from './public-content'
 
 describe('public content settings', () => {
+  it('updates saved result guides while preserving order, removed entries, and unrelated settings', () => {
+    const stored = { ...cloneDefaultPublicContentSettings(), defaults_revision: 19, updated_at: '2026-11-26T00:00:00.000Z' }
+    for (const previous of copy.publicContent.legacy_result_guide_faq) {
+      Object.assign(stored.faq.items.find((item) => item.id === previous.id)!, previous)
+    }
+    stored.faq.items = stored.faq.items.filter((item) => item.id !== 'requirements').reverse()
+    const original = structuredClone(stored)
+    const migrated = normalizePublicContentSettings(stored)
+    expect(migrated.faq.items).toEqual(original.faq.items.map((item) => DEFAULT_PUBLIC_CONTENT_DRAFT.faq.items.find((entry) => entry.id === item.id)))
+    expect(migrated).toEqual({ ...original, defaults_revision: PUBLIC_CONTENT_DEFAULTS_REVISION, faq: migrated.faq })
+    expect(stored).toEqual(original)
+    expect(normalizePublicContentSettings(migrated)).toEqual(migrated)
+  })
+
+  it.each(['question', 'answer', 'action'] as const)('preserves result guide customizations to %s and content saved at the current revision', (field) => {
+    const stored = { ...cloneDefaultPublicContentSettings(), defaults_revision: 19 }
+    const previous = copy.publicContent.legacy_result_guide_faq.find((item) => item.id === 'use-json')!
+    const item = stored.faq.items.find((entry) => entry.id === previous.id)!
+    Object.assign(item, previous, { [field]: field === 'action' ? 'qq_group' : '管理员自定义说明' })
+    expect(normalizePublicContentSettings(stored).faq).toEqual(stored.faq)
+    Object.assign(item, previous, { action: 'none' })
+    stored.defaults_revision = PUBLIC_CONTENT_DEFAULTS_REVISION
+    expect(normalizePublicContentSettings(stored).faq).toEqual(stored.faq)
+  })
+
   it('simplifies saved account rules while preserving custom content, removed rules, and the stored input', () => {
     const stored = { ...cloneDefaultPublicContentSettings(), defaults_revision: 17, updated_at: '2026-11-16T12:00:00.000Z' }
     stored.pricing.disclosures = [
