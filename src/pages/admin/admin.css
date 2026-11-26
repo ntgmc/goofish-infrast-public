@@ -176,6 +176,7 @@
 @container admin-filters (width < 16rem) {
   .admin-record-filters > * { grid-column: 1 / -1; }
 }
+.admin-master-index { max-height: min(65dvh, 28rem); overflow-y: auto; overscroll-behavior-y: contain; }
 .admin-catalog-layout > .admin-selection-index { max-height: min(65dvh, 28rem); }
 .admin-catalog-editor > label { margin-top: 0; }
 .admin-app table { font-variant-numeric: tabular-nums; }
@@ -190,7 +191,7 @@
   .admin-main { padding: 20px 16px 48px; }
   .admin-selection { grid-template-columns: minmax(0, 1fr); }
   .admin-selection-index { max-height: 220px; border-right: 0; border-bottom: 1px solid var(--color-v2-line); padding: 0 0 12px; }
-  .admin-catalog-layout > .admin-selection-index { max-height: 220px; }
+  .admin-catalog-layout > .admin-selection-index, .admin-master-index { max-height: 220px; }
 }
 @media (max-width: 40rem) {
   .admin-header-user { display: none; }
