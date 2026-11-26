@@ -196,7 +196,7 @@ export default function BehaviorRiskPanel({ active = true, search = '' }: { acti
                 const key = selectionKey(riskCase.id, member.user_id)
                 const selection = selections[key] ?? { action: 'none' as const, profileId: member.profiles[0]?.profile_id ?? '' }
                 return (
-                  <div key={member.user_id} className="tool-inset grid gap-3 p-3 xl:grid-cols-[1fr_210px_210px] xl:items-center">
+                  <div key={member.user_id} role="group" aria-label={`成员 ${member.account_email ?? member.user_id}`} className="tool-inset grid gap-3 p-3 xl:grid-cols-[1fr_210px_210px] xl:items-center">
                     <div className="min-w-0">
                       <div className="break-all text-sm font-medium text-ink-primary">{member.account_email ?? '账号已删除'}</div>
                       <div className="mt-1 break-all font-mono text-xs text-ink-muted">用户 ID：{member.user_id}</div>
@@ -205,31 +205,37 @@ export default function BehaviorRiskPanel({ active = true, search = '' }: { acti
                         设备 {member.browser_prefixes.join(', ') || '—'} · 网络 {member.network_prefixes.join(', ') || '—'} · UID {member.uid_prefixes.join(', ') || '—'} · 输出 {member.output_prefixes.join(', ') || '—'} · 干员指纹 {member.operator_fingerprint_prefixes?.join(', ') || '—'}
                       </div>
                     </div>
-                    <select
-                      className="tool-field min-h-10"
-                      value={selection.action}
-                      disabled={controlsDisabled || !canReview || riskCase.status !== 'pending'}
-                      onChange={(event) => {
-                        const action = event.currentTarget.value as MemberAction
-                        setSelections((current) => ({ ...current, [key]: { ...selection, action } }))
-                      }}
-                    >
-                      <option value="none">不处置此成员</option>
-                      <option value="freeze_account">冻结整个账号</option>
-                      <option value="freeze_profile" disabled={member.profiles.length === 0}>冻结指定档案</option>
-                    </select>
-                    <select
-                      className="tool-field min-h-10"
-                      value={selection.profileId}
-                      disabled={controlsDisabled || !canReview || riskCase.status !== 'pending' || selection.action !== 'freeze_profile'}
-                      onChange={(event) => {
-                        const profileId = event.currentTarget.value
-                        setSelections((current) => ({ ...current, [key]: { ...selection, profileId } }))
-                      }}
-                    >
-                      {member.profiles.length === 0 && <option value="">无可选档案</option>}
-                      {member.profiles.map((profile) => <option key={profile.profile_id} value={profile.profile_id}>{profile.profile_label} · {profile.profile_id} · {profile.kind} · {profile.status}</option>)}
-                    </select>
+                    <label className="grid min-w-0 gap-2 text-sm">
+                      <span>处置方式</span>
+                      <select
+                        className="tool-field min-h-10"
+                        value={selection.action}
+                        disabled={controlsDisabled || !canReview || riskCase.status !== 'pending'}
+                        onChange={(event) => {
+                          const action = event.currentTarget.value as MemberAction
+                          setSelections((current) => ({ ...current, [key]: { ...selection, action } }))
+                        }}
+                      >
+                        <option value="none">不处置此成员</option>
+                        <option value="freeze_account">冻结整个账号</option>
+                        <option value="freeze_profile" disabled={member.profiles.length === 0}>冻结指定档案</option>
+                      </select>
+                    </label>
+                    <label className="grid min-w-0 gap-2 text-sm">
+                      <span>指定档案</span>
+                      <select
+                        className="tool-field min-h-10"
+                        value={selection.profileId}
+                        disabled={controlsDisabled || !canReview || riskCase.status !== 'pending' || selection.action !== 'freeze_profile'}
+                        onChange={(event) => {
+                          const profileId = event.currentTarget.value
+                          setSelections((current) => ({ ...current, [key]: { ...selection, profileId } }))
+                        }}
+                      >
+                        {member.profiles.length === 0 && <option value="">无可选档案</option>}
+                        {member.profiles.map((profile) => <option key={profile.profile_id} value={profile.profile_id}>{profile.profile_label} · {profile.profile_id} · {profile.kind} · {profile.status}</option>)}
+                      </select>
+                    </label>
                   </div>
                 )
               })}
