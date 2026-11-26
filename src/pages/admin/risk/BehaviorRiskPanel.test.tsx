@@ -156,11 +156,11 @@ describe('BehaviorRiskPanel review form', () => {
     expect(screen.getByText('完整性哈希：未记录')).toBeInTheDocument()
     expect(screen.getByRole('option', { name: '主档案 · profile-1-complete-id · cdk · active' })).toBeInTheDocument()
 
-    const actionSelect = screen.getAllByRole('combobox')[1]
+    const actionSelect = screen.getByRole('combobox', { name: '处置方式' })
     await user.selectOptions(actionSelect, 'freeze_profile')
     expect(actionSelect).toHaveValue('freeze_profile')
 
-    const profileSelect = screen.getAllByRole('combobox')[2]
+    const profileSelect = screen.getByRole('combobox', { name: '指定档案' })
     await waitFor(() => expect(profileSelect).toBeEnabled())
     expect(profileSelect).toHaveValue('profile-1-complete-id')
   })

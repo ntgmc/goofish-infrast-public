@@ -50,7 +50,13 @@ export function CdkTable({ records, selected, filters, search, pagination, loadi
             </button>
           ))}
         </div>
-        <span className="text-sm text-ink-secondary">共 {pagination.total} 个 CDK</span>
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-sm text-ink-secondary">{loading ? '正在更新 CDK 列表…' : `共 ${pagination.total} 个 CDK`}</span>
+          <button type="button" className="tool-secondary-action text-sm" disabled={Boolean(busyAction)} onClick={() => {
+            onSearchChange('')
+            onFilterChange({ status: 'all', cdk_type: 'all', permission: 'all', risk: 'all', generated: 'all' })
+          }}>重置筛选</button>
+        </div>
       </div>
       <div hidden={!selectedRecords.length} className="admin-batch-actions flex flex-wrap items-end gap-2 border-b border-surface-3 p-4">
         <span className="w-full text-sm text-ink-secondary">当前页已选 {selectedRecords.length} 个 CDK</span>
@@ -70,13 +76,13 @@ export function CdkTable({ records, selected, filters, search, pagination, loadi
         <button type="button" className="tool-secondary-action text-sm" disabled={busy || !selected.length} onClick={() => onSelect([])}>取消选择</button>
       </div>
       <fieldset disabled={Boolean(busyAction)} className="admin-record-filters border-b border-surface-3 p-4">
-        <label className="admin-record-search">
-          <span className="mb-1.5 block text-xs font-medium text-ink-muted">搜索</span>
+        <div className="admin-record-search">
+          <label htmlFor="admin-cdk-search" className="mb-1.5 block text-xs font-medium text-ink-muted">搜索</label>
           <div className="flex gap-2">
-            <input type="search" value={search} onChange={(event) => onSearchChange(event.currentTarget.value)} placeholder="搜索 CDK 标识、订单标识或备注" className="tool-field" />
-            {search && <button type="button" onClick={() => onSearchChange('')} className="tool-secondary-action px-3 text-sm">清空</button>}
+            <input id="admin-cdk-search" type="search" value={search} onChange={(event) => onSearchChange(event.currentTarget.value)} placeholder="搜索 CDK 标识、订单标识或备注" className="tool-field" />
+            {search && <button type="button" onClick={() => onSearchChange('')} className="tool-secondary-action shrink-0 px-3 text-sm">清空</button>}
           </div>
-        </label>
+        </div>
         <label className="block">
           <span className="mb-1.5 block text-xs font-medium text-ink-muted">CDK 类型</span>
           <select value={filters.cdk_type} onChange={(event) => onFilterChange({ cdk_type: event.currentTarget.value as CdkTypeFilter })} className="tool-field">
@@ -99,7 +105,7 @@ export function CdkTable({ records, selected, filters, search, pagination, loadi
         </div></details>
       </fieldset>
         <div className="admin-records-region" aria-busy={loading}>
-          {loading && <div className="border-b border-surface-3 px-4 py-2 text-sm text-ink-muted" role="status">正在加载…</div>}
+          {loading && records.length > 0 && <div className="border-b border-surface-3 px-4 py-2 text-sm text-ink-muted" role="status">正在更新 CDK 列表…</div>}
           <table className="admin-records-table admin-cdk-table w-full text-left text-sm" aria-label="CDK 记录" role="table">
             <thead className="bg-surface-2 text-xs text-ink-muted" role="rowgroup">
               <tr role="row">
@@ -114,7 +120,7 @@ export function CdkTable({ records, selected, filters, search, pagination, loadi
             </thead>
             <tbody className="divide-y divide-surface-3" role="rowgroup">
             {records.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-10 text-center text-ink-muted">{search ? '没有匹配的 CDK，请调整搜索条件。' : '当前筛选没有记录。'}</td></tr>
+              <tr><td colSpan={7} className="px-4 py-10 text-center text-ink-muted">{loading ? '正在查找 CDK…' : search ? '没有匹配的 CDK，请调整搜索条件。' : '当前筛选没有记录。'}</td></tr>
             ) : records.map((record) => {
               const nextPermission = record.cdk_type === 'profile' ? getNextProductPermission(record.permission) : null
               return (

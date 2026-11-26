@@ -159,12 +159,12 @@ describe('manual schedule access and recovery', () => {
     await user.click(within(editor).getByRole('button', { name: '保存本地草稿' }))
     expect(JSON.parse(localStorage.getItem('manual-schedule:manual-profile')!).plans[0].rooms.trading[0]).toEqual(['贸易1', '', '新干员'])
     expect(result.plans[0].rooms.trading[0].operators).toEqual(['贸易1'])
-    await user.click(screen.getByRole('tab', { name: '详情' }))
+    await user.click(screen.getByRole('tab', { name: '设施明细' }))
     const detail = within(screen.getByRole('tabpanel'))
     expect(detail.getByText('贸易1')).toBeInTheDocument()
     expect(detail.queryByText('新干员')).not.toBeInTheDocument()
     expect(detail.getAllByText('200.0%').length).toBeGreaterThan(0)
-    await user.click(screen.getByRole('tab', { name: '总览图 v2' }))
+    await user.click(screen.getByRole('tab', { name: '按班次查看' }))
     await user.click(screen.getByRole('tab', { name: '手动排班' }))
     expect(within(editor).getByText('新干员')).toBeInTheDocument()
     view.unmount()
@@ -205,9 +205,9 @@ describe('ResultPanel overview v2', () => {
       render(<ResultPanel result={result} operators={[
         { id: 'char_103_angel', name: '能天使', own: true, elite: 2, rarity: 6 },
       ]} />)
-      await user.click(screen.getByRole('tab', { name: '总览图 v2' }))
+      await user.click(screen.getByRole('tab', { name: '按班次查看' }))
       const option = screen.getByRole('checkbox', { name: '显示干员职业' })
-      const board = within(screen.getByRole('region', { name: '总览图 v2' }))
+      const board = within(screen.getByRole('region', { name: '按班次查看' }))
       expect(option).not.toBeChecked()
       expect(board.queryByRole('img', { name: '狙击' })).not.toBeInTheDocument()
       await user.click(option)
@@ -220,10 +220,10 @@ describe('ResultPanel overview v2', () => {
       await waitFor(() => expect(download).toHaveBeenLastCalledWith(expect.objectContaining({ version: 'v2', planIndex: 1, showProfession: true })))
       await user.click(screen.getByRole('button', { name: '导出全部班次长图' }))
       await waitFor(() => expect(download).toHaveBeenLastCalledWith(expect.objectContaining({ version: 'v2', planIndex: undefined, showProfession: true })))
-      await user.click(screen.getByRole('tab', { name: '总览图' }))
+      await user.click(screen.getByRole('tab', { name: '全部班次' }))
       expect(screen.queryByRole('checkbox', { name: '显示干员职业' })).not.toBeInTheDocument()
       expect(screen.queryByRole('img', { name: '狙击' })).not.toBeInTheDocument()
-      await user.click(screen.getByRole('tab', { name: '总览图 v2' }))
+      await user.click(screen.getByRole('tab', { name: '按班次查看' }))
       expect(screen.getByRole('checkbox', { name: '显示干员职业' })).toBeChecked()
       await user.click(screen.getByRole('checkbox', { name: '显示干员职业' }))
       expect(screen.queryByRole('img', { name: '术师' })).not.toBeInTheDocument()
@@ -252,14 +252,14 @@ describe('ResultPanel overview v2', () => {
     const { container } = render(<ResultPanel result={createThreeShiftResult()} operators={[
       { id: 'char_103_angel', name: '贸易1', own: true, elite: 2, rarity: 6 },
     ]} />)
-    expect(screen.getByRole('tab', { name: '总览图' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: '全部班次' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByText('贸易2')).toBeInTheDocument()
     expect(screen.getByText('贸易3')).toBeInTheDocument()
     expect(container.querySelector('img[src^="/webp96/"]')).toHaveAttribute('width', '32')
     expect(container.querySelector('img[src="/assets/products/GOLD.png"]')).toHaveAttribute('width', '16')
 
-    await user.click(screen.getByRole('tab', { name: '总览图 v2' }))
-    const board = screen.getByRole('region', { name: '总览图 v2' })
+    await user.click(screen.getByRole('tab', { name: '按班次查看' }))
+    const board = screen.getByRole('region', { name: '按班次查看' })
     expect(within(board).getAllByRole('tab')).toHaveLength(3)
     expect(within(board).getByText('贸易1')).toBeInTheDocument()
     expect(within(board).queryByText('贸易2')).not.toBeInTheDocument()
@@ -278,7 +278,7 @@ describe('ResultPanel overview v2', () => {
     await user.click(within(board).getByRole('tab', { name: /第2班.*6h/ }))
     expect(within(board).getByText('贸易2')).toBeInTheDocument()
     expect(within(board).queryByText('贸易1')).not.toBeInTheDocument()
-    await user.click(screen.getByRole('tab', { name: '总览图' }))
+    await user.click(screen.getByRole('tab', { name: '全部班次' }))
     const original = screen.getByRole('tabpanel')
     expect(within(original).getByText('贸易1')).toBeInTheDocument()
     expect(within(original).getByText('贸易2')).toBeInTheDocument()
@@ -288,8 +288,8 @@ describe('ResultPanel overview v2', () => {
   it('supports arrow, Home and End keys and labels the current shift panel', async () => {
     const user = userEvent.setup()
     render(<ResultPanel result={createThreeShiftResult()} />)
-    await user.click(screen.getByRole('tab', { name: '总览图 v2' }))
-    const board = within(screen.getByRole('region', { name: '总览图 v2' }))
+    await user.click(screen.getByRole('tab', { name: '按班次查看' }))
+    const board = within(screen.getByRole('region', { name: '按班次查看' }))
     const tabs = board.getAllByRole('tab')
     tabs[0].focus()
     await user.keyboard('{ArrowRight}')
@@ -314,8 +314,8 @@ describe('ResultPanel overview v2', () => {
     result.plans[1].Fiammetta = { enable: true, target: '目标2', order: 'pre' }
     result.plans[0].drones = { enable: true, room: 'trading', index: 1, order: 'pre', mode: 'auto' }
     render(<ResultPanel result={result} />)
-    await user.click(screen.getByRole('tab', { name: '总览图 v2' }))
-    const board = within(screen.getByRole('region', { name: '总览图 v2' }))
+    await user.click(screen.getByRole('tab', { name: '按班次查看' }))
+    const board = within(screen.getByRole('region', { name: '按班次查看' }))
     expect(board.getByRole('heading', { name: /办公室.*Lv\.3/ })).toBeInTheDocument()
     expect(board.getByText('本班暂无干员安排')).toBeInTheDocument()
     expect(board.getByText('菲亚梅塔 → 目标1')).toBeInTheDocument()
@@ -336,8 +336,8 @@ describe('ResultPanel overview v2', () => {
       if (mode === 'rotation') result.schedule_mode = mode
       else result.dormitory_rule = mode
       render(<ResultPanel result={result} />)
-      await user.click(screen.getByRole('tab', { name: '总览图 v2' }))
-      const board = within(screen.getByRole('region', { name: '总览图 v2' }))
+      await user.click(screen.getByRole('tab', { name: '按班次查看' }))
+      const board = within(screen.getByRole('region', { name: '按班次查看' }))
       if (mode === 'maa_autofill') {
         expect(board.getByText('宿舍干员')).toBeInTheDocument()
         expect(board.getByText('宿舍干员2')).toBeInTheDocument()
@@ -358,7 +358,7 @@ describe('ResultPanel overview v2', () => {
     result.dormitory_rule = 'maa_pure_autofill'
     result.plans[0].rooms.dormitory.push({ operators: ['宿舍干员2'] })
     render(<ResultPanel result={result} />)
-    for (const tab of ['总览图', '总览图 v2', '详情']) {
+    for (const tab of ['全部班次', '按班次查看', '设施明细']) {
       await user.click(screen.getByRole('tab', { name: tab }))
       const panel = within(screen.getByRole('tabpanel', { name: tab }))
       expect(panel.getByText('宿舍干员')).toBeInTheDocument()
@@ -375,8 +375,8 @@ describe('ResultPanel overview v2', () => {
       operators: ['杜林', '恢复目标'], recovery_support_operators: ['杜林'], autofill: false,
     }]
     render(<ResultPanel result={result} />)
-    await user.click(screen.getByRole('tab', { name: '总览图 v2' }))
-    const board = within(screen.getByRole('region', { name: '总览图 v2' }))
+    await user.click(screen.getByRole('tab', { name: '按班次查看' }))
+    const board = within(screen.getByRole('region', { name: '按班次查看' }))
     expect(board.getByText('杜林')).toBeInTheDocument()
     expect(board.getByText('恢复目标')).toBeInTheDocument()
     expect(board.getByRole('img', { name: '恢复支援' })).toHaveAttribute('src', '/building-skills/bskill_dorm_all&one1.png')
@@ -398,7 +398,7 @@ describe('ResultPanel overview v2', () => {
     result.plans[0].rooms.trading = [{ operators: ['深巡', '能天使'], cross_station_operators: ['深巡'] }]
     result.plans[0].rooms.control = [{ operators: ['阿米娅'] }]
     render(<ResultPanel result={result} />)
-    for (const tab of ['总览图', '总览图 v2']) {
+    for (const tab of ['全部班次', '按班次查看']) {
       await user.click(screen.getByRole('tab', { name: tab }))
       const board = within(screen.getByRole('tabpanel', { name: tab }))
       expect(board.getAllByRole('img', { name: '跨站联动' })).toHaveLength(5)
@@ -415,8 +415,8 @@ describe('ResultPanel overview v2', () => {
   it('falls back to the first shift for shorter results and handles empty results', async () => {
     const user = userEvent.setup()
     const view = render(<ResultPanel result={createThreeShiftResult()} />)
-    await user.click(screen.getByRole('tab', { name: '总览图 v2' }))
-    const board = within(screen.getByRole('region', { name: '总览图 v2' }))
+    await user.click(screen.getByRole('tab', { name: '按班次查看' }))
+    const board = within(screen.getByRole('region', { name: '按班次查看' }))
     await user.click(board.getByRole('tab', { name: /第3班/ }))
     const shorter = createThreeShiftResult()
     shorter.plans = shorter.plans.slice(0, 1)
@@ -483,7 +483,7 @@ describe('ResultPanel tabs', () => {
     result.plans = result.plans.slice(0, 2)
     result.plans[1].rooms.trading[0].product = 'Orundum'
     render(<ResultPanel result={result} />)
-    await userEvent.setup().click(screen.getByRole('tab', { name: mode === 'maa' ? '详情' : '预设队列' }))
+    await userEvent.setup().click(screen.getByRole('tab', { name: mode === 'maa' ? '设施明细' : '预设队列' }))
     const panel = screen.getByRole('tabpanel')
     const icons = panel.querySelectorAll('img[src^="/assets/products/"]')
     expect(icons).toHaveLength(mode === 'maa' ? 4 : 2)
@@ -576,7 +576,7 @@ describe('ResultPanel tabs', () => {
 
     await user.click(disclosureLabel)
     expect(disclosure).toHaveAttribute('open')
-    expect(screen.getByText(/不应导入 MAA/)).toBeInTheDocument()
+    expect(screen.getByText(/请勿导入 MAA/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: '下载完整计算数据' }))
     expect(onDownload).not.toHaveBeenCalled()
     expect(onDownloadFullResult).toHaveBeenCalledTimes(1)
@@ -588,7 +588,7 @@ describe('ResultPanel tabs', () => {
     expect(screen.getByRole('button', { name: '下载完整计算 JSON' })).toBeDisabled()
     expect(screen.getAllByText('生成并完成分析后可查看测算数值')).toHaveLength(2)
     expect(screen.getByRole('link', { name: '比较价格与权益' })).toHaveAttribute('href', '/pricing')
-    expect(screen.getByRole('tab', { name: '导入' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: '使用指南' })).toBeInTheDocument()
   })
 
   it('shows free-preview totals without detailed sanity calculations or exports', async () => {

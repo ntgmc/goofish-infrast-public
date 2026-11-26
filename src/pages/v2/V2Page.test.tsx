@@ -359,7 +359,7 @@ function connect() {
     userCanExportMaaWithoutCoupon: true, inventoryLoaded: true, inventoryError: null as string | null,
     latestWorkspaceResult: summary, handleViewHistory: vi.fn(async () => undefined),
     currentResult: null as OptimizeResult | null, finalResult: null, historyItem: { result: SAMPLE_RESULT },
-    activeConfig: SAMPLE_CONFIG, mergedOperators: SAMPLE_OPERATORS, configDiffRows: [],
+    activeConfig: SAMPLE_CONFIG, mergedOperators: SAMPLE_OPERATORS, configDiffRows: [], resultConfigChanged: false,
     updateConfig: vi.fn(), handleGenerate: vi.fn(async () => undefined), handleDownloadMAA: vi.fn(),
     downloadMaaResult: vi.fn(), downloadFullResult: vi.fn(),
     permission: 'ultimate', userCanEditConfig: true, userCanUseIntermediateAutoConfig: true, userCanUseUpgradeFeatures: true,

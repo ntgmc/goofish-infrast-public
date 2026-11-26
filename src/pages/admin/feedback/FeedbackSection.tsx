@@ -23,20 +23,21 @@ export default function FeedbackSection({ active, canManage = false, canViewUser
   const [todo, setTodo] = useState(requestedTodo && FEEDBACK_TODOS.includes(requestedTodo as typeof FEEDBACK_TODOS[number]) ? requestedTodo : '')
   const [category, setCategory] = useState('')
   const [email, setEmail] = useState('')
+  const [appliedEmail, setAppliedEmail] = useState('')
   const [minWait, setMinWait] = useState('')
   const userId = params.get('user_id') ?? ''
   const owner = usePrivateQueryScope('admin', active)
   const client = useQueryClient()
   const listQuery = useQuery({
-    queryKey: [...owner.key, 'feedback', 'list', page, pageSize, status, todo, category, email, minWait, userId], enabled: owner.enabled,
+    queryKey: [...owner.key, 'feedback', 'list', page, pageSize, status, todo, category, appliedEmail, minWait, userId], enabled: owner.enabled,
     queryFn: ({ signal }) => {
       const query = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
-      for (const [key, value] of Object.entries({ status, todo, category, email, min_wait_hours: minWait, user_id: userId })) if (value) query.set(key, value)
+      for (const [key, value] of Object.entries({ status, todo, category, email: appliedEmail, min_wait_hours: minWait, user_id: userId })) if (value) query.set(key, value)
       return adminApiJson<AdminFeedbackPage>(`/api/admin/feedback?${query}`, { signal })
     },
   })
   const data = listQuery.data
-  const loading = listQuery.isFetching
+  const loading = listQuery.isFetching || email.trim() !== appliedEmail
   const error = listQuery.error ? getApiErrorMessage(listQuery.error, text.loadFailed) : null
   const refreshList = () => client.invalidateQueries({ queryKey: [...owner.key, 'feedback', 'list'] })
   const [selected, setSelected] = useState<string | null>(params.get('feedback_id'))
@@ -45,11 +46,16 @@ export default function FeedbackSection({ active, canManage = false, canViewUser
   const detailRegion = useRef<HTMLDivElement>(null)
   useEffect(() => {
     setTodo(requestedTodo && FEEDBACK_TODOS.includes(requestedTodo as typeof FEEDBACK_TODOS[number]) ? requestedTodo : '')
-    setCategory(''); setEmail(''); setMinWait('')
+    setCategory(''); setEmail(''); setAppliedEmail(''); setMinWait('')
     setStatus('')
     setPage(1)
     setSelected(new URLSearchParams(search).get('feedback_id'))
   }, [search])
+  useEffect(() => {
+    if (email.trim() === appliedEmail) return
+    const timeout = window.setTimeout(() => { setAppliedEmail(email.trim()); setPage(1) }, 300)
+    return () => window.clearTimeout(timeout)
+  }, [email, appliedEmail])
   useEffect(() => { if (selected && window.matchMedia?.('(max-width: 60rem)').matches) detailRegion.current?.scrollIntoView({ block: 'start', behavior: 'instant' }) }, [selected])
   return <section className="tool-panel min-w-0 p-4 sm:p-6">
     {data?.metrics && <dl className="admin-feedback-metrics" aria-label="反馈处理指标">
@@ -61,17 +67,22 @@ export default function FeedbackSection({ active, canManage = false, canViewUser
     <div className="mt-4 flex flex-wrap gap-2" aria-label="反馈快捷筛选">{(['', ...FEEDBACK_TODOS] as const).map((value) => <button key={value} type="button" className={`tool-secondary-action whitespace-nowrap ${todo === value ? 'border-brand-500 text-brand-500' : ''}`} aria-pressed={todo === value} disabled={saving} onClick={() => { setTodo(value); setPage(1); setSelected(null) }}>{value ? text.todos[value] : '全部反馈'}</button>)}</div>
     <div className="admin-feedback-filters mt-4">
       <label className="grid min-w-0 gap-2 text-sm"><span>{text.category}</span><select className="tool-field" value={category} disabled={saving} onChange={(event) => { setCategory(event.target.value); setPage(1) }}><option value="">全部分类</option>{FEEDBACK_CATEGORIES.map((value) => <option key={value} value={value}>{text.categories[value]}</option>)}</select></label>
-      <label className="grid min-w-0 gap-2 text-sm"><span>{text.emailFilter}</span><input className="tool-field" value={email} maxLength={254} disabled={saving} onChange={(event) => { setEmail(event.target.value); setPage(1) }} /></label>
+      <label className="grid min-w-0 gap-2 text-sm"><span>{text.emailFilter}</span><input className="tool-field" value={email} maxLength={254} disabled={saving} onChange={(event) => setEmail(event.target.value)} /></label>
       <label className="grid min-w-0 gap-2 text-sm"><span>{text.waitFilter}</span><select className="tool-field" value={minWait} disabled={saving} onChange={(event) => { setMinWait(event.target.value); setPage(1) }}><option value="">{text.allWaits}</option>{[1, 4, 24, 72, 168].map((hours) => <option key={hours} value={hours}>超过 {hours} 小时</option>)}</select></label>
-      <label className="grid gap-2 text-sm"><span>{text.status}</span><select className="tool-field" value={status} disabled={saving} onChange={(event) => { setStatus(event.target.value as FeedbackStatus | ''); setPage(1) }}><option value="">{text.allStatuses}</option>{FEEDBACK_STATUSES.map((value) => <option key={value} value={value}>{text.adminStatuses[value]}</option>)}</select></label><button type="button" className="tool-secondary-action" disabled={loading || thread.loading || saving} onClick={() => { void refreshList(); void thread.refresh() }}>{text.refresh}</button></div>
+      <label className="grid gap-2 text-sm"><span>{text.status}</span><select className="tool-field" value={status} disabled={saving} onChange={(event) => { setStatus(event.target.value as FeedbackStatus | ''); setPage(1) }}><option value="">{text.allStatuses}</option>{FEEDBACK_STATUSES.map((value) => <option key={value} value={value}>{text.adminStatuses[value]}</option>)}</select></label><div className="flex flex-wrap gap-2">
+        <button type="button" className="tool-secondary-action" disabled={saving} onClick={() => {
+          setTodo(''); setStatus(''); setCategory(''); setEmail(''); setAppliedEmail(''); setMinWait(''); setPage(1)
+        }}>重置筛选</button>
+        <button type="button" className="tool-secondary-action" disabled={loading || thread.loading || saving} onClick={() => { void refreshList(); void thread.refresh() }}>{text.refresh}</button>
+      </div></div>
     {error && <p role="alert" className="tool-alert tool-alert--error mt-4">{error}</p>}
     {loading && <p role="status" className="mt-4 text-sm text-ink-muted">{text.loading}</p>}
     <div className="feedback-admin-workbench mt-5">
       <div className="min-w-0" aria-busy={loading}>
-        {data?.items.length === 0 && <p className="py-8 text-sm text-ink-muted">{text.empty}</p>}
+        {!loading && data?.items.length === 0 && <p className="py-8 text-sm text-ink-muted">{text.empty}</p>}
         <ul className="feedback-admin-index divide-y divide-surface-3">{data?.items.map((item) => <li key={item.id}><button type="button" className="feedback-list-item" aria-pressed={selected === item.id} disabled={saving || loading} onClick={() => setSelected(item.id)}>
           <span className="flex flex-wrap items-start justify-between gap-2"><strong className="min-w-0 break-all">{item.email}</strong><span className="tool-status">{text.adminStatuses[item.status]}</span></span>
-          <span className="mt-2 block line-clamp-2 break-words leading-6">{item.message}</span>
+          <span className="mt-2 line-clamp-2 break-words leading-6">{item.message}</span>
           <span className="mt-2 block text-xs text-ink-muted">{text.categories[item.category]} · {item.assignee ?? text.unassigned}</span>
           {item.waiting_since && <span className="mt-2 block text-xs text-ink-secondary">{text.waiting} {formatDate(item.waiting_since)}</span>}
           <time dateTime={item.updated_at} className="mt-2 block text-xs text-ink-muted">{formatDate(item.updated_at)}</time>

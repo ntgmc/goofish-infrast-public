@@ -106,7 +106,7 @@ describe('ResultSection compatibility fallback', () => {
       </ResultErrorBoundary>,
     )
 
-    expect(await screen.findByRole('alert', undefined, { timeout: 5_000 })).toHaveTextContent('这条排班结果版本过旧或数据不完整，暂时无法完整展示。')
+    expect(await screen.findByRole('alert', undefined, { timeout: 5_000 })).toHaveTextContent(copy.inventory.result_data_incompatible)
     expect(screen.getByRole('button', { name: '下载完整计算数据' })).toBeInTheDocument()
     expect(getDebugDiagnosticsSnapshot().events).toContainEqual(expect.objectContaining({
       type: 'react_error',

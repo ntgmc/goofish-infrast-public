@@ -388,7 +388,7 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
               : onRetryResult && <button type="button" onClick={onRetryResult}>{text.retry}</button>)}
             {error === workflow?.inlineError?.message && workflow?.inlineError?.jobId && <FeedbackButton key={workflow.inlineError.jobId} failureJobId={workflow.inlineError.jobId} className="v2-button v2-button-secondary" />}
           </div></FeedbackRegion>}
-          {configChanged && !loadingResult && <FeedbackRegion key="config-changed">
+          {configChanged && !workflow?.loading && !loadingResult && <FeedbackRegion key="config-changed">
             <div className="v2-feedback v2-overview-stale" role={feedback && !error ? undefined : 'status'}>
               <Settings2 size={16} aria-hidden="true" />{sample ? text.demoConfigChanged : text.configChanged}
             </div>

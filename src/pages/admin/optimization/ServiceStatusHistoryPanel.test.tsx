@@ -25,7 +25,11 @@ describe('ServiceStatusHistoryPanel', () => {
     expect(screen.queryByText('自动启停建议')).not.toBeInTheDocument()
     expect(screen.queryByText('低谷常态实例数')).not.toBeInTheDocument()
     expect(screen.queryByText('启用峰谷启停计划')).not.toBeInTheDocument()
-    fireEvent.change(screen.getByPlaceholderText('追加公开更新'), { target: { value: '正在观察恢复情况。' } })
+    expect(screen.getByRole('combobox', { name: '影响程度' })).toBeEnabled()
+    expect(screen.getByRole('combobox', { name: '事件状态' })).toBeEnabled()
+    expect(screen.getByRole('combobox', { name: '更新后状态' })).toBeEnabled()
+    expect(within(screen.getByRole('article', { name: '状态事件' })).getByText('调查中', { selector: 'span' })).toBeInTheDocument()
+    fireEvent.change(screen.getByRole('textbox', { name: '追加公开更新' }), { target: { value: '正在观察恢复情况。' } })
     fireEvent.click(screen.getByRole('button', { name: '追加更新' }))
     await waitFor(() => expect(adminApiJson).toHaveBeenCalledWith('/api/admin/service-status', expect.objectContaining({
       method: 'PATCH',
@@ -116,8 +120,8 @@ describe('ServiceStatusHistoryPanel', () => {
     })
     render(<ServiceStatusHistoryPanel />)
     await screen.findByText('状态事件')
-    fireEvent.change(screen.getByPlaceholderText('事件标题'), { target: { value: '服务延迟' } })
-    fireEvent.change(screen.getByPlaceholderText('公开更新内容'), { target: { value: '正在调查。' } })
+    fireEvent.change(screen.getByRole('textbox', { name: '事件标题' }), { target: { value: '服务延迟' } })
+    fireEvent.change(screen.getByRole('textbox', { name: '公开更新内容' }), { target: { value: '正在调查。' } })
     fireEvent.click(screen.getByRole('button', { name: '创建事件' }))
     expect(screen.getByRole('button', { name: '保存中…' })).toBeDisabled()
     finish?.()

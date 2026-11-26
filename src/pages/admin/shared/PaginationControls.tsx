@@ -12,7 +12,7 @@ export function PaginationControls({ pagination, loading, onPageChange, onPageSi
   return (
     <nav className="admin-pagination" aria-label="分页导航">
       <div className="admin-pagination-summary text-sm text-ink-muted">
-        <span role="status" aria-live="polite">共 {pagination.total} 条 · {last === 0 ? '暂无分页' : `第 ${current}/${last} 页`}</span>
+        <span role="status" aria-live="polite">{loading && last === 0 ? '正在加载分页…' : `共 ${pagination.total} 条 · ${last === 0 ? '暂无分页' : `第 ${current}/${last} 页`}`}</span>
         <label className="flex items-center gap-2">
           <span>每页</span>
           <select className="tool-field min-h-10 w-24 py-1" value={pagination.page_size} disabled={loading} onChange={(event) => onPageSizeChange(Number(event.currentTarget.value))}>

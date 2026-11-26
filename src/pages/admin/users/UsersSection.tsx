@@ -19,6 +19,12 @@ export default function UsersSection({ model: c, active, search = '' }: { model:
   }, [active, requestedUser, requestedProfile, c.adminCapabilities, c.loadUserDetail])
   const [resetOpen, setResetOpen] = useState(false)
   const detailHeading = useRef<HTMLDivElement>(null)
+  const detailTrigger = useRef<HTMLElement | null>(null)
+  useEffect(() => {
+    if (c.selectedUserDetail || !active) return
+    detailTrigger.current?.focus()
+    detailTrigger.current = null
+  }, [active, c.selectedUserDetail])
   useEffect(() => { setResetOpen(false); c.setResetPassword('') }, [c.selectedUserDetail?.user.id, c.setResetPassword])
   return <section className="space-y-5">
     <div hidden={Boolean(c.selectedUserDetail)}>
@@ -34,7 +40,11 @@ export default function UsersSection({ model: c, active, search = '' }: { model:
       pagination={c.userPagination} loading={c.usersLoading} busyAction={c.busyAction} capabilities={c.adminCapabilities}
       onFilters={(filters) => { c.setUserFilters(filters); c.setUserPage(1) }} onSearch={c.setUserSearchInput} onSelect={c.setSelectedUserIds} onPage={c.setUserPage}
       onPageSize={(size) => { c.setUserPageSize(size); c.setUserPage(1) }} onCopy={c.handleCopyUsers} onExport={c.handleExportUsers} onBulk={c.handleBulkUsers}
-      onDetail={async (user) => { await c.loadUserDetail(user); requestAnimationFrame(() => detailHeading.current?.focus()) }} onFreeze={c.handleFreezeAppUser} onUnfreeze={c.handleUnfreezeAppUser} /></div>
+      onDetail={async (user) => {
+        detailTrigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+        await c.loadUserDetail(user)
+        requestAnimationFrame(() => detailHeading.current?.focus())
+      }} onFreeze={c.handleFreezeAppUser} onUnfreeze={c.handleUnfreezeAppUser} /></div>
     {c.adminCapabilities.includes('sensitive_data_view') && c.selectedUserDetail && <div ref={detailHeading} tabIndex={-1} className="space-y-5" aria-label="用户详情工作区">
       <div className="admin-actions"><button type="button" className="tool-secondary-action" onClick={() => { c.setSelectedUserDetail(null); setResetOpen(false) }}>返回用户列表</button>
         {c.adminCapabilities.includes('user_manage') && <button type="button" className="tool-secondary-action" aria-expanded={resetOpen} onClick={() => { c.setResetUserEmail(c.selectedUserDetail!.user.email); setResetOpen(!resetOpen) }}>重置密码</button>}</div>

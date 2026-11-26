@@ -1,4 +1,5 @@
 import * as esbuild from 'esbuild'
+import assert from 'node:assert/strict'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -8,6 +9,16 @@ await mkdir(bundleDir, { recursive: true })
 
 const store = createMemoryStore()
 globalThis.__sklandHandlerSmokeStore = store
+globalThis.__maaCdkRecordStoreForTesting = {
+  get: async (key) => store.cdks.get(key) ?? null,
+  mutate: async (key, update, options = {}) => {
+    const current = store.cdks.get(key)
+    if (!current || (options.allowedStatuses && !options.allowedStatuses.includes(current.status))) return null
+    const next = update(structuredClone(current))
+    store.cdks.set(key, next)
+    return next
+  },
+}
 process.env.SKLAND_CREDENTIAL_SECRET = 'check-skland-handler-secret'
 process.env.DEPOT_SAMPLE_HASH_SECRET = 'check-depot-sample-secret'
 process.env.FREE_PREVIEW_UID_HASH_SECRET = 'check-free-preview-secret-at-least-32-characters'
@@ -36,6 +47,9 @@ await assertEncodedCredentialPreview()
 await assertInvalidCredentialPreview()
 await assertOversizedCredentialPreview()
 await assertConfirmImport()
+await assertOperatorRiskBeforeBinding()
+await assertOperatorRiskBeforeRefresh()
+await assertCompatibleOperatorBinding()
 await assertProfileImportTransactionRollback()
 await assertNoConfigImportCreatesDefaultConfig()
 await assertRestrictedRotationImport()
@@ -457,7 +471,7 @@ async function assertConfirmImport() {
   if (workspace?.operators?.length !== 2) {
     throw new Error('confirm import: workspace operators were not saved')
   }
-  const cdkRecord = store.cdks.get('cdk/profile-1')
+  const cdkRecord = store.cdks.get('cdk/profile-1.json')
   if (!cdkRecord?.baseline_operator_fingerprint || cdkRecord.latest_operator_fingerprint?.owned_count !== 2) {
     throw new Error('confirm import: trusted operator fingerprint baseline was not saved')
   }
@@ -505,6 +519,88 @@ async function assertConfirmImport() {
   if (store.fetchCalls.length !== fetchCountBeforeReplay) {
     throw new Error('confirm import replay: must not call upstream after pending was consumed')
   }
+}
+
+async function assertOperatorRiskBeforeBinding() {
+  const regressions = [
+    { type: 'operator_ownership_regression', operators: [{ id: 'char_other', name: '其他干员', own: true, elite: 2, rarity: 5 }] },
+    { type: 'operator_elite_regression', operators: [{ id: 'char_010_chen', name: '陈', own: true, elite: 2, rarity: 5 }] },
+    { type: 'operator_count_regression', operators: Array.from({ length: 5 }, (_, index) => ({ id: `char_low_${index}`, name: `低星干员${index}`, own: true, elite: 0, rarity: 2 })) },
+  ]
+  for (const stage of ['preview', 'confirmation']) {
+    for (const { type, operators } of regressions) {
+      const id = `profile-risk-${stage}-${type}`
+      seedProfile({ id, status: 'active' })
+      setFetchMode('complete')
+      const pending = stage === 'confirmation'
+        ? await callSkland('/api/user/skland/credential/preview', { profile_id: id, credential_text: 'manual-skland-cred' }) : null
+      if (pending) assert.equal(pending.status, 200)
+      seedOperatorBaseline(id, operators)
+      const workspaceBefore = structuredClone(store.workspaces.get(id))
+      const profileBefore = structuredClone(store.profiles.get(id))
+      const result = stage === 'preview'
+        ? await callSkland('/api/user/skland/credential/preview', { profile_id: id, credential_text: 'manual-skland-cred' })
+        : await callSkland('/api/user/skland/login/confirm', { profile_id: id, confirmation_id: pending.body.confirmation_id, idempotency_key: `${id}-confirm` })
+      assert.equal(result.status, 409, `${stage}: ${type} must block binding`)
+      assert.equal(result.body.code, 'operator_data_risk')
+      assert.match(result.body.error, /本次操作已拦截/)
+      assert.deepEqual(store.profiles.get(id), profileBefore, 'blocked binding must preserve profile and pending state')
+      assert.deepEqual(store.workspaces.get(id), workspaceBefore, 'blocked binding must preserve JSON operators, config and overrides')
+      const record = store.cdks.get(profileBefore.cdk_key)
+      assert.equal(record.risk_events.at(-1).type, type)
+      assert.equal(record.risk_events.at(-1).detail.soft_block, true)
+      assert.equal(record.baseline_operator_fingerprint.owned_count, operators.length)
+      assert.equal([...store.inventoryOperations.values()].some((operation) => operation.idempotency_key === `${id}-confirm`), false)
+      assertNoSecretLeak(result.body, `operator risk ${stage}`)
+    }
+  }
+}
+
+async function assertOperatorRiskBeforeRefresh() {
+  const id = 'profile-risk-refresh'
+  seedProfile({ id, status: 'active' })
+  setFetchMode('complete')
+  const preview = await callSkland('/api/user/skland/credential/preview', { profile_id: id, credential_text: 'manual-skland-cred' })
+  const confirmed = await callSkland('/api/user/skland/login/confirm', { profile_id: id, confirmation_id: preview.body.confirmation_id, idempotency_key: `${id}-confirm` })
+  assert.equal(confirmed.status, 200)
+  const profileBefore = structuredClone(store.profiles.get(id))
+  const workspaceBefore = structuredClone(store.workspaces.get(id))
+  setFetchMode('operator-regression')
+  const result = await callSkland('/api/user/skland/import/refresh', { profile_id: id })
+  assert.equal(result.status, 409, 'refresh must check the same operator baseline before overwriting data')
+  assert.equal(result.body.code, 'operator_data_risk')
+  assert.deepEqual(store.profiles.get(id), profileBefore)
+  assert.deepEqual(store.workspaces.get(id), workspaceBefore)
+}
+
+async function assertCompatibleOperatorBinding() {
+  for (const mode of ['growth', 'risk-disabled', 'ultimate']) {
+    const id = `profile-compatible-${mode}`
+    seedProfile({ id, status: 'active', permission: mode === 'ultimate' ? 'ultimate' : 'advanced' })
+    seedOperatorBaseline(id, mode === 'growth'
+      ? [{ id: 'char_010_chen', name: '陈', own: true, elite: 0, rarity: 5 }]
+      : [{ id: 'char_other', name: '其他干员', own: true, elite: 2, rarity: 5 }])
+    store.operatorRiskEnabled = mode !== 'risk-disabled'
+    try {
+      setFetchMode('complete')
+      const preview = await callSkland('/api/user/skland/credential/preview', { profile_id: id, credential_text: 'manual-skland-cred' })
+      assert.equal(preview.status, 200, `${mode}: compatible preview must succeed`)
+      const result = await callSkland('/api/user/skland/login/confirm', { profile_id: id, confirmation_id: preview.body.confirmation_id, idempotency_key: `${id}-confirm` })
+      assert.equal(result.status, 200, `${mode}: compatible binding must succeed`)
+      assert.equal(result.body.skland_import.operator_count, 2)
+    } finally {
+      store.operatorRiskEnabled = true
+    }
+  }
+}
+
+function seedOperatorBaseline(id, operators) {
+  const profile = store.profiles.get(id)
+  const record = store.cdks.get(profile.cdk_key)
+  const fingerprint = { hash: 'b'.repeat(64), owned_count: operators.length,
+    operators: Object.fromEntries(operators.map(({ id: key, ...operator }) => [key, operator])) }
+  store.cdks.set(profile.cdk_key, { ...record, baseline_operator_fingerprint: fingerprint, latest_operator_fingerprint: fingerprint })
+  store.workspaces.get(id).operators = structuredClone(operators)
 }
 
 async function assertProfileImportTransactionRollback() {
@@ -749,7 +845,7 @@ async function assertRefreshImport() {
   setFetchMode('refresh')
   const result = await callSkland('/api/user/skland/import/refresh', { profile_id: 'profile-1' })
   assertNoSecretLeak(result.body, 'refresh response')
-  if (result.status !== 200 || result.body.skland_import?.operator_count !== 1) {
+  if (result.status !== 200 || result.body.skland_import?.operator_count !== 2) {
     throw new Error(`refresh import: invalid response ${result.status}`)
   }
   if (result.body.active_profile?.skland_binding?.credential_status !== 'available') {
@@ -1210,7 +1306,7 @@ async function callSkland(path, body, init = {}) {
 
 function seedProfile({ id, status, archivedAt = null, permission = 'advanced' }) {
   const now = '2026-01-01T00:00:00.000Z'
-  const cdkKey = `cdk/${id}`
+  const cdkKey = `cdk/${id}.json`
   store.profiles.set(id, {
     version: 1,
     id,
@@ -1377,7 +1473,7 @@ function setFetchMode(mode) {
           manufactures: ['slot_5', 'slot_14', 'slot_15', 'slot_16', 'slot_26'].map((slotId, index) => ({ slotId, level: [2, 2, 3, 3, 2][index], formulaId: '4' })),
           powers: [{ slotId: 'slot_7', level: 3 }, { slotId: 'slot_6', level: 3 }],
         },
-        chars: mode === 'refresh'
+        chars: mode === 'operator-regression'
           ? [{ charId: 'char_002_amiya', name: '阿米娅', evolvePhase: 2, level: 80, potentialRank: 5, rarity: 0 }]
           : [
             { charId: 'char_002_amiya', name: '阿米娅', evolvePhase: 2, level: 80, potentialRank: 5, rarity: 0 },
@@ -1464,6 +1560,7 @@ function createMemoryStore() {
     snapshotVersion: 0,
     workspaces: new Map(),
     cdks: new Map(),
+    operatorRiskEnabled: true,
     freePreviewClaims: new Map(),
     freePreviewPendingClaims: new Map(),
     lifetimeVoucherPendingBindings: new Map(),
@@ -2017,20 +2114,9 @@ function memoryLicenseUtilsModule() {
 
 function memoryLicenseUtilsModuleFixed() {
   return `
-    export { validateConfig, resolveConfigForPermission, resolveFreePreviewConfig } from 'real-license-utils'
+    export { buildOperatorFingerprint, evaluateOperatorRisk, formatOperatorRiskBlockMessage, getCdkRecordStore, recordOperatorFingerprint, recordSoftBlockedRiskEvent,
+      validateConfig, resolveConfigForPermission, resolveFreePreviewConfig } from 'real-license-utils'
     const store = globalThis.__sklandHandlerSmokeStore
-    export function buildOperatorFingerprint(operators) {
-      const snapshot = Object.fromEntries(operators.map((operator) => [String(operator.id || operator.name), {
-        name: operator.name,
-        own: Boolean(operator.own),
-        elite: Number(operator.elite) || 0,
-        rarity: Number(operator.rarity) || 0,
-      }]))
-      return { hash: 'c'.repeat(64), owned_count: operators.filter((operator) => operator.own).length, operators: snapshot }
-    }
-    export async function getCdkRecordStore() {
-      return { get: async (key) => store.cdks.get(key) ?? null }
-    }
     export function isProfileCdkRecord(record) {
       return (record.cdk_type ?? 'profile') === 'profile'
     }
@@ -2062,21 +2148,10 @@ function memoryLicenseUtilsModuleFixed() {
         : null
     }
     export async function getRiskControlSettings() {
-      return { operator_data_risk_enabled: true, updated_at: null }
+      return { operator_data_risk_enabled: store.operatorRiskEnabled, updated_at: null }
     }
     export function normalizePermissionMode(permission) {
       return permission ?? 'advanced'
-    }
-    export async function recordOperatorFingerprint(record, fingerprint) {
-      const entry = [...store.cdks.entries()].find(([, current]) => current === record)
-      if (!entry) return record
-      const next = {
-        ...record,
-        baseline_operator_fingerprint: record.baseline_operator_fingerprint ?? fingerprint,
-        latest_operator_fingerprint: fingerprint,
-      }
-      store.cdks.set(entry[0], next)
-      return next
     }
     export function validateOperators(operators) {
       if (!Array.isArray(operators) || operators.length === 0) {

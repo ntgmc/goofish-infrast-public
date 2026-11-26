@@ -2,7 +2,7 @@ export const commonCopy = {
   calculationModeLabel: "计算方式",
   standardCalculationLabel: "完整计算",
   quickCalculationLabel: "快速计算",
-  quickCalculationHelp: "快速计算保留完整排班，只缩小升级建议的复核范围。仅展示已验证有收益的建议，收益数值供参考。",
+  quickCalculationHelp: "生成完整排班，并复核部分培养建议。建议已确认有收益，具体数值供参考。",
   dataActivity: {
     slow: '这次加载需要更长时间，请稍候。',
     updated: '数据已更新',
@@ -11,7 +11,7 @@ export const commonCopy = {
   pageReload: "重新加载",
   animationAutoReduced: "检测到持续卡顿，已自动切换为精简动画。",
   animationDismissToast: "关闭提示",
-  configGenerationReadOnly: "排班生成期间，基建配置为只读。生成结束后可继续修改。",
+  configGenerationReadOnly: "正在生成排班，完成后可修改基建配置。",
   droneAutoStrategyLabel: "无人机自动模式",
   droneAutoEfficiency: "效率优先",
   droneAutoInventoryBalance: "库存平衡优先",
@@ -279,7 +279,7 @@ export const commonCopy = {
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_058: "当前可用理智预算为 ",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_059: " 理智/日。预算越高，可持续搓玉产能越高，但会增加材料库存消耗与其他关卡的机会成本。",
+  components_ConfigEditor_059: " 理智/日。增加预算可提高可持续搓玉产能，也会占用刷其他关卡的理智并增加材料消耗。",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_059_details_summary: "展开预算说明",
   // src/components/ConfigEditor.tsx
@@ -287,13 +287,13 @@ export const commonCopy = {
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_061: "排班模式",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_062: "生成两组设施预设队列，在游戏内通过“队列轮换/快速切换”使用。此模式不生成 MAA 排班 JSON。",
+  components_ConfigEditor_062: "生成两组预设队列，在游戏内轮换换班。此模式不生成 MAA 文件。",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_063: "宿舍规则",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_064: "宿舍规则",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_065: "游戏内轮换不生成 MAA 排班 JSON，宿舍规则不参与导出。",
+  components_ConfigEditor_065: "游戏内轮换需手动安排宿舍，不生成 MAA 文件。",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_066: "导出的 MAA JSON 仅固定生产技能必需的宿舍干员，其余空位由 MAA 自动填满；可保留依赖宿舍的高效组合。",
   // src/components/ConfigEditor.tsx
@@ -357,7 +357,7 @@ export const commonCopy = {
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_094: "发电站",
   // src/components/ConfigEditor.tsx
-  components_ConfigEditor_095: "未安装或不想安装 MAA？可生成 MAA 排班表后，手动在游戏内设置队列，再定时执行全部轮换。",
+  components_ConfigEditor_095: "手动换班也可选 MAA 排班：对照结果设置游戏内队列，再按时切换全部设施。",
   // src/components/ConfigEditor.tsx
   components_ConfigEditor_096: "推荐",
   // src/components/ConfigEditor.tsx
@@ -475,7 +475,7 @@ export const commonCopy = {
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_037: "连接恢复中",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_038: "暂时无法获取最新进度，任务仍在后台执行。连接恢复后会自动更新进度。",
+  components_ScheduleProgress_038: "暂时无法获取进度，任务仍在后台执行。连接恢复后会自动更新，无需重新提交。",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_039: "正在尝试第 ",
   // src/components/ScheduleProgress.tsx
@@ -521,7 +521,7 @@ export const commonCopy = {
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_060: "正在展示结果。",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_061: "已超过当前预估，后台仍在计算，完成后会自动展示。",
+  components_ScheduleProgress_061: "计算时间已超过预估，完成后会自动显示结果。",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_062: "后台计算已进入收尾阶段，结果完成后会自动展示。",
   // src/components/ScheduleProgress.tsx
@@ -811,7 +811,7 @@ export const commonCopy = {
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_102: "自动重试等待中",
   // src/components/ScheduleProgress.tsx
-  components_ScheduleProgress_103: "已收到取消请求，正在安全停止任务并确认最终状态。",
+  components_ScheduleProgress_103: "已收到取消请求，正在停止计算，请稍候。",
   // src/components/ScheduleProgress.tsx
   components_ScheduleProgress_104: "任务暂时中断，系统稍后将自动开始第 ",
   // src/components/ScheduleProgress.tsx

@@ -36,7 +36,7 @@ const PUBLIC_METADATA: Record<string, Metadata> = {
     indexable: true,
   },
   '/v2': {
-    title: `${routesCopy.v2.brandDescription} | ${routesCopy.v2.brand} · ${routesCopy.v2.testVersion}`,
+    title: `${routesCopy.v2.brandDescription} | ${routesCopy.v2.brand}`,
     description: routesCopy.v2.resultDescription,
     indexable: false,
   },

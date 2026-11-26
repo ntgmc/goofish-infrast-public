@@ -186,6 +186,9 @@ describe('admin page loading and navigation', () => {
     await user.click(screen.getByRole('button', { name: '刷新当前页' }))
     await waitFor(() => expect(api.json).toHaveBeenCalledTimes(1))
     expect(api.json.mock.calls[0][0]).toBe('/api/admin/users?user_id=user-1&profile_page=1&profile_page_size=100')
+    await user.click(screen.getByRole('button', { name: '返回用户列表' }))
+    expect(await screen.findByRole('button', { name: '详情' })).toHaveFocus()
+    expect(api.json).toHaveBeenCalledTimes(1)
   })
 
   it('opens exact operational cohorts with partial coverage and a feedback todo without a manual search', async () => {

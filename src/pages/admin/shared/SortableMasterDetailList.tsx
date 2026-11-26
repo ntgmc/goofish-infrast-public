@@ -57,8 +57,8 @@ export function SortableMasterDetailList({
   }
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(260px,0.78fr)_minmax(0,1.42fr)]">
-      <div className="tool-inset min-w-0 p-2">
+    <div className="grid items-start gap-5 xl:grid-cols-[minmax(260px,0.78fr)_minmax(0,1.42fr)]">
+      <div className="admin-master-index tool-inset min-w-0 p-2">
         {items.length === 0 ? (
           <div className="rounded-xl border border-dashed border-surface-3 p-4 text-sm text-ink-muted">{emptyLabel}</div>
         ) : (
@@ -117,7 +117,7 @@ function SortableMasterRow({ item, selected, onSelect }: { item: SortableMasterI
         className="min-w-0 flex-1 rounded-r-xl px-3 py-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/70"
       >
         <span className="block truncate text-sm font-semibold text-ink-primary">{item.title || copy.publicContent.admin_untitled}</span>
-        {item.description && <span className="mt-1 block line-clamp-2 text-xs leading-5 text-ink-secondary">{item.description}</span>}
+        {item.description && <span className="mt-1 line-clamp-2 text-xs leading-5 text-ink-secondary">{item.description}</span>}
         {item.meta && <span className="mt-1 block text-[11px] text-ink-muted">{item.meta}</span>}
       </button>
     </div>

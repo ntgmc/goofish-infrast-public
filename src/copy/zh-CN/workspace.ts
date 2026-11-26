@@ -20,7 +20,7 @@ export const workspaceCopy = {
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_010: "先预览游戏昵称和 UID，确认后才会保存绑定并导入干员。",
   components_SklandBindingDialog_lifetime_title: "绑定终身版档案",
-  components_SklandBindingDialog_lifetime_description: "选择森空岛账号并核对信息，导入数据并保存档案后才会消耗终身版兑换 CDK。",
+  components_SklandBindingDialog_lifetime_description: "核对游戏账号后导入数据。档案保存成功后才会消耗兑换道具。",
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_011: "关闭森空岛导入",
   // src/components/SklandBindingDialog.tsx
@@ -34,7 +34,7 @@ export const workspaceCopy = {
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_016: "森空岛导入方式",
   // src/components/SklandBindingDialog.tsx
-  components_SklandBindingDialog_017: "推荐使用扫码授权；无法扫码时，可粘贴凭据或使用书签脚本辅助复制。",
+  components_SklandBindingDialog_017: "推荐扫码授权；无法扫码时，可粘贴凭据，也可用书签脚本复制。",
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_018: "重新生成二维码",
   // src/components/SklandBindingDialog.tsx
@@ -122,7 +122,7 @@ export const workspaceCopy = {
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_060: " 名",
   // src/components/SklandBindingDialog.tsx
-  components_SklandBindingDialog_061: "该账号与当前绑定 UID 不一致，没有保存任何变更。请重新登录正确账号。",
+  components_SklandBindingDialog_061: "UID 与当前档案不一致，未保存修改。请用已绑定的游戏账号重新授权。",
   // src/components/SklandBindingDialog.tsx
   components_SklandBindingDialog_062: "请核对昵称和 UID。确认后会保存森空岛绑定。",
   // src/components/SklandBindingDialog.tsx
@@ -370,7 +370,7 @@ export const workspaceCopy = {
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_071: "可用",
   // src/pages/tool/WorkspaceSetupPage.tsx
-  pages_tool_WorkspaceSetupPage_072: "选择扫码、粘贴凭据或书签脚本后，先核对预览中的昵称和 UID，确认后才会保存绑定并导入数据。",
+  pages_tool_WorkspaceSetupPage_072: "扫码或粘贴凭据后，核对昵称和 UID，再确认绑定并导入数据。",
   // src/pages/tool/WorkspaceSetupPage.tsx
   pages_tool_WorkspaceSetupPage_073: "重新绑定森空岛",
   // src/pages/tool/WorkspaceSetupPage.tsx
@@ -484,7 +484,7 @@ export const workspaceCopy = {
   // src/pages/tool/tool-utils.ts
   pages_tool_tool_utils_018: "密码不能超过 128 位",
   // src/pages/tool/workspace/WorkspaceConfigSection.tsx
-  pages_tool_workspace_WorkspaceConfigSection_001: "工作区设置与排班页共用配置，修改会自动保存，下次生成时生效，已有结果保持原样。",
+  pages_tool_workspace_WorkspaceConfigSection_001: "配置修改会自动保存，重新排班后生效。",
   // src/pages/tool/workspace/ConfigSaveStatus.tsx
   config_not_saved: "配置尚未保存",
   config_save_pending: "更改待保存",

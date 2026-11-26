@@ -294,6 +294,61 @@ it.each(['generation', 'overview'])('shows a failed configuration save beside th
   expect(submissions()[0]![1]!.json).toEqual(expect.objectContaining({ config: patches[0]!.config }))
 }, 15_000)
 
+it.each(['succeeded', 'failed'] as const)('updates the configuration reminder through a %s reschedule', async (status) => {
+  const user = userEvent.setup()
+  let stored = workspace
+  let completeJob!: (job: OptimizationJobSnapshot) => void
+  const completion = new Promise<OptimizationJobSnapshot>((resolve) => { completeJob = resolve })
+  vi.mocked(apiJson).mockImplementation(async (url, options) => {
+    if (url === '/api/auth/me' || url.startsWith('/api/user/workspace?')) return { ...auth, workspace: stored }
+    if (url === '/api/user/workspace' && options?.method === 'PATCH') {
+      stored = { ...stored, config: (options.json as { config: typeof SAMPLE_CONFIG }).config }
+      return { ...auth, workspace: stored }
+    }
+    if (url.startsWith('/api/user/results/previous-result?')) return { item: { ...previous, config: SAMPLE_CONFIG, result: SAMPLE_RESULT } }
+    if (url.startsWith('/api/user/results/new-result?')) return { item: { ...latest, config: stored.config, result: newResult } }
+    if (url.startsWith('/api/optimization/jobs?')) return { jobs: [], nextCursor: null }
+    if (url === '/api/optimization/jobs' && options?.method === 'POST') return { job: queued }
+    if (url === '/api/optimization/jobs/new-job') return completion
+    if (url.startsWith('/api/user/status?')) return {}
+    if (url === '/api/user/inventory') return { stacks: [], capacities: [], recent_events: [] }
+    throw new Error(`Unexpected API request: ${url}`)
+  })
+  const page = () => <MemoryRouter initialEntries={['/v2']}><MotionPreferenceProvider><V2Page /></MotionPreferenceProvider></MemoryRouter>
+  const view = render(page())
+  await screen.findByText(copy.v2.ownSource)
+  await user.click(screen.getByRole('button', { name: copy.v2.sidebar.editConfig }))
+  await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: copy.common.components_ConfigEditor_030 }))
+  await confirmLayout()
+  await user.click(screen.getByRole('button', { name: copy.v2.done }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  expect(await screen.findByText(copy.v2.configChanged)).toBeVisible()
+  await user.click(screen.getByRole('button', { name: copy.v2.regenerate }))
+  await waitFor(() => expect(apiJson).toHaveBeenCalledWith('/api/optimization/jobs/new-job', expect.anything()))
+  expect(screen.queryByText(copy.v2.configChanged)).not.toBeInTheDocument()
+  if (status === 'succeeded') stored = { ...stored, latest_result: latest, result_history: [latest, previous] }
+  await act(async () => completeJob(status === 'succeeded' ? {
+    ...queued, status, executionPhase: 'terminal', canCancel: false,
+    result: newResult, historyResultId: latest.id, calculationStage: 'completed',
+    estimate: { ...queued.estimate, phase: 'completed', remainingMs: 0 },
+  } : {
+    ...queued, status, executionPhase: 'terminal', canCancel: false,
+    error: { code: 'fixture_failure', message: '排班失败，请重试。', recoveryAction: 'retry', retryable: true, attemptCount: 1, supportReference: 'fixture' },
+  }))
+  await waitFor(() => expect(screen.getByRole('button', { name: copy.v2.regenerate })).toBeEnabled())
+  if (status === 'failed') {
+    expect(screen.getAllByRole('alert').some((alert) => alert.textContent?.includes('排班失败，请重试。'))).toBe(true)
+    expect(screen.getByText(copy.v2.configChanged)).toBeVisible()
+  } else {
+    expect(within(screen.getByRole('region', { name: copy.v2.lmd })).getByText('12,345')).toBeVisible()
+    expect(screen.queryByText(copy.v2.configChanged)).not.toBeInTheDocument()
+    view.unmount()
+    render(page())
+    await screen.findByText(copy.v2.ownSource)
+    expect(screen.queryByText(copy.v2.configChanged)).not.toBeInTheDocument()
+  }
+}, 15_000)
+
 it('recovers a job authorization failure in place and offers an explicit retry after authorization', async () => {
   const boundProfile: UserGameAccount = { ...profile, skland_binding: { uid: '12345678', nickname: 'Doctor', channel_name: '官服',
     bound_at: profile.created_at, last_imported_at: profile.created_at, credential_status: 'available', credential_invalid_at: null, credential_invalid_reason: null } }

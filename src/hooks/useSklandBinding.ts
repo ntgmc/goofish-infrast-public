@@ -51,6 +51,7 @@ export type SklandPayload = AuthSuccessResponse & {
     | 'skland_service_not_configured'
     | 'idempotency_conflict'
     | 'operation_in_progress'
+    | 'operator_data_risk'
     | 'free_preview_uid_claimed'
     | 'free_preview_already_claimed'
     | 'skland_uid_owned'

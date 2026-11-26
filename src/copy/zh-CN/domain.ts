@@ -104,7 +104,7 @@ export const domainCopy = {
     close: "关闭",
     done: "完成",
     move_hint: "选择本班已进驻的干员时，两个位置的干员会交换；当前位置为空时，该干员会移到此处。",
-    result_scope: "手动调整在本页单独编辑；总览、详情和数据仍对应原排班。模拟成功后，可在手动工具栏中导出当前手动方案。",
+    result_scope: "手动修改只影响本页安排。原排班的收益数据保留；模拟成功后，可在本页导出手动方案。",
     rules_title: "保存、覆盖与导出规则",
     save_rule: "点击“保存本地草稿”才会保存当前干员和无人机安排。再次保存会覆盖此入口中该档案的上一份草稿，即使上一份草稿来自另一份排班。切换标签页会保留当前修改；刷新或离开页面前，请保存或下载备份。",
     restore_rule: "恢复或导入草稿会替换当前手动安排；有未保存修改时会先要求确认。草稿必须与当前原排班匹配。导入备份后，仍需点击“保存本地草稿”才能存入浏览器。",
@@ -112,7 +112,7 @@ export const domainCopy = {
     simulation_rule: "模拟成功后，可直接导出当前测算结果，也可在云端历史中查看。结果会新增为档案的最新排班，原记录保留；普通历史达到档案上限时会清理最旧记录，长期保留请封存。模拟不会保存本地草稿；再次调整后需重新测算。",
     export_rule_title: "下载与导出",
     export_rule: "手动页的图片对应当前手动安排，测算前不含效率和产量。模拟成功后，点击“导出”即可按档案权益下载 MAA 文件和完整测算数据，也可下载排班图片。草稿备份可重新导入继续编辑，不能直接导入 MAA。",
-    data_scope: "这里的数据对应当前打开的排班结果，手动调整和保存草稿不会改变它。手动方案的效率、产量和心情可在“手动排班”中模拟查看，测算完成后可直接导出结果，也可从云端历史中打开。",
+    data_scope: "数据来自当前打开的排班。手动修改后，请在“手动排班”中模拟效率、产量和心情；完成后可导出结果，也可从历史方案中查看。",
     save: "保存本地草稿",
     backup: "下载草稿备份",
     import: "导入草稿备份",
@@ -134,16 +134,16 @@ export const domainCopy = {
     no_drone: "取消本班无人机加速",
   },
   game_queue: {
-    maa_hint: "按排班设置好游戏内预设队列，就能快速切换干员组合。换班时间、宿舍休息、无人机和菲亚梅塔仍需手动安排。",
-    open_overview: "在游戏内打开“基建 → 进驻总览 → 工作区”，找到各个贸易站、制造站和发电站的“预设队列”。",
-    set_queues: "对照本站“总览图 v2”或“详情”，为每个设施按班次顺序设置干员，并核对制造站产物。班次数多于可保存的队列数时，可合并相同的干员组合；仍放不下的班次，在换班时重新设置。",
-    switch_maa: "首次使用时，逐个设施点击目标队列的切换按钮，进驻第一班。之后按班次时长，逐个设施切换到下一班。“队列轮换”只会切换符合游戏条件的设施；按固定时间换班时，请逐个核对并切换。",
-    switch_rotation: "首次使用时，将每个设施切换到队列 1。游戏提示可轮换后，使用“队列轮换”，再检查各设施的实际进驻队列。需要提前换班时，可逐个设施点击目标队列的切换按钮。",
-    support: "控制中枢、会客室和办公室不在工作区内，需要按对应班次手动换人。",
-    dormitory: "让下班干员按宿舍安排休息。使用“干员休整”后，检查床位和恢复支援干员。",
-    drones: "按各班的无人机目标，以及换班前后的使用顺序，手动使用无人机。",
-    fiammetta: "启用菲亚梅塔时，按排班要求手动为目标干员恢复心情。",
-    autofill: "排班采用 MAA 自动填满宿舍时，需要自行安排下班干员休息，并保留排班中的宿舍技能干员。纯自动填满方案也需自行安排宿舍。",
+    maa_hint: "按排班设置预设队列，按时手动换班。宿舍、无人机和菲亚梅塔也需手动操作。",
+    open_overview: "打开游戏“基建 → 进驻总览 → 工作区”，进入各生产设施的“预设队列”。",
+    set_queues: "对照“排班安排”，按班次设置各设施的干员，核对制造站产物。相同组合可共用队列；队列放不下时，在换班时重新设置。",
+    switch_maa: "先逐个设施切到第一班，之后按排班时间切换下一班。“队列轮换”只切换符合游戏条件的设施，请逐个核对。",
+    switch_rotation: "先将各设施切到队列 1。游戏提示可轮换后，点击“队列轮换”并核对结果；提前换班时，逐个设施切换队列。",
+    support: "控制中枢、会客室和办公室需按班次手动换人。",
+    dormitory: "按宿舍安排让下班干员休息。使用“干员休整”后，核对床位和恢复支援干员。",
+    drones: "按排班指定的目标和时机，手动使用无人机。",
+    fiammetta: "启用菲亚梅塔时，手动为指定干员恢复心情。",
+    autofill: "宿舍采用 MAA 自动填满时，请自行安排休息，并保留指定的宿舍技能干员；纯自动填满也需自行安排。",
   },
   result_image: {
     long: "导出总览长图",
@@ -161,7 +161,7 @@ export const domainCopy = {
     cross_station_hint: "与其他房间的干员配合生效，换班时请一并保留配套安排",
     recovery_support: "恢复支援",
     recovery_support_hint: "专门进驻宿舍，加速同宿舍干员恢复心情",
-    tab: "总览图 v2",
+    tab: "按班次查看",
     shifts: "切换班次",
     hint: "切换班次查看干员安排，展开房间详情查看效率和心情。",
     shift: (index: number) => `第 ${index} 班`,
@@ -189,11 +189,11 @@ export const domainCopy = {
   // src/components/result-panel/DroneSummary.tsx
   components_result_panel_DroneSummary_005: " · 速度 ",
   // src/components/result-panel/Guides.tsx
-  components_result_panel_Guides_001: "不用 MAA？在游戏内设置预设队列",
+  components_result_panel_Guides_001: "设置游戏内队列",
   // src/components/result-panel/Guides.tsx
-  components_result_panel_Guides_002: "按下方预设队列，为每个设施设置队列 1 和队列 2，之后用游戏内的“队列轮换”或“快速切换”换班。同一设施中心情消耗最快的干员会触发切换，届时该设施内的所有干员会一起换班。游戏内轮换模式不生成排班 JSON。",
+  components_result_panel_Guides_002: "为各设施设置队列 1 和队列 2，用“队列轮换”或“快速切换”换班。心情消耗最快的干员触发切换时，该设施全员一起换班。此模式不生成 MAA 文件。",
   // src/components/result-panel/Guides.tsx
-  components_result_panel_Guides_003: "如何在 MAA 中使用排班 JSON",
+  components_result_panel_Guides_003: "将排班导入 MAA",
   // src/components/result-panel/Guides.tsx
   components_result_panel_Guides_004: "展开查看",
   // src/components/result-panel/Guides.tsx
@@ -381,19 +381,19 @@ export const domainCopy = {
   // src/components/result-panel/ResultPanel.tsx
   components_result_panel_ResultPanel_016: "排班表固定",
   // src/components/result-panel/ResultPanel.tsx
-  components_result_panel_ResultPanel_017: "总览图",
+  components_result_panel_ResultPanel_017: "全部班次",
   // src/components/result-panel/ResultPanel.tsx
   components_result_panel_ResultPanel_018: "预设队列",
   // src/components/result-panel/ResultPanel.tsx
-  components_result_panel_ResultPanel_019: "详情",
+  components_result_panel_ResultPanel_019: "设施明细",
   // src/components/result-panel/ResultPanel.tsx
   components_result_panel_ResultPanel_020: "数据",
   // src/components/result-panel/ResultPanel.tsx
-  components_result_panel_ResultPanel_021: "设置",
+  components_result_panel_ResultPanel_021: "换班指南",
   // src/components/result-panel/ResultPanel.tsx
-  components_result_panel_ResultPanel_022: "导入",
+  components_result_panel_ResultPanel_022: "使用指南",
   // src/components/result-panel/ResultPanel.tsx
-  components_result_panel_ResultPanel_023: "建议",
+  components_result_panel_ResultPanel_023: "培养建议",
   // src/components/result-panel/ResultPanel.tsx
   components_result_panel_ResultPanel_024: "生成结果",
   // src/components/result-panel/ResultPanel.tsx
@@ -403,7 +403,7 @@ export const domainCopy = {
   // src/components/result-panel/ResultPanel.tsx
   components_result_panel_ResultPanel_028: "按下方结果设置完整的游戏内轮换，也可保存排班图片。免费版不支持 MAA 导出和高级分析。",
   // src/components/result-panel/ResultPanel.tsx
-  components_result_panel_ResultPanel_030: "按下方预设队列在游戏内逐个设施设置，平时使用队列轮换的快速切换按钮。",
+  components_result_panel_ResultPanel_030: "对照排班设置各设施的预设队列，再在游戏内轮换换班。",
   // src/components/result-panel/ResultPanel.tsx
   components_result_panel_ResultPanel_031: "下载 MAA JSON 并导入 MAA 执行排班。本次结果和配置会保存在账号工作区。",
   // src/components/result-panel/ResultPanel.tsx
@@ -425,7 +425,7 @@ export const domainCopy = {
   // src/components/result-panel/ResultPanel.tsx
   components_result_panel_ResultPanel_040: "开发者与排障",
   // src/components/result-panel/ResultPanel.tsx
-  components_result_panel_ResultPanel_041: "完整计算 JSON 包含心情、效率、原始结果和调试字段，仅用于分析或问题排查，不应导入 MAA。",
+  components_result_panel_ResultPanel_041: "包含心情、效率、原始结果和调试数据，可用于分析和排查问题。请勿导入 MAA。",
   // src/components/result-panel/ResultPanel.tsx
   components_result_panel_ResultPanel_042: "纯 MAA 自动填满",
   // src/components/result-panel/ResultPanel.tsx

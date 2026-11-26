@@ -31,7 +31,7 @@ describe('FeatureSettingsSection', () => {
     render(<FeatureSettingsSection />)
     await user.click(await screen.findByRole('tab', { name: '公开工具' }))
     const tools = screen.getByRole('checkbox', { name: /公开工具中心/ })
-    const depot = screen.getByRole('combobox', { name: '基建价值分析' })
+    const depot = screen.getByRole('combobox', { name: '仓库价值分析' })
     expect(tools).toBeChecked()
     expect(depot).toHaveValue('open')
     await user.click(tools)
@@ -165,7 +165,7 @@ describe('FeatureSettingsSection', () => {
     expect(screen.getByRole('checkbox', { name: /一天一换/ })).not.toBeChecked()
     await user.click(screen.getByRole('tab', { name: '页面' }))
     expect(screen.queryByRole('checkbox', { name: /V1 旧版入口/ })).not.toBeInTheDocument()
-    await user.click(screen.getByRole('checkbox', { name: /V2 工作台/ }))
+    await user.click(screen.getByRole('checkbox', { name: /排班工作台/ }))
     await user.click(screen.getByRole('button', { name: '保存功能开关' }))
     await waitFor(() => expect(adminApiJson).toHaveBeenLastCalledWith('/api/admin/feature-settings', expect.objectContaining({
       json: { expected_revision: 5, features: {

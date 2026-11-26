@@ -79,6 +79,34 @@ it.each(['late', 'ordered', 'view', 'leave'])('keeps the latest history choice a
   }
 })
 
+it('compares changes with the displayed result and keeps missing configuration separate from a change', async () => {
+  const matching = { ...detail('older'), config: { ...config, allow_product_rebalance: false, auto_balance_source: 'limited_config' } }
+  const unknown = { ...detail('legacy'), config: null }
+  vi.stubGlobal('fetch', vi.fn(async (input) => {
+    const path = String(input)
+    if (path.startsWith('/api/user/results/older')) return json({ item: matching })
+    if (path.startsWith('/api/user/results/legacy')) return json({ item: unknown })
+    return json({ stacks: [], capacities: [], balances: [] })
+  }))
+  const props: Props = { ...propsFor(), workspace: { ...workspace, latest_result: detail('newer') } }
+  const hook = renderHook((input) => useOptimizeWorkflow(input), { initialProps: props })
+  await act(async () => { await hook.result.current.handleViewHistory(matching) })
+  expect(hook.result.current.configDiffRows).toEqual([])
+  expect(hook.result.current.resultConfigChanged).toBe(false)
+  const changed = { ...config, Fiammetta: { enable: !config.Fiammetta?.enable } }
+  hook.rerender({ ...props, configOverride: changed })
+  expect(hook.result.current.resultConfigChanged).toBe(true)
+  hook.rerender({ ...props, license: createAccountLicense(profile, operators, changed) })
+  expect(hook.result.current.resultConfigChanged).toBe(true)
+  hook.rerender({ ...props, license: createAccountLicense(profile, operators, { ...config, calculation_mode: 'quick' }) })
+  expect(hook.result.current.configDiffRows).toEqual([])
+  expect(hook.result.current.resultConfigChanged).toBe(true)
+  hook.rerender(props)
+  expect(hook.result.current.resultConfigChanged).toBe(false)
+  await act(async () => { await hook.result.current.handleViewHistory(unknown) })
+  expect(hook.result.current.resultConfigChanged).toBe(false)
+})
+
 it('requires explicit coupon selection and preserves included entitlements', async () => {
   for (const permission of ['recommended', 'advanced'] as const) {
     const requests: Array<{ use_items?: string[] }> = []

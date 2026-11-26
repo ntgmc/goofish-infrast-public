@@ -43,13 +43,14 @@ export function useAdminUserList(options: Options, operationsSearch = '') {
   }, [operationsSearch])
 
   useEffect(() => {
+    if (userSearchInput.trim() === userSearch) return
     setSelectedUserIds([])
     const timeout = window.setTimeout(() => {
       setUserSearch(userSearchInput.trim())
       setUserPage(1)
     }, 300)
     return () => window.clearTimeout(timeout)
-  }, [userSearchInput])
+  }, [userSearchInput, userSearch])
 
   useEffect(() => { setSelectedUserIds([]) }, [userPage, userPageSize, userSearch, userFilters])
 
@@ -68,13 +69,15 @@ export function useAdminUserList(options: Options, operationsSearch = '') {
   })
   const appUsers = enabled ? query.data?.app_users ?? [] : []
   const userPagination = (enabled && query.data?.pagination) || { ...EMPTY_PAGINATION, page_size: userPageSize }
-  const usersLoading = enabled && query.isFetching
+  const usersLoading = enabled && (query.isFetching || userSearchInput.trim() !== userSearch)
   const usersLoaded = enabled && query.isFetched
   const selectedUsers = useMemo(() => appUsers.filter((user) => selectedUserIds.includes(user.id)), [appUsers, selectedUserIds])
 
   useEffect(() => {
-    if (enabled && query.error) setError(query.error.message)
-  }, [enabled, query.error, setError])
+    if (!enabled) return
+    if (query.error) setError(query.error.message)
+    else if (query.isSuccess) setError(null)
+  }, [enabled, query.error, query.isSuccess, setError])
 
   useEffect(() => {
     if (enabled && query.data?.pagination && query.data.pagination.page !== userPage) setUserPage(query.data.pagination.page)

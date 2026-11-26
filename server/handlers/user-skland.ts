@@ -37,11 +37,14 @@ import { hasDatabaseUrl, query, withTransaction } from '../storage/postgres'
 import { createLifetimeVoucherProfileAuthorizationInTransaction, saveProfileInTransaction } from '../storage/cdk-redemption'
 import {
   buildOperatorFingerprint,
+  evaluateOperatorRisk,
+  formatOperatorRiskBlockMessage,
   getCdkRecordStore,
   getRiskControlSettings,
   isProfileCdkRecord,
   normalizePermissionMode,
   recordOperatorFingerprint,
+  recordSoftBlockedRiskEvent,
   resolveConfigForPermission,
   resolveFreePreviewConfig,
   validateConfig,
@@ -141,7 +144,7 @@ class SklandHttpError extends Error {
   constructor(
     readonly code: string,
     message: string,
-    readonly status: 400 | 404 | 409,
+    readonly status: 400 | 403 | 404 | 409,
     readonly recoveryAction?: 'retry' | 'rebind' | 'bind_first',
   ) {
     super(message)
@@ -683,6 +686,8 @@ async function prepareSklandImport(
     throw new SklandHttpError('skland_account_mismatch', '森空岛账号与当前档案绑定的 UID 不一致。', 409, 'rebind')
   }
 
+  await validateSklandOperatorRisk(profile, operatorsCheck.operators)
+
   return {
     binding: imported.binding,
     operators: operatorsCheck.operators,
@@ -804,6 +809,28 @@ async function runSklandImportPostCommit(
     if (result.status === 'rejected') console.warn('skland import post-commit task skipped:', result.reason)
   }
   if (hasDatabaseUrl()) scheduleInvitationSettlement(userId)
+}
+
+async function validateSklandOperatorRisk(
+  profile: UserGameAccountRecord,
+  operators: PreparedSklandImport['operators'],
+): Promise<void> {
+  if (!profile.cdk_key) return
+  const cdkStore = await getCdkRecordStore()
+  const cdkRecord = await cdkStore.get(profile.cdk_key)
+  if (!cdkRecord || !isProfileCdkRecord(cdkRecord) || cdkRecord.status !== 'used') return
+  if (normalizePermissionMode(cdkRecord.permission) !== 'advanced') return
+  const riskSettings = await getRiskControlSettings()
+  if (!riskSettings.operator_data_risk_enabled) return
+  const risk = evaluateOperatorRisk(cdkRecord, operators)
+  if (risk.ok) return
+  const blocked = await recordSoftBlockedRiskEvent(
+    cdkRecord,
+    risk.event,
+    formatOperatorRiskBlockMessage(risk.event.reason),
+    risk.fingerprint,
+  )
+  throw new SklandHttpError('operator_data_risk', blocked.message, blocked.frozen ? 403 : 409)
 }
 
 async function recordSklandOperatorFingerprint(
@@ -1622,6 +1649,7 @@ async function createPendingSklandConfirmationFromCred(
   if (profile.skland_binding?.uid && profile.skland_binding.uid !== imported.binding.uid) {
     return handleAccountMismatch(user, profile, preview, requestContext)
   }
+  await validateSklandOperatorRisk(profile, operatorsCheck.operators)
   if (isFreePreviewProfile(profile)) {
     const existingClaim = await getFreePreviewClaim(hashFreePreviewUid(imported.binding.uid))
     if (existingClaim && existingClaim.profile_id !== profile.id) {

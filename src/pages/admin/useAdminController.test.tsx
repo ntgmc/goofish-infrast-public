@@ -424,11 +424,14 @@ describe('useAdminController announcement drafts', () => {
     await waitForHydration(result)
     failSummary = true
     await act(async () => result.current.patchCdk(adminCdkRecord('a'.repeat(64)), 'unfreeze'))
-    expect(result.current.notice).toContain('CDK 已更新')
-    expect(result.current.notice).toContain('操作已成功，但部分数据刷新失败')
+    expect(result.current.notice).toBe('CDK 已更新')
     expect(result.current.error).toContain('CDK summary unavailable')
     expect(result.current.overviewPartialFailure).toBe(true)
     expect(result.current.lastSuccessfulSyncAt).not.toBeNull()
+    failSummary = false
+    await act(async () => result.current.loadDashboard())
+    expect(result.current.error).toBeNull()
+    expect(result.current.notice).toBe('CDK 已更新')
     expect(adminApi.json.mock.calls.filter(([url, init]) => url === '/api/admin/cdk' && init?.method === 'PATCH')).toHaveLength(1)
   })
 
@@ -727,9 +730,12 @@ describe('useAdminController announcement drafts', () => {
         reason: '工单 OPS-103 管理员操作',
       }),
     }))
-    expect(result.current.notice).toContain('已冻结账号：user@example.test')
-    expect(result.current.notice).toContain('操作已成功，但部分数据刷新失败')
+    expect(result.current.notice).toBe('已冻结账号：user@example.test')
     expect(result.current.error).toContain('用户列表刷新失败')
+    failUserPageGet = false
+    await act(async () => result.current.loadDashboard())
+    expect(result.current.error).toBeNull()
+    expect(result.current.notice).toBe('已冻结账号：user@example.test')
   })
 })
 

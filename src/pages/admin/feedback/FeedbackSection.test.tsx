@@ -54,6 +54,26 @@ it('preserves drafts on a conflict and uses the refreshed revision for an audite
   expect(screen.getByLabelText(copy.feedback.publicReply)).toHaveValue('')
 })
 
+it('applies the final email search once and cancels a pending search when filters reset', async () => {
+  mocks.api.mockResolvedValue({ items: [feedback], pagination: { page: 1, page_size: 25, total: 1, total_pages: 1 } })
+  render(<MemoryRouter><FeedbackSection active /></MemoryRouter>)
+  await screen.findByRole('button', { name: /user@example.com/ })
+  const requests = mocks.api.mock.calls.length
+  const email = screen.getByLabelText(copy.feedback.emailFilter)
+  fireEvent.change(email, { target: { value: 'first' } })
+  fireEvent.change(email, { target: { value: ' final@example.com ' } })
+  expect(mocks.api).toHaveBeenCalledTimes(requests)
+  expect(screen.getByRole('button', { name: /user@example.com/ })).toBeDisabled()
+  await waitFor(() => expect(mocks.api).toHaveBeenCalledWith('/api/admin/feedback?page=1&page_size=25&email=final%40example.com', expect.anything()))
+  expect(mocks.api).toHaveBeenCalledTimes(requests + 1)
+  fireEvent.change(email, { target: { value: 'obsolete@example.com' } })
+  fireEvent.click(screen.getByRole('button', { name: '重置筛选' }))
+  expect(email).toHaveValue('')
+  await waitFor(() => expect(screen.getByRole('button', { name: /user@example.com/ })).toBeEnabled())
+  await new Promise((resolve) => window.setTimeout(resolve, 350))
+  expect(mocks.api.mock.calls.some(([url]) => url.includes('obsolete'))).toBe(false)
+})
+
 it('lets viewers inspect follow-up records without mutation controls', async () => {
   mocks.api.mockImplementation(async (url) => url.includes('feedback_id=')
     ? { feedback, entries: [{ revision: 1, actor: 'admin', actor_username: 'operator', message: null, internal_note: '排查情况', status: 'processing', previous_status: 'processing', assignee: null, previous_assignee: null, created_at: feedback.created_at }], next_before_revision: null }
