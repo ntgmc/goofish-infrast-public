@@ -228,7 +228,7 @@ function ConnectedDashboard({ session }: { session: V2Session }) {
       setError(null)
       await workflow.handleIncrementalRecompute()
     } }} taskCenterAction={taskCenterAction} generationProgress={progress} result={result ?? SAMPLE_RESULT} operators={workflow.mergedOperators} config={workflow.activeConfig}
-    sample={!result} configChanged={Boolean(result && !workflow.resultIsCurrent && (operatorsChanged || workflow.configDiffRows.length > 0 || session.configOverride))}
+    sample={!result} configChanged={Boolean(result && !workflow.resultIsCurrent && (operatorsChanged || workflow.resultConfigChanged))}
     onUpdateConfig={workflow.updateConfig}
     onImportOperators={async (operators) => {
       if (!await session.flushConfigSave()) throw new Error(copy.v2.saveFailed)
