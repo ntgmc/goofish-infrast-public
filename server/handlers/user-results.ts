@@ -2,6 +2,8 @@ import { createHash, randomUUID } from 'node:crypto'
 import { ZodError } from 'zod'
 import { hasCapability } from '../../src/lib/product-catalog'
 import { projectOptimizeResultForCapabilities } from '../../src/lib/optimize-result-projection'
+import { getUpgradePaybackDays } from '../../src/lib/upgrade-suggestion-roi'
+import { attachTrainingCostsToUpgradeSuggestions } from './training-cost'
 import { requestSchemas } from '../security/request-policy'
 import { getValidatedJson, stableJsonStringify } from '../security/request-validation'
 import {
@@ -11,6 +13,7 @@ import {
 } from '../storage/inventory-store'
 import {
   getProfileForUser,
+  getProfileWorkspace,
   isDepotValueProfile,
   isFreePreviewProfile,
   toPublicWorkspace,
@@ -83,13 +86,21 @@ export async function handleUserResultsRequest(
 
       const stored = await getProfileOptimizationResult(profile.id, detailResultId!)
       if (!stored) return jsonResponse({ error: '排班结果不存在。', code: 'result_not_found' }, 404)
-      const result = parseOptimizeResult(JSON.parse(JSON.stringify(stored.result)))
-      return jsonResponse({
-        item: {
-          ...stored,
-          result: projectOptimizeResultForCapabilities(result, authorization.subject, Boolean(stored.job_id) && await hasTrainingDiagnosisEntitlement(stored.job_id!)),
-        },
-      })
+      const parsed = parseOptimizeResult(JSON.parse(JSON.stringify(stored.result)))
+      const result = projectOptimizeResultForCapabilities(parsed, authorization.subject, Boolean(stored.job_id) && await hasTrainingDiagnosisEntitlement(stored.job_id!))
+      if (url.searchParams.get('training_costs') === 'latest' && result.upgrade_suggestions?.length) {
+        const workspace = await getProfileWorkspace(profile.id)
+        const suggestions = await attachTrainingCostsToUpgradeSuggestions({
+          suggestions: result.upgrade_suggestions,
+          operators: workspace?.operators ?? [],
+          profile,
+        })
+        result.upgrade_suggestions = suggestions.map((suggestion) => suggestion.roi ? {
+          ...suggestion,
+          roi: { ...suggestion.roi, payback_days: getUpgradePaybackDays(suggestion) },
+        } : suggestion)
+      }
+      return jsonResponse({ item: { ...stored, result } })
     }
 
     if (req.method !== 'POST') return jsonResponse({ error: '方法不允许。' }, 405)

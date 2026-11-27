@@ -121,9 +121,10 @@ const enough = training.calculateEliteTrainingCostForTest({
   calInfo,
   calPlayer: {
     items: [
-      { id: '4001', count: 999999 },
-      { id: '2004', count: 999999 },
-      { id: '3001', count: 99 },
+      { itemId: '4001', have: '499999' },
+      { id: '4001', quantity: 500000 },
+      { itemId: '2004', quantity: '999999' },
+      { id: '3001', have: 99 },
       { id: '3002', count: 99 },
     ],
     characters: [{ id: 'char_test_a', evolvePhase: 0, level: 1, rarity: 2 }],

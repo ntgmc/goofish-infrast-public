@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => ({
   getProfileCapacityLimitsInTransaction: vi.fn(),
   recordPersonalUseDeclarationUsage: vi.fn(),
   getProfileForUser: vi.fn(),
+  getProfileWorkspace: vi.fn(),
+  attachTrainingCostsToUpgradeSuggestions: vi.fn(),
   getValidatedJson: vi.fn(),
   recordTrackedExportBehaviorEvent: vi.fn(),
   recordMaaExport: vi.fn(),
@@ -48,6 +50,7 @@ vi.mock('../storage/inventory-store', () => {
 
 vi.mock('../storage/user-store', () => ({
   getProfileForUser: mocks.getProfileForUser,
+  getProfileWorkspace: mocks.getProfileWorkspace,
   isDepotValueProfile: (profile: { kind?: string }) => profile.kind === 'depot_value',
   isFreePreviewProfile: (profile: { kind?: string }) => profile.kind === 'free_preview',
   normalizeProfileKind: (profile: { kind?: string }) => profile.kind ?? 'cdk',
@@ -102,6 +105,7 @@ vi.mock('../security/request-validation', () => ({
   getValidatedJson: mocks.getValidatedJson,
   stableJsonStringify: (value: unknown) => JSON.stringify(value),
 }))
+vi.mock('./training-cost', () => ({ attachTrainingCostsToUpgradeSuggestions: mocks.attachTrainingCostsToUpgradeSuggestions }))
 vi.mock('./usage-stats', () => ({ recordMaaExport: mocks.recordMaaExport }))
 vi.mock('./user-auth', () => ({
   jsonResponse: (body: unknown, status = 200) => new Response(status === 204 ? null : JSON.stringify(body), {
@@ -164,6 +168,7 @@ beforeEach(() => {
     run({ query: mocks.clientQuery })
   ))
   mocks.updateProfileWorkspaceInTransaction.mockResolvedValue(workspaceRecord())
+  mocks.getProfileWorkspace.mockResolvedValue({ operators: [{ id: 'op-1', name: 'Operator' }] })
 })
 
 describe('result history mutations', () => {
@@ -288,6 +293,42 @@ describe('result history reads', () => {
     expect(body.item.result.searched_state_count).toBe(123456)
     expect(body.item.result).not.toHaveProperty('daily_production')
     expect(mocks.getProfileOptimizationResult).toHaveBeenCalledWith('profile-1', 'result-1')
+  })
+
+  it.each([1727, 0])('recalculates live training costs and payback from %s missing sanity without changing history', async (missing) => {
+    const owned = profile('cdk', 'growth')
+    mocks.getProfileForUser.mockResolvedValue(owned)
+    const stored = storedHistoryItem()
+    const suggestion = { type: 'single' as const, id: 'op-1', name: 'Operator', current: 1, target: 2, gain: 1,
+      roi: { efficiency_gain: 1, daily_sanity_gain: 18.9, payback_days: null, payback_basis: 'missing_sanity' as const } }
+    stored.result.upgrade_suggestions = [suggestion]
+    mocks.getProfileOptimizationResult.mockResolvedValue(stored)
+    mocks.attachTrainingCostsToUpgradeSuggestions.mockResolvedValue([{ ...suggestion, training_cost: {
+      status: 'available', sources: { skland: 'ok' }, operators: [{ status: 'complete' }],
+      missing: { equivalent_sanity: missing },
+    } }])
+    const response = await userResultsHandler(new Request('http://localhost/api/user/results/result-1?profile_id=profile-1&training_costs=latest'))
+    expect(response.status).toBe(200)
+    const { item } = await response.json()
+    expect(item.result.upgrade_suggestions[0].roi.payback_days).toBeCloseTo(missing / 18.9)
+    expect(mocks.attachTrainingCostsToUpgradeSuggestions).toHaveBeenCalledWith({
+      suggestions: [suggestion], operators: [{ id: 'op-1', name: 'Operator' }], profile: owned,
+    })
+    expect(stored.result.upgrade_suggestions[0]).not.toHaveProperty('training_cost')
+    expect(mocks.updateProfileWorkspaceInTransaction).not.toHaveBeenCalled()
+  })
+
+  it.each(['recommended', 'expired'] as const)('does not read inventory when %s access hides suggestions', async (access) => {
+    mocks.getProfileForUser.mockResolvedValue({ ...profile('cdk', access === 'expired' ? 'growth' : 'recommended'),
+      ...(access === 'expired' ? { expires_at: '2020-01-01' } : {}) })
+    const stored = storedHistoryItem()
+    stored.result.upgrade_suggestions = [{ type: 'single', name: 'Operator', current: 1, target: 2, gain: 1 }]
+    mocks.getProfileOptimizationResult.mockResolvedValue(stored)
+    const response = await userResultsHandler(new Request('http://localhost/api/user/results/result-1?profile_id=profile-1&training_costs=latest'))
+    expect(response.status).toBe(200)
+    expect((await response.json()).item.result).not.toHaveProperty('upgrade_suggestions')
+    expect(mocks.attachTrainingCostsToUpgradeSuggestions).not.toHaveBeenCalled()
+    expect(mocks.getProfileWorkspace).not.toHaveBeenCalled()
   })
 
   it('keeps diagnosis purchased for the saved job while retaining current data restrictions', async () => {

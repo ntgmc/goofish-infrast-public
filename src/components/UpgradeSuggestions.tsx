@@ -9,6 +9,7 @@ import type {
 } from '../lib/types'
 import { getUpgradeSuggestionId } from '../lib/upgrade-suggestion-id'
 import { getUpgradePaybackDays } from '../lib/upgrade-suggestion-roi'
+import { isUpgradeSuggestionCompleted } from '../lib/upgrade-suggestion-completion'
 import { copy, CURRENT_LOCALE } from '../copy/index'
 import { PRODUCT_LABELS } from './result-panel/labels'
 import { projectsFromUpgradeSuggestion, type CultivationProjectScope } from '../lib/cultivation-project-import'
@@ -22,6 +23,7 @@ interface Props {
   description?: string;
   sortByCost?: boolean;
   projectScope?: CultivationProjectScope;
+  inventoryLoading?: boolean;
 }
 
 type SortMode = 'payback' | 'gain' | 'stock'
@@ -32,7 +34,7 @@ const SORT_OPTIONS: { id: SortMode; label: string }[] = [
   { id: 'stock', label: copy.optimize.components_UpgradeSuggestions_003 },
 ]
 
-export default function UpgradeSuggestions({ suggestions, embedded = false, description = copy.optimize.components_UpgradeSuggestions_005, sortByCost = true, projectScope }: Props) {
+export default function UpgradeSuggestions({ suggestions, embedded = false, description = copy.optimize.components_UpgradeSuggestions_005, sortByCost = true, projectScope, inventoryLoading = false }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [sortMode, setSortMode] = useState<SortMode>('payback')
   const [singleOnly, setSingleOnly] = useState(false)
@@ -113,6 +115,7 @@ export default function UpgradeSuggestions({ suggestions, embedded = false, desc
             onToggleExpanded={() => toggleExpanded(id)}
             embedded={embedded}
             projectScope={projectScope}
+            inventoryLoading={inventoryLoading}
           />
         ))}
       </div>
@@ -132,6 +135,7 @@ function SuggestionCard({
   onToggleExpanded,
   embedded,
   projectScope,
+  inventoryLoading,
 }: {
   suggestion: UpgradeSuggestion;
   rank: number;
@@ -139,11 +143,13 @@ function SuggestionCard({
   onToggleExpanded: () => void;
   embedded: boolean;
   projectScope?: CultivationProjectScope;
+  inventoryLoading: boolean;
 }) {
   const title = suggestion.name || suggestion.ops?.map((op) => op.name).join(' + ') || copy.optimize.components_UpgradeSuggestions_017
   const cost = suggestion.training_cost
+  const completed = isUpgradeSuggestionCompleted(suggestion)
   const stockEnough = isStockEnough(cost)
-  const stockLabel = getStockLabel(cost)
+  const stockLabel = completed ? copy.optimize.upgradeCompleted : inventoryLoading ? copy.optimize.upgradeInventoryLoading : getStockLabel(cost)
   const projects = projectScope ? projectsFromUpgradeSuggestion(suggestion) : []
 
   return (
@@ -153,11 +159,11 @@ function SuggestionCard({
           <OperatorPortraits suggestion={suggestion} />
           <div className="min-w-0">
             <div className="upgrade-suggestion-title"><span className="upgrade-suggestion-rank">#{rank}</span><h3>{title}</h3></div>
-            <span className={`tool-status ${stockEnough ? 'tool-status--success' : ''}`}>{stockLabel}</span>
+            <span className={`tool-status ${completed || stockEnough ? 'tool-status--success' : ''}`}>{stockLabel}</span>
           </div>
         </div>
         <div className="upgrade-suggestion-actions">
-          {projectScope && <CultivationProjectImport key={`${projectScope.userId}:${projectScope.profileId}:${JSON.stringify(projects)}`} scope={projectScope} projects={projects} />}
+          {projectScope && !completed && <CultivationProjectImport key={`${projectScope.userId}:${projectScope.profileId}:${JSON.stringify(projects)}`} scope={projectScope} projects={projects} />}
           <button type="button" onClick={onToggleExpanded} className="tool-secondary-action" aria-expanded={expanded}>
             {expanded ? copy.optimize.components_UpgradeSuggestions_021 : copy.optimize.components_UpgradeSuggestions_022}
           </button>
@@ -167,9 +173,9 @@ function SuggestionCard({
         {suggestion.desc && <p className="text-sm leading-6 text-ink-secondary">{suggestion.desc}</p>}
         {(suggestion.rooms || suggestion.impact?.summary) && <p className="text-xs leading-5 text-ink-muted">{suggestion.impact?.summary || `${copy.optimize.components_UpgradeSuggestions_020}${suggestion.rooms}`}</p>}
       </div>}
-      <MetricGrid suggestion={suggestion} cost={cost} />
+      {completed ? <p className="text-sm leading-6 text-ink-secondary">{copy.optimize.upgradeCompletedHelp}</p> : <MetricGrid suggestion={suggestion} cost={cost} />}
       {expanded && <div className="space-y-3 border-t border-surface-3 pt-4">
-        <TrainingCostPanel cost={cost} />
+        {!completed && <TrainingCostPanel cost={cost} />}
         <ImpactPanel suggestion={suggestion} />
       </div>}
     </article>
@@ -400,6 +406,8 @@ function PartialOutcomeRow({ outcome }: { outcome: UpgradePartialOutcome }) {
 }
 
 function compareSuggestions(left: UpgradeSuggestion, right: UpgradeSuggestion, mode: SortMode, leftIndex: number, rightIndex: number): number {
+  const completionOrder = Number(isUpgradeSuggestionCompleted(left)) - Number(isUpgradeSuggestionCompleted(right))
+  if (completionOrder) return completionOrder
   if (mode === 'gain') {
     return compareEconomicGain(left, right)
       || leftIndex - rightIndex

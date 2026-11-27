@@ -27,6 +27,7 @@ TanStack Query v5 管理普通页面读取：库存、新手任务、优化任�
 | QQ 绑定与领取核验 | `['user', userId, null, 'qqbot-verification']` |
 | QQ 群活动与领取状态 | `['user', userId, null, 'qqbot-activities', groupId, campaignId]` |
 | 钱书平衡的账号培养资料 | `['user', userId, profileId, 'training-ratio', 森空岛快照版本]` |
+| 排班培养建议的当前库存成本 | `['user', userId, profileId, 'upgrade-training-costs', resultId, 森空岛快照版本]` |
 | AI 排班解读及积分价格 | `['user', userId, profileId, 'schedule-explanation', resultId]` |
 | V2 工作台助手可用性 | `['user', userId, profileId, 'workspace-assistant', task]` |
 | 排班历史详情 | `['user', userId, profileId, 'result-history', 'detail', resultId]` |

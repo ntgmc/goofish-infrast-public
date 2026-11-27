@@ -69,7 +69,11 @@ export const optimizeCopy = {
   // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_004: "练度优化建议",
   // src/components/UpgradeSuggestions.tsx
-  components_UpgradeSuggestions_005: "材料缺口和回本时间按森空岛库存估算。培养完成后，请更新干员数据并重新排班。",
+  components_UpgradeSuggestions_005: "刷新森空岛数据后，材料缺口和回本时间会随库存更新。培养完成后，请更新干员数据并重新排班。",
+  upgradeCompleted: '已完成',
+  upgradeCompletedHelp: '已达到目标练度。更新干员数据并重新排班，查看新的培养建议。',
+  upgradeInventoryLoading: '正在读取养成库存…',
+  upgradeInventoryFailed: '养成库存读取失败，请刷新后重试。',
   // src/components/UpgradeSuggestions.tsx
   components_UpgradeSuggestions_006: "建议排序",
   // src/components/UpgradeSuggestions.tsx

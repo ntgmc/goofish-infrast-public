@@ -130,6 +130,42 @@ describe('UpgradeSuggestions', () => {
     expect(screen.queryByText(/\+38%/)).not.toBeInTheDocument()
   })
 
+  it.each([1, 2])('shows reached elite %s as completed and puts it after pending suggestions', async (elite) => {
+    const user = userEvent.setup()
+    const completed = paybackSuggestion('已培养干员', 0, 100)
+    completed.target = 1
+    completed.training_cost!.status = 'partial'
+    completed.training_cost!.operators = [operatorCost(completed.id!, elite)]
+    const pending = paybackSuggestion('待培养干员', 100, 1)
+    renderComponent([completed, pending])
+    const cards = screen.getAllByRole('article')
+    expect(within(cards[0]).getByRole('heading', { name: '待培养干员' })).toBeInTheDocument()
+    expect(within(cards[1]).getByText('已完成')).toBeInTheDocument()
+    expect(within(cards[1]).queryByText('预计回本')).not.toBeInTheDocument()
+    expect(within(cards[1]).queryByText('材料已够')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '最大收益' }))
+    expect(within(screen.getAllByRole('article')[1]).getByText('已完成')).toBeInTheDocument()
+  })
+
+  it('completes a bundle only when every target has reached its required elite', () => {
+    const first = { id: 'char-a', name: '干员 A', current: 0, target: 1 }
+    const second = { id: 'char-b', name: '干员 B', current_elite: 0, target_elite: 2 }
+    const bundle: UpgradeSuggestion = { ...paybackSuggestion('组合建议', 0, 10), type: 'bundle', ops: [first, second] }
+    const cost = bundle.training_cost!
+    cost.operators = [operatorCost(first.id, 1), operatorCost(second.id, 1)]
+    const { rerender } = renderComponent([bundle])
+    expect(within(screen.getByRole('article')).queryByText('已完成')).not.toBeInTheDocument()
+    expect(within(screen.getByRole('article')).getByText('材料已够')).toBeInTheDocument()
+    rerender(<UpgradeSuggestions suggestions={[{ ...bundle, training_cost: { ...cost,
+      operators: [operatorCost(first.id, 1), operatorCost(second.id, 2)],
+    } }]} />)
+    expect(within(screen.getByRole('article')).getByText('已完成')).toBeInTheDocument()
+    rerender(<UpgradeSuggestions suggestions={[{ ...bundle, training_cost: { ...cost,
+      operators: [operatorCost(first.id, 1)],
+    } }]} />)
+    expect(within(screen.getByRole('article')).queryByText('已完成')).not.toBeInTheDocument()
+  })
+
   it('prunes expanded ids when suggestions are replaced', async () => {
     const user = userEvent.setup()
     const props = baseProps()
@@ -142,6 +178,11 @@ describe('UpgradeSuggestions', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: '查看解释' })).toHaveAttribute('aria-expanded', 'false'))
   })
 })
+
+function operatorCost(id: string, elite: number) {
+  return { status: 'complete' as const, id, name: id, current_elite: elite, target_elite: elite,
+    current_level: 1, target_level: 1, totals: emptyBucket(), missing: emptyBucket(), warnings: [] }
+}
 
 function renderComponent(suggestions: UpgradeSuggestion[]) {
   return render(<UpgradeSuggestions {...baseProps()} suggestions={suggestions} />)
