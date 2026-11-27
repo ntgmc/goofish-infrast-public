@@ -5,6 +5,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import ConfigEditor from './ConfigEditor'
 import { CONFIG_PRESETS, cloneConfig, normalizeConfig } from '../lib/config'
 import { copy } from '../copy'
+import { getFacilityIds } from '../lib/facility-layout'
 
 vi.mock('../lib/site-feature-context', () => ({ useSiteFeatures: () => ({ features: { one_shift_per_day: false } }) }))
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
@@ -141,6 +142,38 @@ it('preserves preset permissions while allowing a matching 252 map and inventory
   await userEvent.click(screen.getByRole('button', { name: copy.skland.importConfig }))
   await screen.findByText(copy.skland.configPresetRequired)
   expect(update).toHaveBeenCalledTimes(1)
+})
+
+it.each(Object.keys(CONFIG_PRESETS))('selects the %s preset after importing matching production in different positions', async (id) => {
+  const { props } = setup()
+  const preset = CONFIG_PRESETS[id]
+  const config = normalizeConfig({ ...preset, desc: copy.v2.configCustomPreset })
+  const configuration = { ...preset, facility_layout: getFacilityIds(preset).reverse() }
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ configuration })))
+  const onUpdate = vi.fn((mutate: (next: typeof config) => void) => mutate(config))
+  render(<ConfigEditor {...props} config={config} onUpdate={onUpdate} guideSklandImport />)
+  expect(screen.getByRole('button', { name: copy.v2.configCustomPreset })).toHaveAttribute('aria-pressed', 'true')
+  await userEvent.click(screen.getByRole('button', { name: copy.skland.importConfig }))
+  await screen.findByText(copy.skland.configReview.success)
+  const labels: Record<string, string> = { '243': '243 均衡', '243-1': '243 搓玉', '333': '333 搓玉', '333-lmd': '333 纯钱' }
+  expect(screen.getByRole('button', { name: labels[id] ?? preset.desc })).toHaveAttribute('aria-pressed', 'true')
+  expect(screen.getByRole('button', { name: copy.v2.configCustomPreset })).toHaveAttribute('aria-pressed', 'false')
+  expect(config.facility_layout).toEqual(configuration.facility_layout)
+  expect(onUpdate).toHaveBeenCalledOnce()
+})
+
+it('keeps imported production custom when only its room counts match a preset', async () => {
+  const { config, props } = setup()
+  const configuration = { ...CONFIG_PRESETS['243'], desc: copy.skland.importedConfig,
+    facility_layout: getFacilityIds(CONFIG_PRESETS['243']).reverse(),
+    product_requirements: { trading_stations: { LMD: 2 }, manufacturing_stations: { 'Pure Gold': 1, 'Battle Record': 3 } } }
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ configuration })))
+  render(<ConfigEditor {...props} guideSklandImport />)
+  await userEvent.click(screen.getByRole('button', { name: copy.skland.importConfig }))
+  await screen.findByText(copy.skland.configReview.success)
+  expect(screen.getByRole('button', { name: copy.v2.configCustomPreset })).toHaveAttribute('aria-pressed', 'true')
+  expect(screen.getByRole('button', { name: '243 均衡' })).toHaveAttribute('aria-pressed', 'false')
+  expect(config.product_requirements).toEqual(configuration.product_requirements)
 })
 
 it('aborts an in-flight import on profile change and ignores its late response', async () => {
