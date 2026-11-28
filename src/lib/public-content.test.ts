@@ -11,6 +11,35 @@ import {
 } from './public-content'
 
 describe('public content settings', () => {
+  it('updates saved help defaults while preserving order, removed entries, and unrelated settings', () => {
+    const stored = { ...cloneDefaultPublicContentSettings(), defaults_revision: 20, updated_at: '2026-11-28T00:00:00.000Z' }
+    for (const previous of copy.publicContent.legacy_help_faq) {
+      Object.assign(stored.faq.items.find((item) => item.id === previous.id)!, previous)
+    }
+    stored.faq.items = stored.faq.items.filter((item) => item.id !== 'config-layout').reverse()
+    const original = structuredClone(stored)
+    const migrated = normalizePublicContentSettings(stored)
+    expect(migrated.faq.items).toEqual(original.faq.items.map((item) => DEFAULT_PUBLIC_CONTENT_DRAFT.faq.items.find((entry) => entry.id === item.id)))
+    expect(migrated).toEqual({ ...original, defaults_revision: PUBLIC_CONTENT_DEFAULTS_REVISION, faq: migrated.faq })
+    expect(stored).toEqual(original)
+    expect(normalizePublicContentSettings(migrated)).toEqual(migrated)
+  })
+
+  it.each(['question', 'answer', 'action'] as const)('preserves help customizations to %s and content saved at the current revision', (field) => {
+    const stored = { ...cloneDefaultPublicContentSettings(), defaults_revision: 20 }
+    for (const previous of copy.publicContent.legacy_help_faq) {
+      Object.assign(stored.faq.items.find((item) => item.id === previous.id)!, previous, {
+        [field]: field === 'action' ? 'qq_group' : '管理员自定义说明',
+      })
+    }
+    expect(normalizePublicContentSettings(stored).faq).toEqual(stored.faq)
+    for (const previous of copy.publicContent.legacy_help_faq) {
+      Object.assign(stored.faq.items.find((item) => item.id === previous.id)!, previous, { action: 'none' })
+    }
+    stored.defaults_revision = PUBLIC_CONTENT_DEFAULTS_REVISION
+    expect(normalizePublicContentSettings(stored).faq).toEqual(stored.faq)
+  })
+
   it('updates saved result guides while preserving order, removed entries, and unrelated settings', () => {
     const stored = { ...cloneDefaultPublicContentSettings(), defaults_revision: 19, updated_at: '2026-11-26T00:00:00.000Z' }
     for (const previous of copy.publicContent.legacy_result_guide_faq) {

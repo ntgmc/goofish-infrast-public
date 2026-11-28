@@ -138,7 +138,7 @@ export const v2Copy = {
     },
     helpExamples: { skland: '如：找不到干员', generation: '如：生成超时', result: '如：导出失败', inventory: '如：兑换码发货' },
     helpFallback: '暂时找不到能确认的答案。可提交问题和页面提示，由人工核对。', helpSource: '公开规则',
-    inventoryOld: '干员和游戏库存可以分别更新。请在「森空岛数据」刷新并核对背包更新时间。',
+    inventoryOld: '请在「森空岛数据」点击「刷新森空岛数据」重试，成功后核对游戏背包的更新时间。',
     inventoryCheck: '先核对游戏背包的更新时间。若时间早于游戏里的变动，请刷新森空岛数据。',
     authorize: '当前授权需要重新确认。请打开「森空岛数据」，为原游戏账号重新授权。',
     retryConfig: '当前配置尚未保存。先重试保存，再开始计算。', retryJob: '请先查看任务提示。服务暂时不可用时可稍后重试，持续失败可通过原任务提交反馈。',
