@@ -26,7 +26,7 @@ import { sectionLabels, V2_GUEST_SECTIONS, v2Path, v2Section, v2SectionAvailable
 import V2Navigation from './V2Navigation'
 import V2TopbarTools from './V2TopbarTools'
 import { normalizeScheduleMode, SCHEDULE_MODE_LABELS, validateScheduleConfig } from '../../lib/config'
-import type { AuthSuccessResponse, LicenseConfig, LicenseOperator, OptimizeResult, PermissionMode, UpgradeSuggestion } from '../../lib/types'
+import type { AuthSuccessResponse, LicenseConfig, LicenseOperator, OptimizeResult, PermissionMode } from '../../lib/types'
 import ScheduleBoard from './ScheduleBoard'
 import ScheduleContext from './ScheduleContext'
 import IncomeAnalysis from './IncomeAnalysis'
@@ -34,8 +34,6 @@ import ProductionSummary from './ProductionSummary'
 import ScheduleExplanation from './ScheduleExplanation'
 import ResultChanges from './ResultChanges'
 import PageHelp from './pages/PageHelp'
-import CultivationAdvisor, { type AdvisorRow } from './CultivationAdvisor'
-import { projectsFromUpgradeSuggestion } from '../../lib/cultivation-project-import'
 import ResultExportDrawer from './ResultExportDrawer'
 import ManualResultExport from './ManualResultExport'
 import OptionsDrawer, { type OptionPanel, type V2Session } from './OptionsDrawer'
@@ -54,30 +52,7 @@ type View = 'schedule' | 'analysis' | 'manual' | 'training'
 const ManualScheduleEditor = lazy(() => import('../../components/result-panel/ManualScheduleEditor'))
 const ReadOnlyScheduleBoard = lazy(() => import('../../components/result-panel/ResultBoardV2'))
 const UpgradeSuggestions = lazy(() => import('../../components/UpgradeSuggestions'))
-
-function baseAdvisorRows(suggestions: UpgradeSuggestion[]): AdvisorRow[] {
-  const labels = copy.v2.workspaceAssistant
-  const format = (value: number) => value.toLocaleString('zh-CN', { maximumFractionDigits: 1 })
-  return suggestions.flatMap((suggestion, index) => {
-    const title = suggestion.type === 'single' ? suggestion.name : suggestion.ops?.map((operator) => operator.name).join('、')
-    if (!title) return []
-    const gain = suggestion.roi?.daily_sanity_gain
-    const orundum = suggestion.orundum_roi?.sustainable_orundum_gain
-    const cost = suggestion.training_cost
-    const facts = gain == null ? [] : [labels.gain(format(gain))]
-    if (orundum != null) facts.push(labels.orundumGain(format(orundum)))
-    if (cost?.status === 'available') {
-      const total = cost.totals.equivalent_sanity
-      if (total != null) facts.push(labels.totalCost(format(total)))
-      else facts.push(labels.materialUnknown)
-      const covered = !cost.missing.cash && !cost.missing.exp && cost.missing.materials.every((item) => !item.count)
-      if (covered) facts.push(labels.readyMaterials)
-      else if (cost.missing.equivalent_sanity != null) facts.push(labels.missingSanity(format(cost.missing.equivalent_sanity)))
-      if (gain != null && gain > 0 && total != null) facts.push(labels.payback(format(total / gain)))
-    } else facts.push(labels.unknownCost)
-    return [{ id: `upgrade-${index + 1}`, title, facts: facts.slice(0, 4), projects: projectsFromUpgradeSuggestion(suggestion) }]
-  })
-}
+const LiveUpgradeSuggestions = lazy(() => import('./LiveUpgradeSuggestions'))
 
 export default function V2Dashboard({ session, workflow, taskCenterAction, generationProgress, result, operators, config, sample, configChanged, onUpdateConfig,
   onImportOperators, onGenerate, onExport, sampleOperators = false, busy = false, loadingResult = false, generationDisabledReason, onRetryResult, error, notice,
@@ -427,8 +402,8 @@ export default function V2Dashboard({ session, workflow, taskCenterAction, gener
                 {sample && <SampleCapabilityNotice />}
                 <Suspense fallback={<Loading label={text.loading} />}>
                   {!sample && <UpgradeSuggestionStatusNotice result={result} />}
-                  {!sample && session.user && session.activeProfile && workflow?.suggestions?.length ? <CultivationAdvisor key={arrivalKey} scope={{ userId: session.user.id, profileId: session.activeProfile.id }} rows={baseAdvisorRows(workflow.suggestions)} /> : null}
-                  <UpgradeSuggestions suggestions={sample ? sampleSuggestions : workflow?.suggestions ?? []} description={sample ? text.advancedSample.training : undefined} sortByCost={!sample} embedded projectScope={!sample && session.user && session.activeProfile ? { userId: session.user.id, profileId: session.activeProfile.id } : undefined} />
+                  {sample ? <UpgradeSuggestions suggestions={sampleSuggestions} description={text.advancedSample.training} sortByCost={false} embedded />
+                    : <LiveUpgradeSuggestions suggestions={workflow?.suggestions ?? []} session={session} resultId={exportResultId} />}
                 </Suspense>
               </section>
             ) : view === 'analysis' ? (

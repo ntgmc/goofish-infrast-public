@@ -3,7 +3,7 @@ import { calculateTrainingCost } from '../../src/lib/training-ratio'
 import { allocateCultivationMaterials } from '../../src/lib/cultivation-planner'
 import type { LicenseOperator, UpgradeTrainingCost } from '../../src/lib/types'
 import { decryptSklandCredential, SklandClient } from './skland-client'
-import { getSklandSnapshot } from '../skland-snapshot'
+import { getSklandSnapshot, readSnapshotItems } from '../skland-snapshot'
 import type { UserGameAccountRecord } from '../storage/user-store'
 import {
   EXP_ITEM_VALUES,
@@ -24,8 +24,8 @@ type LevelData = {
 
 type UpgradeSuggestionLike = Record<string, unknown>
 
-export type TrainingCostParams = {
-  suggestions: UpgradeSuggestionLike[]
+type TrainingCostParams<T extends UpgradeSuggestionLike> = {
+  suggestions: T[]
   operators: LicenseOperator[]
   profile?: UserGameAccountRecord | null
 }
@@ -146,12 +146,12 @@ const WORKSHOP_RECIPES: Record<string, [number, Record<string, number>]> = {
   '3282': [2, { '3222': 3 }],
 }
 
-export async function attachTrainingCostsToUpgradeSuggestions({
+export async function attachTrainingCostsToUpgradeSuggestions<T extends UpgradeSuggestionLike>({
   suggestions,
   operators,
   profile,
-}: TrainingCostParams): Promise<UpgradeSuggestionLike[]> {
-  if (suggestions.length === 0) return suggestions
+}: TrainingCostParams<T>): Promise<(T & { training_cost: UpgradeTrainingCost })[]> {
+  if (suggestions.length === 0) return []
 
   if (!profile?.skland_binding?.encrypted_cred) {
     return suggestions.map((suggestion) => ({
@@ -481,7 +481,7 @@ function createCultivateContext(client: SklandClient, calInfo: unknown, calPlaye
     calInfo: calInfoRecord,
     calPlayer: calPlayerRecord,
     itemMeta: createItemMeta(calInfoRecord.items),
-    playerItems: readInventoryItems(calPlayerRecord.items),
+    playerItems: Object.entries(readSnapshotItems(calPlayer)).map(([id, count]) => ({ id, count })),
     playerCharacters: Array.isArray(calPlayerRecord.characters)
       ? calPlayerRecord.characters.filter(isRecord)
       : [],
@@ -640,17 +640,6 @@ function mergeMaterialAmounts(target: MaterialAmount[], items: MaterialAmount[])
     target.push({ ...item })
   }
   target.sort((a, b) => (a.sortId ?? 9999999) - (b.sortId ?? 9999999) || a.id.localeCompare(b.id))
-}
-
-function readInventoryItems(value: unknown): InventoryItem[] {
-  if (!Array.isArray(value)) return []
-  return value
-    .filter(isRecord)
-    .map((item) => ({
-      id: stringValue(item.id),
-      count: numberValue(item.count) ?? 0,
-    }))
-    .filter((item) => item.id && item.count > 0)
 }
 
 function createItemMeta(value: unknown): Record<string, unknown> {

@@ -32,11 +32,12 @@ export function readSklandFacilityConfig(value: unknown) {
   readSklandFacilityRooms(value)
   const { data: { building } } = buildingSchema.parse(value)
   const matchesLevels = (actual: z.infer<typeof stationSchema>[], expected: number[]) => actual.map((room) => room.level).sort().join() === [...expected].sort().join()
-  const preset = Object.values(CONFIG_PRESETS).find((candidate) => candidate.trading_stations_count === building.tradings.length
+  const presets = Object.values(CONFIG_PRESETS).filter((candidate) => candidate.trading_stations_count === building.tradings.length
     && candidate.manufacturing_stations_count === building.manufactures.length
     && building.powers.every((room) => room.level === 3)
     && matchesLevels(building.tradings, candidate.trading_station_levels ?? Array(candidate.trading_stations_count).fill(3))
     && matchesLevels(building.manufactures, candidate.manufacturing_station_levels ?? Array(candidate.manufacturing_stations_count).fill(3)))
+  const preset = presets[0]
   if (!preset) throw new Error(copy.skland.configUnsupported)
   const products = { trading_stations: {} as Record<string, number>, manufacturing_stations: {} as Record<string, number> }
   for (const station of building.tradings) {
@@ -65,7 +66,10 @@ export function readSklandFacilityConfig(value: unknown) {
     })
     return available.splice(index, 1)[0]
   })
-  const config = sklandFacilityConfigSchema.parse({ layout: preset.layout, desc: copy.skland.importedConfig,
+  const matchingPreset = presets.find((candidate) =>
+    Object.entries(candidate.product_requirements.trading_stations).every(([product, count]) => products.trading_stations[product] === count)
+    && Object.entries(candidate.product_requirements.manufacturing_stations).every(([product, count]) => products.manufacturing_stations[product] === count))
+  const config = sklandFacilityConfigSchema.parse({ layout: preset.layout, desc: matchingPreset?.desc ?? copy.skland.importedConfig,
     trading_stations_count: preset.trading_stations_count, manufacturing_stations_count: preset.manufacturing_stations_count,
     ...(preset.trading_station_levels && { trading_station_levels: [...preset.trading_station_levels] }),
     ...(preset.manufacturing_station_levels && { manufacturing_station_levels: [...preset.manufacturing_station_levels] }),

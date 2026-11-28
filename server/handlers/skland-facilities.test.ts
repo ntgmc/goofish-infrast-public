@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { readSklandFacilityConfig, readSklandFacilityRooms } from './skland-facilities'
-import { normalizeConfig, validateScheduleConfig } from '../../src/lib/config'
-import { hasConfirmedFacilityLayout } from '../../src/lib/facility-layout'
+import { CONFIG_PRESETS, normalizeConfig, validateScheduleConfig } from '../../src/lib/config'
+import { getFacilityIds, hasConfirmedFacilityLayout, SKLAND_PRODUCTION_SLOTS } from '../../src/lib/facility-layout'
+import { copy } from '../../src/copy'
 
 function playerInfo() {
   return { data: { building: {
@@ -42,6 +43,33 @@ describe('Skland facility positions', () => {
     expect(config.facility_layout).toEqual(['trading_1', 'trading_2', 'manufacture_1', 'manufacture_2', 'manufacture_3', 'manufacture_4', 'power_1', 'power_2', 'power_3'])
     expect(hasConfirmedFacilityLayout(config)).toBe(true)
     expect(validateScheduleConfig(config)).toEqual({ ok: true })
+  })
+  it.each(Object.keys(CONFIG_PRESETS))('recognizes the %s preset from production while preserving different room positions', (id) => {
+    const preset = CONFIG_PRESETS[id]
+    const facilityIds = getFacilityIds(preset).reverse()
+    const tradingProducts = Object.entries(preset.product_requirements.trading_stations).flatMap(([product, count]) => Array<string>(count).fill(product))
+    const manufacturingProducts = Object.entries(preset.product_requirements.manufacturing_stations).flatMap(([product, count]) => Array<string>(count).fill(product))
+    const rooms = facilityIds.map((facility, position) => {
+      const [type, number] = facility.split('_')
+      const index = Number(number) - 1
+      const levels = type === 'trading' ? preset.trading_station_levels : preset.manufacturing_station_levels
+      return { type, slotId: SKLAND_PRODUCTION_SLOTS[position], level: type === 'power' ? 3 : levels?.[index] ?? 3,
+        strategy: tradingProducts[index] === 'LMD' ? 'O_GOLD' : 'O_DIAMOND',
+        formulaId: manufacturingProducts[index] === 'Pure Gold' ? '4' : manufacturingProducts[index] === 'Battle Record' ? '3' : '13' }
+    })
+    const config = readSklandFacilityConfig({ data: { building: {
+      tradings: rooms.filter((room) => room.type === 'trading'),
+      manufactures: rooms.filter((room) => room.type === 'manufacture'),
+      powers: rooms.filter((room) => room.type === 'power'),
+    } } })
+    expect(config.desc).toBe(preset.desc)
+    expect(config.product_requirements).toEqual(preset.product_requirements)
+    expect(config.facility_layout).not.toEqual(getFacilityIds(preset))
+    expect(config.facility_layout?.map((facility) => facility.split('_')[0])).toEqual(facilityIds.map((facility) => facility.split('_')[0]))
+    expect(validateScheduleConfig(normalizeConfig(config))).toEqual({ ok: true })
+  })
+  it('keeps non-preset production separate from a matching room-count and level template', () => {
+    expect(readSklandFacilityConfig(playerInfo()).desc).toBe(copy.skland.importedConfig)
   })
   it('rejects unsupported layouts and products instead of guessing a usable configuration', () => {
     const unsupported = playerInfo()
