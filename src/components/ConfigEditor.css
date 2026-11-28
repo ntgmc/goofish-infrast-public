@@ -29,7 +29,8 @@
   background: var(--theme-surface-2);
 }
 
-.config-skland-import > .config-skland-trigger { grid-area: import; }
+.config-skland-import > :is(.config-skland-trigger, .config-skland-actions) { grid-area: import; }
+.config-skland-import > .config-skland-actions { margin: 0; }
 .config-skland-help { grid-area: help; }
 .config-skland-import:has(.config-skland-feedback[data-kind="error"]) { grid-template-areas: 'feedback import'; }
 .config-skland-import[data-imported] {

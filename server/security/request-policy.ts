@@ -898,7 +898,7 @@ export function getRoutePolicy(pathname: string): RoutePolicy | null {
     } catch {
       return null
     }
-    return route({ GET: none() }, ['profile_id'])
+    return route({ GET: none() }, ['profile_id', 'training_costs'])
   }
   if (!pathname.startsWith('/api/optimization/jobs/')) return null
   const suffix = pathname.slice('/api/optimization/jobs/'.length)

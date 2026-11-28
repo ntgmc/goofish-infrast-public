@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useState, type CSSProperties, type ReactNode } from 'react'
 import {
   ControlRoomIcon, TradingStationIcon, ManufactureIcon, PowerPlantIcon, DormitoryIcon, MeetingRoomIcon,
   RecruitmentIcon, TrainingRoomIcon, DroneIcon, OperatorsIcon, TasksIcon, ShiftTimeIcon,
@@ -26,6 +26,15 @@ const roomIcons: Record<SklandRoom['type'], LucideIcon> = {
 }
 type Building = NonNullable<SklandGame['building']>
 
+// Game overview rows: production rooms, dormitory, then the right-side facility.
+const roomSlots = [
+  ['', '', '', 'slot_34', 'slot_36'],
+  [...SKLAND_PRODUCTION_SLOTS.slice(0, 3), 'slot_28', ''],
+  [...SKLAND_PRODUCTION_SLOTS.slice(3, 6), 'slot_20', 'slot_23'],
+  [...SKLAND_PRODUCTION_SLOTS.slice(6, 9), 'slot_9', 'slot_13'],
+  ['', '', '', 'slot_3', ''],
+].flat()
+
 export function SklandOverview({ game, lmd, exp }: { game: SklandGame; lmd: number | null; exp: number | null }) {
   const player = game.player
   const control = game.building?.rooms.find((room) => room.type === 'control')
@@ -36,13 +45,13 @@ export function SklandOverview({ game, lmd, exp }: { game: SklandGame; lmd: numb
         <div className="skland-profile-name"><h2>{player.name ?? text.name}</h2>{player.level != null && <span className="skland-level">Lv.{player.level}</span>}</div>
         <dl className="skland-profile-details"><div><dt>{text.mainStage}</dt><dd>{player.mainStage ?? text.unavailable}</dd></div><div><dt>{text.lastOnline}</dt><dd>{date(player.lastOnline)}</dd></div></dl>
       </div>
-      {control && control.operators.length > 0 && <div className="skland-command-team"><h3>{text.roomTypes.control}</h3><ul className="skland-residents">{control.operators.map((operator) => <Resident key={operator.id} operator={operator} />)}</ul></div>}
+      {control && control.operators.length > 0 && <div className="skland-command-team"><h3>{text.roomTypes.control}</h3><ul className="skland-residents" style={{ '--resident-count': control.operators.length } as CSSProperties}>{control.operators.map((operator) => <Resident key={operator.id} operator={operator} />)}</ul></div>}
       <dl className="skland-collection">{([[text.operators, player.operators], [text.skins, player.skins], [text.furniture, player.furniture], [text.tired, game.building?.tired]] as const).map(([label, count]) => <div key={label}><dt>{label}</dt><dd>{number(count)}</dd></div>)}</dl>
       {player.dataAt != null && player.dataAt > 0 && <p className="skland-profile-time">{text.sourceTime(date(player.dataAt))}</p>}
     </section>
     <div className="skland-resource-grid">
       <Resource label={text.sanity} icon={SanityIcon} value={ratio(player.sanity)} current={player.sanity?.current} max={player.sanity?.max} tone="trading">
-        {player.sanity?.completeAt ? <span>{text.recovery} {date(player.sanity.completeAt)}</span> : null}
+        {player.sanity?.completeAt ? <span>{text.recovery} <time dateTime={new Date(player.sanity.completeAt * 1000).toISOString()} title={date(player.sanity.completeAt)}>{shortDate(player.sanity.completeAt)}</time></span> : null}
       </Resource>
       <Resource label={text.drones} icon={DroneIcon} value={ratio(game.building?.drones)} current={game.building?.drones?.current} max={game.building?.drones?.max} tone="power" />
       <Resource label={text.lmd} icon={LmdIcon} value={number(lmd)} amount={lmd} product="LMD" tone="manufacture" />
@@ -63,7 +72,7 @@ export function SklandOverview({ game, lmd, exp }: { game: SklandGame; lmd: numb
           <span className="skland-recruit-index" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
           <RecruitmentIcon size={28} aria-hidden="true" /><h3>{text.recruitSlot(index)}</h3>
           <strong>{text.recruitStates[state] ?? text.unavailable}</strong>
-          {slot.finishAt != null && slot.finishAt > 0 && <p><ShiftTimeIcon size={14} aria-hidden="true" />{text.completion}<br />{date(slot.finishAt)}</p>}
+          {slot.finishAt != null && slot.finishAt > 0 && <p><ShiftTimeIcon size={14} aria-hidden="true" />{text.completion} <time dateTime={new Date(slot.finishAt * 1000).toISOString()} title={date(slot.finishAt)}>{shortDate(slot.finishAt)}</time></p>}
         </li>
       })}</ol> : <p className="skland-empty">{text.unavailable}</p>}
     </section>
@@ -71,16 +80,13 @@ export function SklandOverview({ game, lmd, exp }: { game: SklandGame; lmd: numb
 }
 
 export function SklandInfrastructure({ building }: { building: Building }) {
-  const productionTypes: SklandRoom['type'][] = ['trading', 'manufacture', 'power']
-  const production = building.rooms.filter((room) => productionTypes.includes(room.type))
-    .sort((left, right) => productionTypes.indexOf(left.type) - productionTypes.indexOf(right.type)
-      || SKLAND_PRODUCTION_SLOTS.indexOf(left.id) - SKLAND_PRODUCTION_SLOTS.indexOf(right.id))
-  const control = building.rooms.filter((room) => room.type === 'control')
-  const support = building.rooms.filter((room) => ['meeting', 'hire', 'training'].includes(room.type))
-  const dormitories = building.rooms.filter((room) => room.type === 'dormitory')
+  const rooms = [...building.rooms].sort((left, right) => {
+    const leftPosition = roomSlots.indexOf(left.id)
+    const rightPosition = roomSlots.indexOf(right.id)
+    return (leftPosition < 0 ? roomSlots.length : leftPosition) - (rightPosition < 0 ? roomSlots.length : rightPosition)
+  })
   const label = (room: SklandRoom) => {
-    const peers = building.rooms.filter((entry) => entry.type === room.type)
-      .sort((left, right) => SKLAND_PRODUCTION_SLOTS.indexOf(left.id) - SKLAND_PRODUCTION_SLOTS.indexOf(right.id))
+    const peers = rooms.filter((entry) => entry.type === room.type)
     return `${text.roomTypes[room.type]}${peers.length > 1 ? ` ${peers.findIndex((entry) => entry.id === room.id) + 1}` : ''}`
   }
   return <section className="skland-game skland-infrastructure" aria-label={text.infrastructure}>
@@ -89,14 +95,7 @@ export function SklandInfrastructure({ building }: { building: Building }) {
       <div data-tired={Boolean(building.tired)}><dt><OperatorsIcon size={16} aria-hidden="true" />{text.tired}</dt><dd>{number(building.tired)}</dd></div>
     </dl>
     <div className="skland-base-map">
-      {(control.length > 0 || production.length > 0) && <section className="skland-base-production" aria-label={text.productionRooms}>
-        {control.map((room) => <Room key={room.id} room={room} building={building} label={label(room)} />)}
-        {production.map((room) => <Room key={room.id} room={room} building={building} label={label(room)} />)}
-      </section>}
-      {(support.length > 0 || dormitories.length > 0) && <section className="skland-base-support" aria-label={text.supportRooms}>
-        {support.map((room) => <Room key={room.id} room={room} building={building} label={label(room)} />)}
-        {dormitories.map((room) => <Room key={room.id} room={room} building={building} label={label(room)} />)}
-      </section>}
+      {rooms.map((room) => <Room key={room.id} room={room} building={building} label={label(room)} />)}
     </div>
   </section>
 }
@@ -121,35 +120,36 @@ function Meter({ label, current, max }: { label: string; current?: number | null
   return current != null && max != null && max > 0 ? <progress className="skland-meter" aria-label={label} value={current} max={max} /> : null
 }
 
-function Resident({ operator, role, overlay = false }: { operator: SklandRoom['operators'][number]; role?: string; overlay?: boolean }) {
+function Resident({ operator, role }: { operator: SklandRoom['operators'][number]; role?: string }) {
   const [failed, setFailed] = useState(false)
   const morale = operator.morale == null ? null : Math.round(operator.morale * 10) / 10
   const moraleLabel = `${text.morale} ${morale == null ? text.moraleUnavailable : `${morale} / 24`}`
-  return <li className="skland-resident" data-overlay={overlay} data-tired={morale != null && morale <= 4}>
+  return <li className="skland-resident" data-tired={morale != null && morale <= 4}>
     <span className="skland-portrait-frame">
       <span className="skland-portrait" aria-hidden="true">{!failed ? <img src={`/webp96/${encodeURIComponent(operator.id)}.webp`} alt="" width={96} height={96} loading="lazy" decoding="async" onError={() => setFailed(true)} /> : <span>{operator.name.slice(0, 1)}</span>}</span>
-      {overlay && <span className="skland-morale-overlay" aria-label={moraleLabel} title={morale == null ? text.unavailable : moraleLabel}><MoraleIcon size={12} aria-hidden="true" /><b>{morale ?? '—'}</b></span>}
+      <span className="skland-resident-morale" aria-label={moraleLabel} title={morale == null ? text.unavailable : moraleLabel}><MoraleIcon size={12} aria-hidden="true" /><b>{morale ?? '—'}</b></span>
     </span>
     <div className="skland-resident-name">{role && <small>{role}</small>}<strong>{operator.name}</strong></div>
-    {!overlay && <><span className="skland-morale" title={morale == null ? text.unavailable : undefined}>{text.morale} <b>{morale == null ? text.moraleUnavailable : `${morale} / 24`}</b></span><Meter label={`${operator.name} · ${text.morale}`} current={operator.morale} max={24} /></>}
   </li>
 }
 
 function Room({ room, building, label }: { room: SklandRoom; building: Building; label: string }) {
   const position = SKLAND_PRODUCTION_SLOTS.indexOf(room.id)
+  const mapPosition = roomSlots.indexOf(room.id)
   const Icon = roomIcons[room.type]
   const production = room.type === 'manufacture' || room.type === 'trading'
   const productIcon = production ? Object.values(catalog).find((item) => item.name === room.product)?.icon : undefined
   const clues = room.type === 'meeting' ? building.clues : null
   const training = room.type === 'training' ? building.training : null
-  return <article className="skland-room" data-tone={room.type} aria-label={label}>
+  return <article className="skland-room" data-tone={room.type} aria-label={label}
+    style={mapPosition < 0 ? undefined : { '--room-row': Math.floor(mapPosition / 5) + 1, '--room-column': mapPosition % 5 + 1 } as CSSProperties}>
     <Icon className="skland-room-watermark" size={120} strokeWidth={1} aria-hidden="true" />
     <header className="skland-room-heading">
       <div className="skland-room-identity"><h3>{label}</h3><span className="skland-room-level" role="img" aria-label={`${text.level} ${room.level}`} title={`Lv.${room.level}`}>{Array.from({ length: room.level }, (_, index) => <i key={index} aria-hidden="true" />)}</span></div>
       {production && <span className="skland-room-product">{productIcon && <img src={`/item-icons/${encodeURIComponent(productIcon)}.png`} alt="" width={22} height={22} loading="lazy" decoding="async" />}<strong title={room.product == null ? text.unavailable : undefined}>{room.product ?? '—'}</strong></span>}
       {room.comfort != null && <span className="skland-room-comfort">{text.comfort} <b>{number(room.comfort)}</b></span>}
     </header>
-    {room.operators.length ? <ul className="skland-residents" aria-label={text.residents}>{room.operators.map((operator) => <Resident key={operator.id} operator={operator} overlay
+    {room.operators.length ? <ul className="skland-residents" aria-label={text.residents} style={{ '--resident-count': room.operators.length } as CSSProperties}>{room.operators.map((operator) => <Resident key={operator.id} operator={operator}
       role={training ? operator.name === training.trainee ? text.trainee : operator.name === training.trainer ? text.trainer : undefined : undefined} />)}</ul>
       : <p className="skland-room-empty">{text.noResidents}</p>}
     {(production || clues || training || position >= 0) && <footer className="skland-room-footer">

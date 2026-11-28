@@ -53,8 +53,8 @@ export default function Skland({ session, onOpenProfile, onProfiles, onConfig }:
   const canRefresh = snapshot.available && !snapshot.busy && !(data?.retryAt && Date.parse(data.retryAt) > now)
   const game = data && ['fresh', 'stale'].includes(sklandResourceState(data.game.fetchedAt)) ? data.game.data : null
   const profiles = session.profiles.filter((entry) => entry.status === 'active' && !entry.archived_at)
-  return <div className="space-y-5">
-    <section className="v2-panel p-5 sm:p-6">
+  return <div className="space-y-3">
+    <section className="v2-panel p-3 sm:p-4">
       <div className="skland-account-controls flex flex-wrap items-end justify-between gap-4">
         {profiles.length > 0 ? <label className="v2-field min-w-0 w-full sm:w-auto sm:flex-1 sm:max-w-sm"><span>{text.profile}</span>
           <select className="v2-input" value={profile?.id ?? ''} disabled={Boolean(session.openingProfileId)} onChange={(event) => {
@@ -73,7 +73,7 @@ export default function Skland({ session, onOpenProfile, onProfiles, onConfig }:
       {snapshot.error && <Notice error>{snapshot.error}</Notice>}
       <DataRefresh pending={snapshot.busy} revision={data} error={Boolean(snapshot.error)}
         label={copy.v2.dataActivity.syncing} description={data ? copy.v2.dataActivity.current : undefined} skeleton={data ? undefined : 'cards'} />
-      <p className="mt-4 text-sm leading-6 text-ink-secondary">{text.snapshotHelp}</p>
+      <p className="mt-2 text-sm leading-6 text-ink-secondary">{text.snapshotHelp}</p>
       {profile?.skland_binding && <p className="mt-2 text-sm text-ink-muted">UID {profile.skland_binding.uid}</p>}
     </section>
     {refreshed && data && profile && session.user && <details className="v2-disclosure" onToggle={(event) => setChangesOpen(event.currentTarget.open)}><summary>{copy.v2.workspaceAssistant.changes}</summary>
@@ -82,15 +82,15 @@ export default function Skland({ session, onOpenProfile, onProfiles, onConfig }:
       </AccountChanges> : <p className="v2-muted">{copy.v2.workspaceAssistant.changesMissing}</p>}
     </details>}
     {data && <Tabs.Root className="v2-data-arrival" value={tab} onValueChange={setTab}>
-      <Tabs.List className="mb-5 flex border-b border-surface-3" aria-label={text.title}>
+      <Tabs.List className="mb-3 flex border-b border-surface-3" aria-label={text.title}>
         {(['overview', 'backpack', 'infrastructure'] as const).map((entry) => <Tabs.Trigger key={entry} value={entry}
           className="min-h-11 flex-1 border-b-2 border-transparent px-3 py-3 text-sm font-medium text-ink-secondary data-[state=active]:border-brand-500 data-[state=active]:text-ink-primary focus-visible:outline-2 focus-visible:outline-brand-500 sm:flex-none sm:px-6">{text[entry]}</Tabs.Trigger>)}
       </Tabs.List>
-      <Tabs.Content value="overview" className="space-y-5">
+      <Tabs.Content value="overview" className="space-y-3">
         {game ? <SklandOverview game={game} lmd={data.inventory.lmd} exp={data.inventory.exp} /> : <Notice>{text.noGame}</Notice>}
         <DataTime value={data.game.fetchedAt} />
       </Tabs.Content>
-      <Tabs.Content value="backpack" className="space-y-5"><SklandBackpack items={['fresh', 'stale'].includes(sklandResourceState(data.inventory.fetchedAt)) ? data.inventory.items : null} names={data.inventory.itemNames ?? {}} userId={session.user!.id} uid={data.uid} />
+      <Tabs.Content value="backpack" className="space-y-3"><SklandBackpack items={['fresh', 'stale'].includes(sklandResourceState(data.inventory.fetchedAt)) ? data.inventory.items : null} names={data.inventory.itemNames ?? {}} userId={session.user!.id} uid={data.uid} />
         <DataTime value={data.inventory.fetchedAt} />
       </Tabs.Content>
       <Tabs.Content value="infrastructure" className="space-y-5">

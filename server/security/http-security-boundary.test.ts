@@ -149,6 +149,26 @@ describe('HTTP security boundary', () => {
     }
   })
 
+  it.each(['profile_id=profile-1', 'profile_id=profile-1&training_costs=latest'])(
+    'allows saved-result reads through the HTTP boundary (%s)', (query) => {
+      expect(inspectIncomingRequest(incomingGet(`/api/user/results/result-1?${query}`, 'localhost:3001')).allowed).toBe(true)
+    },
+  )
+
+  it.each([
+    '/api/user/results/result-1?profile_id=profile-1&unexpected=true',
+    '/api/user/results/result-1?profile_id=profile-1&training_costs=latest&training_costs=latest',
+    '/api/user/results/result-1?profile_id=profile-1&profile_id=profile-2&training_costs=latest',
+    '/api/user/results?profile_id=profile-1&scope=active&training_costs=latest',
+  ])('rejects unsupported or duplicate saved-result query parameters (%s)', async (target) => {
+    const decision = inspectIncomingRequest(incomingGet(target, 'localhost:3001'))
+    expect(decision.allowed).toBe(false)
+    if (!decision.allowed) {
+      expect(decision.response.status).toBe(400)
+      await expect(decision.response.json()).resolves.toMatchObject({ code: 'invalid_request' })
+    }
+  })
+
   it('allows the public service status endpoint without query parameters', () => {
     expect(inspectIncomingRequest(incomingGet('/api/status', 'localhost:3001', '127.0.0.1')).allowed).toBe(true)
     expect(inspectIncomingRequest(incomingGet('/api/status?unexpected=true', 'localhost:3001', '127.0.0.1')).allowed).toBe(false)

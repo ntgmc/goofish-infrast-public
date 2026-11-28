@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createHash } from 'node:crypto'
+import type { IncomingMessage } from 'node:http'
+import { inspectIncomingRequest } from '../security/http-boundary'
 import { FREE_PREVIEW_LIMITED_CDK_ACTIVITY } from '../free-preview-trial'
 import { InventoryError } from '../storage/inventory-store'
 import { PersonalUseDeclarationRequiredError } from '../storage/personal-use-declaration-store'
@@ -97,9 +99,6 @@ vi.mock('../storage/personal-use-declaration-store', () => ({
     }
   },
   recordPersonalUseDeclarationUsage: mocks.recordPersonalUseDeclarationUsage,
-}))
-vi.mock('../security/request-policy', () => ({
-  requestSchemas: { maaExport: {}, fullResultExport: {}, resultArchive: {} },
 }))
 vi.mock('../security/request-validation', () => ({
   getValidatedJson: mocks.getValidatedJson,
@@ -307,7 +306,7 @@ describe('result history reads', () => {
       status: 'available', sources: { skland: 'ok' }, operators: [{ status: 'complete' }],
       missing: { equivalent_sanity: missing },
     } }])
-    const response = await userResultsHandler(new Request('http://localhost/api/user/results/result-1?profile_id=profile-1&training_costs=latest'))
+    const response = await requestThroughHttpBoundary(new Request('http://localhost/api/user/results/result-1?profile_id=profile-1&training_costs=latest'))
     expect(response.status).toBe(200)
     const { item } = await response.json()
     expect(item.result.upgrade_suggestions[0].roi.payback_days).toBeCloseTo(missing / 18.9)
@@ -324,7 +323,7 @@ describe('result history reads', () => {
     const stored = storedHistoryItem()
     stored.result.upgrade_suggestions = [{ type: 'single', name: 'Operator', current: 1, target: 2, gain: 1 }]
     mocks.getProfileOptimizationResult.mockResolvedValue(stored)
-    const response = await userResultsHandler(new Request('http://localhost/api/user/results/result-1?profile_id=profile-1&training_costs=latest'))
+    const response = await requestThroughHttpBoundary(new Request('http://localhost/api/user/results/result-1?profile_id=profile-1&training_costs=latest'))
     expect(response.status).toBe(200)
     expect((await response.json()).item.result).not.toHaveProperty('upgrade_suggestions')
     expect(mocks.attachTrainingCostsToUpgradeSuggestions).not.toHaveBeenCalled()
@@ -703,6 +702,15 @@ describe('MAA JSON export entitlement', () => {
     })
   })
 })
+
+async function requestThroughHttpBoundary(req: Request): Promise<Response> {
+  const url = new URL(req.url)
+  const decision = inspectIncomingRequest({
+    method: req.method, url: `${url.pathname}${url.search}`, headers: { host: url.host },
+    rawHeaders: ['Host', url.host], socket: { remoteAddress: '127.0.0.1' },
+  } as IncomingMessage)
+  return decision.allowed ? userResultsHandler(req) : decision.response
+}
 
 function exportRequest(path = 'maa-export'): Request {
   return new Request(`http://localhost/api/user/${path}`, { method: 'POST' })

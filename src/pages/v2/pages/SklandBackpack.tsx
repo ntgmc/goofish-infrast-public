@@ -5,6 +5,7 @@ import { copy } from '../../../copy'
 import itemCatalog from '../../../data/skland-items.json'
 import { matchesSearch } from '../../../lib/search'
 import { Notice } from '../components/WorkspaceUI'
+import './skland-game.css'
 
 const text = copy.skland
 const catalog: Record<string, { name: string; icon?: string; group: string; sort: number }> = itemCatalog
@@ -24,15 +25,15 @@ export default function SklandBackpack({ items, names, userId, uid }: {
       || (names[left] ?? catalog[left]?.name ?? '').localeCompare(names[right] ?? catalog[right]?.name ?? '', 'zh-CN', { numeric: true }))
   return <>
     <ManualResources key={JSON.stringify([userId, uid])} userId={userId} uid={uid} items={items} />
-    {!items ? <Notice>{text.noInventory}</Notice> : <section className="v2-panel min-w-0 p-5 sm:p-6">
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-3"><label className="v2-field min-w-0 w-full sm:w-auto sm:flex-1 sm:max-w-sm"><span>{text.search}</span><input type="search" className="v2-input" value={search} onChange={(event) => setSearch(event.target.value)} /></label><span className="text-sm text-ink-secondary">{text.itemCount(visible.length)}</span></div>
-      <div className="space-y-6">{groups.map((group) => {
+    {!items ? <Notice>{text.noInventory}</Notice> : <section className="v2-panel skland-backpack">
+      <div className="skland-backpack-toolbar"><label className="v2-field"><span>{text.search}</span><input type="search" className="v2-input" value={search} onChange={(event) => setSearch(event.target.value)} /></label><span>{text.itemCount(visible.length)}</span></div>
+      <div className="skland-item-groups">{groups.map((group) => {
         const entries = visible.filter(([id]) => (catalog[id]?.group ?? 'other') === group)
         return entries.length > 0 && <section key={group} aria-label={text.itemGroups[group]}>
-          <h2 className="mb-3 border-b border-surface-3 pb-3 font-semibold">{text.itemGroups[group]}</h2>
-          <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{entries.map(([id, count]) => <div key={id} className="tool-inset flex min-w-0 items-center gap-3 p-3">
-            <dt className="flex min-w-0 flex-1 items-center gap-3 text-sm"><ItemArt id={id} /><span className="min-w-0 break-words">{names[id] ?? catalog[id]?.name ?? text.unnamedItem}</span></dt>
-            <dd className="shrink-0 font-semibold tabular-nums">{count.toLocaleString('zh-CN')}</dd>
+          <h2>{text.itemGroups[group]}</h2>
+          <dl className="skland-item-grid">{entries.map(([id, count]) => <div key={id} className="skland-backpack-item">
+            <dt><ItemArt id={id} /><span>{names[id] ?? catalog[id]?.name ?? text.unnamedItem}</span></dt>
+            <dd>{count.toLocaleString('zh-CN')}</dd>
           </div>)}</dl>
         </section>
       })}</div>
@@ -44,8 +45,8 @@ export default function SklandBackpack({ items, names, userId, uid }: {
 function ItemArt({ id }: { id: string }) {
   const icon = catalog[id]?.icon
   const [failed, setFailed] = useState(false)
-  return <span className="grid size-12 shrink-0 place-items-center" aria-hidden="true">
-    {icon && !failed ? <img src={`/item-icons/${encodeURIComponent(icon)}.png`} alt="" width={48} height={48} className="size-12 object-contain" loading="lazy" onError={() => setFailed(true)} />
+  return <span className="skland-item-art" aria-hidden="true">
+    {icon && !failed ? <img src={`/item-icons/${encodeURIComponent(icon)}.png`} alt="" width={48} height={48} loading="lazy" onError={() => setFailed(true)} />
       : <MaterialIcon size={28} className="text-ink-muted" />}
   </span>
 }
@@ -73,19 +74,21 @@ function ManualResources({ userId, uid, items }: { userId: string; uid: string; 
       setNotice(text.manualSaved)
     } catch { setFailed(true); setNotice(text.manualSaveFailed) }
   }
-  return <section className="v2-panel min-w-0 p-5 sm:p-6" aria-labelledby="skland-manual-resources">
-    <h2 id="skland-manual-resources" className="mb-2 font-semibold">{text.manualResources}</h2>
-    <p className="text-sm leading-6 text-ink-secondary">{text.inventoryHelp}</p>
-    <form className="mt-5" onSubmit={save}>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{missing.map((id) => <label key={id} className="tool-inset flex min-w-0 items-center gap-3 p-3">
-        <ItemArt id={id} /><span className="v2-field min-w-0 flex-1"><span>{catalog[id].name}</span>
-          <input type="number" inputMode="numeric" min="0" max="1000000000000" step="1" className="v2-input tabular-nums" placeholder={text.notRecorded} value={values[id] ?? ''}
-            onChange={(event) => { setValues({ ...values, [id]: event.target.value }); setNotice('') }} />
-        </span>
-      </label>)}</div>
-      <div className="mt-4 flex flex-wrap items-center gap-4"><button type="submit" className="v2-button v2-button-secondary">{text.saveResources}</button>
-        {notice && <p role={failed ? 'alert' : 'status'} className={`text-sm ${failed ? 'text-error' : 'text-ink-secondary'}`}>{notice}</p>}
-      </div>
-    </form>
+  return <section className="v2-panel skland-manual-resources" aria-labelledby="skland-manual-resources">
+    <details open={Boolean(initial.error) || undefined}>
+      <summary><h2 id="skland-manual-resources">{text.manualResources}</h2></summary>
+      <p className="text-sm leading-6 text-ink-secondary">{text.inventoryHelp}</p>
+      <form onSubmit={save}>
+        <div className="skland-manual-grid">{missing.map((id) => <label key={id} className="skland-manual-item">
+          <ItemArt id={id} /><span className="v2-field min-w-0 flex-1"><span>{catalog[id].name}</span>
+            <input type="number" inputMode="numeric" min="0" max="1000000000000" step="1" className="v2-input tabular-nums" placeholder={text.notRecorded} value={values[id] ?? ''}
+              onChange={(event) => { setValues({ ...values, [id]: event.target.value }); setNotice('') }} />
+          </span>
+        </label>)}</div>
+        <div className="mt-4 flex flex-wrap items-center gap-4"><button type="submit" className="v2-button v2-button-secondary">{text.saveResources}</button>
+          {notice && <p role={failed ? 'alert' : 'status'} className={`text-sm ${failed ? 'text-error' : 'text-ink-secondary'}`}>{notice}</p>}
+        </div>
+      </form>
+    </details>
   </section>
 }
