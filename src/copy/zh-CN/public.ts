@@ -544,7 +544,7 @@ export const publicCopy = {
     share_preview: '查看完整商品图',
     qr_code: '购买二维码',
     share_help: '打开原图后长按或保存，在闲鱼中识别。',
-    qr_help: '闲鱼或微信扫码购买；闲鱼仅支持支付宝，微信扫码可用微信支付。',
+    qr_help: '闲鱼或微信扫码购买',
     qr_download: '保存二维码',
     qr_loading: '正在生成二维码…',
     qr_failed: '二维码暂时无法生成，可直接打开商品链接购买。',
