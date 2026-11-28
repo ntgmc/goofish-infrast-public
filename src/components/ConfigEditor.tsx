@@ -336,7 +336,7 @@ export default function ConfigEditor({
         {!sklandAuthorizationMessage && <button type="button" className="tool-secondary-action min-h-11 px-4 config-skland-trigger" disabled={readOnly || (!guideSklandImport && importing)}
           aria-busy={importing} aria-disabled={guideSklandImport && importing ? true : undefined} aria-describedby={guideSklandImport ? importMessageId : undefined}
           onClick={() => void importSklandConfig()}><SklandIcon />{importing ? copy.skland.importingConfig : guideSklandImport && imported ? text.reimportConfig : copy.skland.importConfig}</button>}
-        {sklandActions && <div className="v2-actions">{sklandActions}</div>}
+        {sklandActions && <div className="v2-actions config-skland-actions">{sklandActions}</div>}
         <p id={importMessageId} className={guideSklandImport && (importFeedback || sklandAuthorizationMessage) ? 'sr-only' : 'config-help config-skland-help'}>{guideSklandImport ? copy.skland.configReview.importHelp : copy.skland.importConfigHelp}</p>
         {guideSklandImport && <div className={importFeedback || sklandAuthorizationMessage ? 'config-skland-feedback' : 'sr-only'} data-kind={importError ? 'error' : imported?.previousDataTime ? 'previous' : imported ? 'success' : undefined}>
           <div role="status" aria-atomic="true" className="config-skland-message">
