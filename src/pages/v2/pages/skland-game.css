@@ -94,7 +94,7 @@
   --base-line: var(--color-v2-rail-line);
   --base-surface: var(--color-v2-rail);
   --base-tone: var(--base-ink);
-  container-type: inline-size;
+  container: skland-base / inline-size;
   gap: var(--space-2xs);
 }
 .skland-base-status { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs) var(--space-md); font-size: var(--text-sm); }
@@ -102,17 +102,17 @@
 .skland-base-status dt { color: var(--v2-secondary); }
 .skland-base-status dd { font-weight: 650; }
 .skland-base-status [data-tired="true"] dd { color: var(--color-v2-error); }
-.skland-base-map, .skland-base-production, .skland-base-support { display: grid; align-content: start; gap: var(--space-2xs); min-width: 0; }
-.skland-base-map > :only-child { grid-column: 1 / -1; }
+.skland-base-map { display: grid; align-content: start; gap: var(--space-2xs); min-width: 0; }
 .skland-infrastructure .skland-room {
   position: relative;
   isolation: isolate;
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   gap: var(--space-2xs);
   min-width: 0;
-  min-height: 10rem;
-  padding: 0.625rem;
+  min-height: 8rem;
+  padding: clamp(0.375rem, 0.7cqi, 0.625rem);
   border: 1px solid var(--base-line);
   background: var(--base-surface);
   background-image: repeating-linear-gradient(135deg, transparent 0 23px, color-mix(in oklab, var(--base-ink) 2%, transparent) 23px 24px);
@@ -123,35 +123,38 @@
 .skland-room[data-tone="power"] { --base-tone: color-mix(in oklab, var(--station-power) 60%, var(--base-ink)); }
 .skland-room[data-tone="dormitory"] { --base-tone: color-mix(in oklab, var(--station-power) 65%, var(--base-ink)); }
 .skland-room-watermark { position: absolute; bottom: 0; right: 0; z-index: -1; opacity: .045; pointer-events: none; }
-.skland-room-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3xs) var(--space-2xs); min-width: 0; }
-.skland-room-identity { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2xs); min-width: 0; padding-left: var(--space-2xs); border-left: 4px solid var(--base-tone); }
-.skland-room-heading h3 { font-size: var(--text-sm); font-weight: 650; line-height: 1.4; }
-.skland-room-level { display: inline-flex; align-items: center; gap: 2px; height: 14px; color: var(--base-tone); }
-.skland-room-level i { width: 6px; height: 10px; background: currentColor; clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); }
-.skland-room-product { display: flex; align-items: center; gap: var(--space-3xs); min-width: 0; max-width: 100%; color: var(--base-tone); font-size: var(--text-xs); }
-.skland-room-product img { flex: none; width: 22px; height: 22px; object-fit: contain; }
+.skland-room-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3xs); min-width: 0; }
+.skland-room-identity { display: flex; flex-wrap: wrap; align-items: center; gap: clamp(0.125rem, 1.5cqi, 0.5rem); min-width: 0; padding-left: var(--space-2xs); border-left: 4px solid var(--base-tone); }
+.skland-room-heading h3 { font-size: clamp(0.6875rem, 6cqi, var(--text-sm)); font-weight: 650; line-height: 1.4; }
+.skland-room-level { display: inline-flex; align-items: center; gap: clamp(1px, 0.75cqi, 2px); height: 14px; color: var(--base-tone); }
+.skland-room-level i { width: clamp(4px, 2.5cqi, 6px); height: clamp(8px, 5cqi, 10px); background: currentColor; clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); }
+.skland-room-product { display: flex; align-items: center; gap: var(--space-3xs); min-width: 0; max-width: 100%; color: var(--base-tone); font-size: clamp(0.625rem, 5.6cqi, var(--text-xs)); }
+.skland-room-product img { flex: none; width: clamp(1rem, 9cqi, 1.375rem); height: clamp(1rem, 9cqi, 1.375rem); object-fit: contain; }
 .skland-room-product strong { font-weight: 600; }
 .skland-room-comfort { color: var(--base-muted); font-size: var(--text-xs); }
-.skland-room .skland-residents { display: grid; grid-template-columns: repeat(auto-fill, 4.5rem); justify-content: start; gap: var(--space-2xs); }
-.skland-room .skland-resident { gap: var(--space-3xs); }
-.skland-room .skland-portrait { width: 4.5rem; height: 4.5rem; border: 1px solid var(--base-line); background: var(--color-v2-rail-hover); }
+.skland-room .skland-residents { display: grid; grid-template-columns: repeat(auto-fill, minmax(3.5rem, 1fr)); max-width: calc(var(--resident-count) * 4rem); justify-content: start; gap: var(--space-3xs); }
+.skland-room .skland-resident { container-type: inline-size; gap: var(--space-3xs); }
+.skland-room .skland-portrait-frame { display: grid; justify-items: center; gap: var(--space-3xs); }
+.skland-room .skland-portrait { width: clamp(2.25rem, 85cqi, 3rem); height: clamp(2.25rem, 85cqi, 3rem); border: 1px solid var(--base-line); background: var(--color-v2-rail-hover); }
 .skland-room .skland-portrait > span { color: var(--base-ink); }
-.skland-room .skland-resident-name strong { font-size: var(--text-sm); font-weight: 500; }
-.skland-room .skland-resident-name small { color: var(--base-muted); }
-.skland-morale-overlay { position: absolute; bottom: 1px; left: 1px; right: 1px; display: flex; justify-content: center; align-items: center; gap: var(--space-3xs); padding: 1px 2px; color: var(--base-ink); background: color-mix(in oklab, var(--base-surface) 92%, transparent); font: 600 var(--text-xs) / 1.35 var(--font-mono); }
-.skland-morale-overlay > svg { flex: none; color: var(--color-v2-rail-accent); }
-.skland-room [data-tired="true"] .skland-morale-overlay { color: var(--base-ink); background: color-mix(in oklab, var(--color-negative) 45%, var(--base-surface)); }
-.skland-room [data-tired="true"] .skland-morale-overlay > svg { color: inherit; }
+.skland-room .skland-resident-name strong { font-size: clamp(0.625rem, 19.5cqi, var(--text-xs)); font-weight: 500; }
+.skland-room .skland-resident-name small { color: var(--base-muted); font-size: clamp(0.625rem, 20cqi, var(--text-xs)); }
+.skland-resident-morale { display: flex; justify-content: center; align-items: center; gap: 0.125rem; color: var(--base-muted); font: 600 clamp(0.625rem, 20cqi, var(--text-xs)) / 1.35 var(--font-mono); }
+.skland-resident-morale > svg { flex: none; width: 1em; height: 1em; }
+.skland-room [data-tired="true"] .skland-resident-morale { color: color-mix(in oklab, var(--color-negative) 55%, var(--base-ink)); }
 .skland-room .skland-room-empty { color: var(--base-muted); font-size: var(--text-sm); padding-block: var(--space-sm); }
 .skland-room-footer { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-3xs) var(--space-2xs); margin-top: auto; padding-top: var(--space-3xs); border-top: 1px solid var(--base-line); color: var(--base-muted); font-size: var(--text-xs); line-height: 1.6; font-variant-numeric: tabular-nums; }
 .skland-room-footer b, .skland-room-footer time { color: var(--base-ink); font-weight: 600; }
 .skland-room-position { margin-left: auto; color: var(--base-muted); font: 400 var(--text-xs) / 1.6 var(--font-mono); }
-@container (min-width: 36rem) {
-  .skland-base-production, .skland-base-support { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .skland-room:is([data-tone="control"], [data-tone="dormitory"]) { grid-column: 1 / -1; }
+@container skland-base (min-width: 36rem) {
+  .skland-base-map { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .skland-room:is([data-tone="control"], [data-tone="dormitory"], [data-tone="meeting"], [data-tone="hire"], [data-tone="training"]) { grid-column: 1 / -1; }
 }
-@container (min-width: 64rem) {
-  .skland-base-map { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
+@container skland-base (min-width: 64rem) {
+  .skland-base-map { grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.6fr) minmax(0, 1fr); }
+  .skland-base-map > .skland-room { grid-row: var(--room-row, auto); grid-column: var(--room-column, auto); }
+  .skland-base-map > .skland-room[data-tone="control"] { grid-column: 3 / 5; }
+  .skland-room .skland-residents { grid-template-columns: repeat(var(--resident-count), minmax(0, 1fr)); }
 }
 .skland-profile .skland-portrait { border-color: var(--color-v2-rail-line); border-bottom-color: var(--color-v2-rail-accent); background: var(--color-v2-rail-hover); }
 .skland-profile .skland-morale { color: var(--color-v2-rail-muted); }
